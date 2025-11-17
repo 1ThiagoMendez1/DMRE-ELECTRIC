@@ -29,7 +29,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <SidebarHeader>
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center gap-2 text-xl font-bold font-headline text-glow-primary">
-                <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" width={40} height={40} className="h-10 w-10" />
+                <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" width={48} height={48} className="h-12 w-12" />
                 <span className="group-data-[collapsible=icon]:hidden">D.M.R.E</span>
             </Link>
             <div className="flex-1" />

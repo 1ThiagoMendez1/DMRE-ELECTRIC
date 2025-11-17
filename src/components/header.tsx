@@ -32,7 +32,7 @@ export function Header() {
     >
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 text-2xl font-bold font-headline text-glow-primary">
-          <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" width={56} height={56} className="h-14 w-14" />
+          <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" width={64} height={64} className="h-16 w-16" />
           <span className="hidden sm:inline">D.M.R.E</span>
         </Link>
         <nav className="hidden md:flex items-center gap-6">
