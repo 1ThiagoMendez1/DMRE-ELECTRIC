@@ -17,7 +17,7 @@ export default function LoginPage() {
       <Card className="mx-auto max-w-sm w-full border-border/50 bg-card/50 backdrop-blur-sm">
         <CardHeader className="text-center">
           <Link href="/" className="flex items-center justify-center gap-2 text-2xl font-bold font-headline text-glow-primary mb-2">
-            <Image src="https://i.ibb.co/Wc6S6q4/logo.png" alt="D.M.R.E Logo" width={56} height={56} className="h-14 w-14" />
+            <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" width={56} height={56} className="h-14 w-14" />
             <span>D.M.R.E</span>
           </Link>
           <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
