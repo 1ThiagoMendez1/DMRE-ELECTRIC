@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { mockWorkCodes } from "@/lib/data";
-import { MoreVertical, Pencil, Plus, Trash2, Eye } from "lucide-react";
+import { MoreVertical, Pencil, Plus, Trash2, Eye, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -16,24 +16,38 @@ import { Textarea } from "@/components/ui/textarea";
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
 function WorkCodeForm({ onSave, code, onCancel }: { onSave: (data: any) => void; code?: any, onCancel: () => void }) {
+    const [materials, setMaterials] = useState(code?.materials || []);
+
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         const data = Object.fromEntries(formData.entries());
-        onSave(data);
+        // Aquí se deberían procesar los materiales también
+        onSave({ ...data, materials });
     };
 
-    // TODO: Implementar la lógica para añadir/editar/eliminar materiales asociados
+    const addMaterial = () => {
+        setMaterials([...materials, { id: `mat-${Date.now()}`, name: '', quantity: 1, unitValue: 0 }]);
+    };
+
+    const removeMaterial = (id: string) => {
+        setMaterials(materials.filter((m: any) => m.id !== id));
+    };
+
+    const handleMaterialChange = (id: string, field: string, value: string | number) => {
+        setMaterials(materials.map((m: any) => (m.id === id ? { ...m, [field]: value } : m)));
+    };
+
     return (
         <form onSubmit={handleSubmit}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{code ? 'Editar Código de Trabajo' : 'Crear Nuevo Código de Trabajo'}</DialogTitle>
                     <DialogDescription>
                         Define un nuevo código para estandarizar trabajos en las cotizaciones.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="name" className="text-right">Nombre</Label>
                         <Input id="name" name="name" defaultValue={code?.name} className="col-span-3" />
@@ -47,11 +61,69 @@ function WorkCodeForm({ onSave, code, onCancel }: { onSave: (data: any) => void;
                         <Input id="labor" name="labor" type="number" placeholder="Opcional" defaultValue={code?.labor} className="col-span-3" />
                     </div>
                     
-                    {/* Sección de materiales (a implementar) */}
-                    <div>
+                    {/* Sección de materiales */}
+                    <div className="space-y-4">
                         <Label>Materiales Asociados</Label>
-                        <Card className="mt-2 bg-secondary/30 p-4 text-center text-muted-foreground">
-                            <p className="text-sm">La funcionalidad para agregar materiales se implementará próximamente.</p>
+                        <Card className="bg-secondary/30">
+                            <CardContent className="p-4">
+                                {materials.length > 0 ? (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Nombre</TableHead>
+                                                <TableHead className="w-[100px]">Cantidad</TableHead>
+                                                <TableHead className="w-[150px]">Valor Unit.</TableHead>
+                                                <TableHead className="w-[150px] text-right">Total</TableHead>
+                                                <TableHead className="w-[50px]"></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {materials.map((material: any) => {
+                                                const total = (material.quantity || 0) * (material.unitValue || 0);
+                                                return (
+                                                    <TableRow key={material.id}>
+                                                        <TableCell>
+                                                            <Input 
+                                                                placeholder="Nombre del material" 
+                                                                value={material.name}
+                                                                onChange={(e) => handleMaterialChange(material.id, 'name', e.target.value)}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Input 
+                                                                type="number" 
+                                                                value={material.quantity} 
+                                                                className="w-full text-center"
+                                                                onChange={(e) => handleMaterialChange(material.id, 'quantity', parseFloat(e.target.value))}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                             <Input 
+                                                                type="number" 
+                                                                value={material.unitValue} 
+                                                                className="w-full text-right"
+                                                                onChange={(e) => handleMaterialChange(material.id, 'unitValue', parseFloat(e.target.value))}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono">{formatCurrency(total)}</TableCell>
+                                                        <TableCell>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMaterial(material.id)}>
+                                                                <Trash2 className="h-4 w-4"/>
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                ) : (
+                                    <div className="text-center text-muted-foreground p-4">Aún no se han añadido materiales.</div>
+                                )}
+                                 <Button type="button" variant="outline" className="w-full mt-4" onClick={addMaterial}>
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Añadir Material
+                                </Button>
+                            </CardContent>
                         </Card>
                     </div>
 
