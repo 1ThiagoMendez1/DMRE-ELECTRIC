@@ -26,7 +26,7 @@ export default function Home() {
         <AnimatedBackground />
         <div className="z-10 flex flex-col items-center p-4">
           <h1 className="text-5xl md:text-7xl font-bold text-glow-primary tracking-tighter mb-4 font-headline">
-            Ingeniería de Inteligencia Eléctrica
+            Diseño y montaje de redes electricas
           </h1>
           <p className="text-lg md:text-xl text-primary/80 max-w-3xl mx-auto mb-8">
             Pioneros en el futuro de la energía con soluciones eléctricas impulsadas por IA, desde redes inteligentes hasta cableado estructurado avanzado.
