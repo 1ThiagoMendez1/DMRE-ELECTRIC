@@ -6,10 +6,10 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 const navLinks = [
-  { name: 'About', href: '#about' },
-  { name: 'Services', href: '#services' },
-  { name: 'Projects', href: '#projects' },
-  { name: 'Contact', href: '#contact' },
+  { name: 'Sobre Nosotros', href: '#about' },
+  { name: 'Servicios', href: '#services' },
+  { name: 'Proyectos', href: '#projects' },
+  { name: 'Contacto', href: '#contact' },
 ];
 
 export function Header() {
@@ -33,7 +33,7 @@ export function Header() {
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 text-2xl font-bold font-headline text-glow-primary">
           <Zap className="h-7 w-7 text-primary" />
-          <span>VoltAI</span>
+          <span>D.M.R.E</span>
         </Link>
         <nav className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => (

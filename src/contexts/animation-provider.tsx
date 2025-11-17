@@ -13,7 +13,7 @@ type AnimationContextType = {
 const AnimationContext = createContext<AnimationContextType | null>(null);
 
 export function AnimationProvider({ children }: { children: ReactNode }) {
-  const [animationConfig, setAnimationConfig] = useState({ intensity: 50, reasoning: 'Initializing...' });
+  const [animationConfig, setAnimationConfig] = useState({ intensity: 50, reasoning: 'Inicializando...' });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function AnimationProvider({ children }: { children: ReactNode }) {
           setAnimationConfig({ intensity: result.animationIntensity, reasoning: result.reasoning });
           
           if (toastId) {
-             // If there's an existing toast, dismiss it before showing a new one
+             // Si hay una notificación existente, descártala antes de mostrar una nueva
              const { dismiss } = useToast();
              dismiss(toastId);
           }
@@ -36,13 +36,13 @@ export function AnimationProvider({ children }: { children: ReactNode }) {
             title: (
               <div className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-primary" />
-                <span className="font-bold">AI Animation Control</span>
+                <span className="font-bold">Control de Animación IA</span>
               </div>
             ),
             description: (
               <div>
                 <p>{result.reasoning}</p>
-                <p className="font-medium mt-1">Intensity set to: <span className="text-accent font-bold">{result.animationIntensity.toFixed(0)}%</span></p>
+                <p className="font-medium mt-1">Intensidad ajustada a: <span className="text-accent font-bold">{result.animationIntensity.toFixed(0)}%</span></p>
               </div>
             ),
             duration: 5000,
@@ -50,17 +50,17 @@ export function AnimationProvider({ children }: { children: ReactNode }) {
           toastId = id;
         }
       } catch (error) {
-         console.error("Failed to fetch animation intensity", error);
+         console.error("No se pudo obtener la intensidad de la animación", error);
          if (isMounted) {
-             setAnimationConfig({ intensity: 30, reasoning: 'Fell back to default due to an error.' });
+             setAnimationConfig({ intensity: 30, reasoning: 'Se volvió al valor predeterminado debido a un error.' });
          }
       }
     };
 
-    // Initial fetch
+    // Búsqueda inicial
     fetchIntensity();
 
-    // Refresh every 30 seconds
+    // Actualizar cada 30 segundos
     const interval = setInterval(fetchIntensity, 30000);
 
     return () => {
@@ -79,8 +79,8 @@ export function AnimationProvider({ children }: { children: ReactNode }) {
 export const useAnimation = () => {
   const context = useContext(AnimationContext);
   if (!context) {
-    // Fallback for server components or parts of the app outside the provider
-    return { intensity: 50, reasoning: 'Default value used outside of provider.' };
+    // Respaldo para componentes de servidor o partes de la aplicación fuera del proveedor
+    return { intensity: 50, reasoning: 'Valor predeterminado utilizado fuera del proveedor.' };
   }
   return context;
 };

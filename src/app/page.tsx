@@ -25,39 +25,39 @@ import { deleteProjectAction, uploadProjectAction } from './actions';
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
-      {/* Hero Section */}
+      {/* Sección Héroe */}
       <section id="home" className="relative h-screen flex items-center justify-center text-center overflow-hidden">
         <AnimatedBackground />
         <div className="z-10 flex flex-col items-center p-4">
           <h1 className="text-5xl md:text-7xl font-bold text-glow-primary tracking-tighter mb-4 font-headline">
-            Electric Intelligence Engineering
+            Ingeniería de Inteligencia Eléctrica
           </h1>
           <p className="text-lg md:text-xl text-primary/80 max-w-3xl mx-auto mb-8">
-            Pioneering the future of energy with AI-driven electrical solutions, from intelligent grids to advanced structured cabling.
+            Pioneros en el futuro de la energía con soluciones eléctricas impulsadas por IA, desde redes inteligentes hasta cableado estructurado avanzado.
           </p>
           <Button size="lg" className="electric-button font-bold text-lg px-8 py-6">
-            Explore Our Services <MoveRight className="ml-2 h-5 w-5" />
+            Explora Nuestros Servicios <MoveRight className="ml-2 h-5 w-5" />
           </Button>
         </div>
       </section>
 
-      {/* About Us Section */}
+      {/* Sección Sobre Nosotros */}
       <section id="about" className="py-20 lg:py-32 bg-background">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-4xl font-bold text-primary mb-4 font-headline">Fusing Electricity with Intelligence</h2>
+              <h2 className="text-4xl font-bold text-primary mb-4 font-headline">Fusionando Electricidad con Inteligencia</h2>
               <p className="text-lg text-foreground/80 mb-4">
-                At VoltAI, we are more than just electrical engineers. We are innovators and architects of the future, dedicated to integrating cutting-edge artificial intelligence with foundational electrical systems. Our expertise spans complex electrical installations, robust structured cabling, and the design of resilient power grids.
+                En D.M.R.E, somos más que ingenieros eléctricos. Somos innovadores y arquitectos del futuro, dedicados a integrar la inteligencia artificial de vanguardia con los sistemas eléctricos fundamentales. Nuestra experiencia abarca instalaciones eléctricas complejas, cableado estructurado robusto y el diseño de redes eléctricas resilientes.
               </p>
               <p className="text-lg text-foreground/80">
-                We believe in creating sustainable, efficient, and intelligent infrastructures that power tomorrow's world. Our team's deep knowledge in applied engineering ensures every project is a benchmark in quality and forward-thinking design.
+                Creemos en la creación de infraestructuras sostenibles, eficientes e inteligentes que impulsen el mundo del mañana. El profundo conocimiento de nuestro equipo en ingeniería aplicada garantiza que cada proyecto sea un referente de calidad y diseño vanguardista.
               </p>
             </div>
             <div className="relative h-80 w-full">
               <Image
                 src={getPlaceholderImage('about-us-image')?.imageUrl || ''}
-                alt="Futuristic electrical grid"
+                alt="Red eléctrica futurista"
                 fill
                 className="object-cover rounded-lg shadow-2xl shadow-primary/20"
                 data-ai-hint="electrical grid"
@@ -67,12 +67,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Services Section */}
+      {/* Sección de Servicios */}
       <section id="services" className="py-20 lg:py-32 bg-secondary/30">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold text-primary mb-2 font-headline">Our Expertise</h2>
+          <h2 className="text-4xl font-bold text-primary mb-2 font-headline">Nuestra Experiencia</h2>
           <p className="text-lg text-foreground/80 mb-12 max-w-2xl mx-auto">
-            We provide a comprehensive suite of services to power your vision, from initial design to long-term maintenance.
+            Ofrecemos un conjunto completo de servicios para potenciar tu visión, desde el diseño inicial hasta el mantenimiento a largo plazo.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {services.map((service, index) => (
@@ -92,14 +92,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Projects Section */}
+      {/* Sección de Proyectos */}
       <section id="projects" className="py-20 lg:py-32">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center mb-12">
             <div>
-              <h2 className="text-4xl font-bold text-primary mb-2 font-headline">Project Showcase</h2>
+              <h2 className="text-4xl font-bold text-primary mb-2 font-headline">Vitrina de Proyectos</h2>
               <p className="text-lg text-foreground/80 max-w-2xl">
-                A glimpse into our portfolio of successfully executed next-generation projects.
+                Un vistazo a nuestra cartera de proyectos de próxima generación ejecutados con éxito.
               </p>
             </div>
             <form action={uploadProjectAction}>
@@ -108,11 +108,11 @@ export default function Home() {
                   <TooltipTrigger asChild>
                     <Button type="submit" className="bg-accent/80 hover:bg-accent text-accent-foreground font-bold">
                       <Upload className="mr-2 h-4 w-4" />
-                      Upload Project
+                      Subir Proyecto
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Admin only: Upload a new project.</p>
+                    <p>Solo admin: Subir un nuevo proyecto.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -145,7 +145,7 @@ export default function Home() {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Admin only: Delete project.</p>
+                          <p>Solo admin: Eliminar proyecto.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -157,39 +157,39 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Contact Section */}
+      {/* Sección de Contacto */}
       <section id="contact" className="py-20 lg:py-32 bg-secondary/30">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div>
-              <h2 className="text-4xl font-bold text-primary mb-4 font-headline">Connect With Us</h2>
+              <h2 className="text-4xl font-bold text-primary mb-4 font-headline">Conecta con Nosotros</h2>
               <p className="text-lg text-foreground/80 mb-8">
-                Have a project in mind or need expert consultation? Reach out and let's build the future together.
+                ¿Tienes un proyecto en mente o necesitas una consulta de expertos? Contáctanos y construyamos el futuro juntos.
               </p>
               <form className="space-y-6">
                 <Input
                   type="text"
-                  placeholder="Your Name"
+                  placeholder="Tu Nombre"
                   className="bg-background/50 text-lg p-6 focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
                 />
                 <Input
                   type="email"
-                  placeholder="Your Email"
+                  placeholder="Tu Email"
                   className="bg-background/50 text-lg p-6 focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
                 />
                 <Textarea
-                  placeholder="Your Message"
+                  placeholder="Tu Mensaje"
                   className="bg-background/50 text-lg p-6 min-h-[150px] focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
                 />
                 <Button type="submit" size="lg" className="w-full electric-button font-bold text-lg p-6 bg-primary text-primary-foreground hover:text-primary-foreground">
-                  Send Message
+                  Enviar Mensaje
                 </Button>
               </form>
             </div>
             <div className="relative h-96 md:h-full w-full mt-8 md:mt-0">
                <Image
                 src={getPlaceholderImage('contact-map')?.imageUrl || ''}
-                alt="Stylized map"
+                alt="Mapa estilizado"
                 fill
                 className="object-cover rounded-lg"
                 style={{

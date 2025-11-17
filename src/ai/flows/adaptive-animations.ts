@@ -1,11 +1,10 @@
-// src/ai/flows/adaptive-animations.ts
 'use server';
 /**
- * @fileOverview A flow that controls website animations based on server load.
+ * @fileOverview Un flujo que controla las animaciones del sitio web según la carga del servidor.
  *
- * - adaptAnimations - A function that adjusts animation intensity based on server load.
- * - AdaptAnimationsInput - The input type for the adaptAnimations function.
- * - AdaptAnimationsOutput - The return type for the adaptAnimations function.
+ * - adaptAnimations - Una función que ajusta la intensidad de la animación según la carga del servidor.
+ * - AdaptAnimationsInput - El tipo de entrada para la función adaptAnimations.
+ * - AdaptAnimationsOutput - El tipo de retorno para la función adaptAnimations.
  */
 
 import {ai} from '@/ai/genkit';
@@ -14,17 +13,17 @@ import {z} from 'genkit';
 const AdaptAnimationsInputSchema = z.object({
   serverLoad: z
     .number()
-    .describe("The current server load, as a percentage (0-100)."),
+    .describe("La carga actual del servidor, como un porcentaje (0-100)."),
 });
 export type AdaptAnimationsInput = z.infer<typeof AdaptAnimationsInputSchema>;
 
 const AdaptAnimationsOutputSchema = z.object({
   animationIntensity: z
     .number()
-    .describe("The suggested animation intensity, as a percentage (0-100)."),
+    .describe("La intensidad de animación sugerida, como un porcentaje (0-100)."),
   reasoning: z
     .string()
-    .describe("The AI's reasoning for the suggested animation intensity."),
+    .describe("El razonamiento de la IA para la intensidad de animación sugerida."),
 });
 export type AdaptAnimationsOutput = z.infer<typeof AdaptAnimationsOutputSchema>;
 
@@ -36,21 +35,21 @@ const prompt = ai.definePrompt({
   name: 'adaptAnimationsPrompt',
   input: {schema: AdaptAnimationsInputSchema},
   output: {schema: AdaptAnimationsOutputSchema},
-  prompt: `You are an AI assistant that dynamically adjusts the animation intensity of a website based on the current server load.
+  prompt: `Eres un asistente de IA que ajusta dinámicamente la intensidad de la animación de un sitio web en función de la carga actual del servidor.
 
-  The goal is to enhance the user experience by increasing animations during idle periods and reducing them during high load to maintain performance.
+  El objetivo es mejorar la experiencia del usuario aumentando las animaciones durante los períodos de inactividad y reduciéndolas durante la alta carga para mantener el rendimiento.
 
-  Current Server Load: {{serverLoad}}%
+  Carga actual del servidor: {{serverLoad}}%
 
-  Instructions:
-  1. Analyze the current server load.
-  2. Determine the appropriate animation intensity (0-100%).
-  3. Provide a brief reasoning for your decision.
+  Instrucciones:
+  1. Analiza la carga actual del servidor.
+  2. Determina la intensidad de animación apropiada (0-100%).
+  3. Proporciona un breve razonamiento para tu decisión.
 
-  Output:
-  - animationIntensity: The suggested animation intensity as a percentage (0-100).
-  - reasoning: A brief explanation of why this intensity level was chosen, considering server load and user experience.
-  Output in JSON format.
+  Salida:
+  - animationIntensity: La intensidad de animación sugerida como un porcentaje (0-100).
+  - reasoning: Una breve explicación de por qué se eligió este nivel de intensidad, considerando la carga del servidor y la experiencia del usuario.
+  Salida en formato JSON.
   `,
 });
 
