@@ -14,10 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AnimatedBackground } from '@/components/animated-background';
 import { LogIn, MoveRight } from 'lucide-react';
+import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
 
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
+      <Header />
       {/* Sección Héroe */}
       <section id="home" className="relative h-screen flex items-center justify-center text-center overflow-hidden">
         <AnimatedBackground />
@@ -167,6 +170,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 }
