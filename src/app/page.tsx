@@ -37,11 +37,6 @@ export default function Home() {
                 Explora Nuestros Servicios <MoveRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button size="lg" asChild variant="outline" className="font-bold text-lg px-8 py-6 border-accent text-accent hover:bg-accent/10 hover:text-accent">
-               <Link href="/dashboard">
-                <LogIn className="mr-2 h-5 w-5" /> Portal de Cliente
-              </Link>
-            </Button>
           </div>
         </div>
       </section>
