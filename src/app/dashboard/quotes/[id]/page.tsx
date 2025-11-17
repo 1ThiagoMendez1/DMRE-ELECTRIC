@@ -1,4 +1,6 @@
 
+'use client';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,9 +33,13 @@ export default function QuoteDetailsPage({ params }: { params: { id: string }}) 
     const subtotal = quote.total / 1.19;
     const iva = quote.total - subtotal;
 
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 print:hidden">
                  <Button variant="outline" size="icon" asChild>
                     <Link href="/dashboard">
                         <ArrowLeft />
@@ -45,7 +51,7 @@ export default function QuoteDetailsPage({ params }: { params: { id: string }}) 
                 </div>
             </div>
 
-            <Card className="border-border/50">
+            <Card className="border-border/50 print:shadow-none print:border-none">
                 <CardHeader className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <CardTitle>Cliente: {quote.client}</CardTitle>
@@ -118,7 +124,7 @@ export default function QuoteDetailsPage({ params }: { params: { id: string }}) 
                             <span className="font-mono">{formatCurrency(quote.total)}</span>
                         </div>
                     </div>
-                     <Button size="lg" variant="outline" className="w-full max-w-sm mt-4 electric-button">
+                     <Button size="lg" variant="outline" className="w-full max-w-sm mt-4 electric-button print:hidden" onClick={handlePrint}>
                         <FileDown />
                         Exportar a PDF
                     </Button>
