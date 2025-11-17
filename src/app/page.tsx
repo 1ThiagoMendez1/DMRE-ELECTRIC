@@ -32,10 +32,15 @@ export default function Home() {
             Pioneros en el futuro de la energía con soluciones eléctricas impulsadas por IA, desde redes inteligentes hasta cableado estructurado avanzado.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button size="lg" asChild className="electric-button font-bold text-lg px-8 py-6">
+            <Button size="lg" asChild variant="outline" className="electric-button font-bold text-lg px-8 py-6 border-primary text-primary hover:bg-primary/10 hover:text-primary text-glow-primary">
               <Link href="#services">
                 Explora Nuestros Servicios <MoveRight className="ml-2 h-5 w-5" />
               </Link>
+            </Button>
+            <Button size="lg" asChild className="electric-button font-bold text-lg px-8 py-6">
+                <Link href="/login">
+                    <LogIn className="mr-2 h-5 w-5" /> Portal de Cliente
+                </Link>
             </Button>
           </div>
         </div>
