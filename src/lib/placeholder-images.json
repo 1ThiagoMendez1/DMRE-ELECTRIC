@@ -1,3 +1,52 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "project1",
+      "description": "A futuristic data center with glowing blue server racks.",
+      "imageUrl": "https://images.unsplash.com/photo-1683322499436-f4383dd59f5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxkYXRhJTIwY2VudGVyfGVufDB8fHx8MTc2MzMxNTAwOHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "data center"
+    },
+    {
+      "id": "project2",
+      "description": "A smart city grid at night, with lines of light representing data flow.",
+      "imageUrl": "https://images.unsplash.com/photo-1473042904451-00171c69419d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzbWFydCUyMGNpdHl8ZW58MHx8fHwxNzYzMzk0ODMwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "smart city"
+    },
+    {
+      "id": "project3",
+      "description": "An automated factory with robotic arms and conveyor belts.",
+      "imageUrl": "https://images.unsplash.com/photo-1717386255777-ce60792a2a56?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxhdXRvbWF0ZWQlMjBmYWN0b3J5fGVufDB8fHx8MTc2MzM5NzI5NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "automated factory"
+    },
+    {
+      "id": "project4",
+      "description": "A large-scale solar farm under a clear blue sky.",
+      "imageUrl": "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxzb2xhciUyMGZhcm18ZW58MHx8fHwxNzYzMjk0MDA4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "solar farm"
+    },
+    {
+      "id": "project5",
+      "description": "Close-up of complex structured cabling in a network room.",
+      "imageUrl": "https://images.unsplash.com/photo-1681770678332-3a190df72091?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxuZXR3b3JrJTIwY2FibGVzfGVufDB8fHx8MTc2MzM4ODkyNHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "network cables"
+    },
+    {
+      "id": "project6",
+      "description": "An electric vehicle charging station with a futuristic design.",
+      "imageUrl": "https://images.unsplash.com/photo-1692600409678-df2024a29af1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MXwxfHNlYXJjaHwxMHx8ZWxlY3RyaWMlMjB2ZWhpY2xlfGVufDB8fHx8MTc2MzM2ODI4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "electric vehicle"
+    },
+    {
+      "id": "about-us-image",
+      "description": "An abstract image of a glowing blue and green electrical grid network.",
+      "imageUrl": "https://images.unsplash.com/photo-1678295630775-f5b1587cdfef?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxlbGVjdHJpY2FsJTIwZ3JpZHxlbnwwfHx8fDE3NjMzOTcyOTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "electrical grid"
+    },
+    {
+      "id": "contact-map",
+      "description": "A dark, stylized world map with glowing connection points.",
+      "imageUrl": "https://images.unsplash.com/photo-1650526087824-163941841b52?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3b3JsZCUyMG1hcHxlbnwwfHx8fDE3NjMyODMzNzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "world map"
+    }
+  ]
 }
