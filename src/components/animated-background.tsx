@@ -1,18 +1,12 @@
 'use client';
 
-import { useAnimation } from '@/contexts/animation-provider';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 
 export function AnimatedBackground() {
-  const { intensity } = useAnimation();
-  const [animationSpeed, setAnimationSpeed] = useState('1.0');
+  const intensity = 50; // Default intensity
 
   useEffect(() => {
-    // We want higher intensity to mean faster animation (smaller duration)
-    // Intensity is 0-100. Let's map it to a duration multiplier.
-    // A base duration of 4s. At 100 intensity, maybe 2s. At 0, maybe 8s.
-    // Duration = Base - (Intensity/100 * (Base-Min))
     const baseDuration = 4; // seconds
     const minDuration = 2;
     const maxDuration = 8;
