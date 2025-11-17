@@ -1,4 +1,5 @@
-import { Zap, Twitter, Linkedin, Github } from 'lucide-react';
+import { Twitter, Linkedin, Github } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 export function Footer() {
@@ -8,7 +9,7 @@ export function Footer() {
         <div className="grid md:grid-cols-3 gap-8">
           <div className="flex flex-col">
              <Link href="/" className="flex items-center gap-2 text-2xl font-bold font-headline text-glow-primary mb-4">
-              <Zap className="h-7 w-7 text-primary" />
+              <Image src="/logo.png" alt="D.M.R.E Logo" width={56} height={56} className="h-14 w-14" />
               <span>D.M.R.E</span>
             </Link>
             <p className="text-foreground/60 max-w-xs">

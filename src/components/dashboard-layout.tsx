@@ -14,10 +14,11 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
-import { LogOut, Zap } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { dashboardNavItems } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import Image from 'next/image';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,7 +29,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <SidebarHeader>
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center gap-2 text-xl font-bold font-headline text-glow-primary">
-                <Zap className="h-6 w-6 text-primary" />
+                <Image src="/logo.png" alt="D.M.R.E Logo" width={40} height={40} className="h-10 w-10" />
                 <span className="group-data-[collapsible=icon]:hidden">D.M.R.E</span>
             </Link>
             <div className="flex-1" />

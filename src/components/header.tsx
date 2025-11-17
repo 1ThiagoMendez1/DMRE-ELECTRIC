@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Zap } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -32,8 +32,8 @@ export function Header() {
     >
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 text-2xl font-bold font-headline text-glow-primary">
-          <Zap className="h-7 w-7 text-primary" />
-          <span>D.M.R.E</span>
+          <Image src="/logo.png" alt="D.M.R.E Logo" width={56} height={56} className="h-14 w-14" />
+          <span className="hidden sm:inline">D.M.R.E</span>
         </Link>
         <nav className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => (
