@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Card,
   CardContent,
@@ -12,15 +13,7 @@ import { getPlaceholderImage } from '@/lib/placeholder-images';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AnimatedBackground } from '@/components/animated-background';
-import { MoveRight, Trash2, Upload } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { deleteProjectAction, uploadProjectAction } from './actions';
+import { LogIn, MoveRight } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -35,9 +28,18 @@ export default function Home() {
           <p className="text-lg md:text-xl text-primary/80 max-w-3xl mx-auto mb-8">
             Pioneros en el futuro de la energía con soluciones eléctricas impulsadas por IA, desde redes inteligentes hasta cableado estructurado avanzado.
           </p>
-          <Button size="lg" className="electric-button font-bold text-lg px-8 py-6">
-            Explora Nuestros Servicios <MoveRight className="ml-2 h-5 w-5" />
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button size="lg" asChild className="electric-button font-bold text-lg px-8 py-6">
+              <Link href="#services">
+                Explora Nuestros Servicios <MoveRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+            <Button size="lg" asChild variant="outline" className="font-bold text-lg px-8 py-6 border-accent text-accent hover:bg-accent/10 hover:text-accent">
+               <Link href="/dashboard">
+                <LogIn className="mr-2 h-5 w-5" /> Portal de Cliente
+              </Link>
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -95,29 +97,10 @@ export default function Home() {
       {/* Sección de Proyectos */}
       <section id="projects" className="py-20 lg:py-32">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center mb-12">
-            <div>
-              <h2 className="text-4xl font-bold text-primary mb-2 font-headline">Vitrina de Proyectos</h2>
-              <p className="text-lg text-foreground/80 max-w-2xl">
-                Un vistazo a nuestra cartera de proyectos de próxima generación ejecutados con éxito.
-              </p>
-            </div>
-            <form action={uploadProjectAction}>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button type="submit" className="bg-accent/80 hover:bg-accent text-accent-foreground font-bold">
-                      <Upload className="mr-2 h-4 w-4" />
-                      Subir Proyecto
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Solo admin: Subir un nuevo proyecto.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </form>
-          </div>
+          <h2 className="text-4xl font-bold text-primary mb-2 font-headline">Vitrina de Proyectos</h2>
+          <p className="text-lg text-foreground/80 mb-12 max-w-2xl">
+            Un vistazo a nuestra cartera de proyectos de próxima generación ejecutados con éxito.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
               <Card key={project.id} className="group relative overflow-hidden rounded-lg border-border/50 bg-card/50">
@@ -133,23 +116,6 @@ export default function Home() {
                 <div className="absolute bottom-0 left-0 p-6 text-white">
                   <h3 className="text-xl font-bold text-primary-foreground mb-1 font-headline">{project.title}</h3>
                   <p className="text-sm text-foreground/80">{project.description}</p>
-                </div>
-                <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <form action={deleteProjectAction}>
-                    <input type="hidden" name="projectId" value={project.id} />
-                     <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button type="submit" size="icon" variant="destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Solo admin: Eliminar proyecto.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </form>
                 </div>
               </Card>
             ))}

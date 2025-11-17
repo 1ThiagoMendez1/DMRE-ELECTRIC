@@ -2,8 +2,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getAnimationIntensity } from '@/app/actions';
-import { useToast } from '@/hooks/use-toast';
-import { Bot } from 'lucide-react';
 
 type AnimationContextType = {
   intensity: number; // 0-100
@@ -14,40 +12,15 @@ const AnimationContext = createContext<AnimationContextType | null>(null);
 
 export function AnimationProvider({ children }: { children: ReactNode }) {
   const [animationConfig, setAnimationConfig] = useState({ intensity: 50, reasoning: 'Inicializando...' });
-  const { toast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
-    let toastId: string | undefined;
-
+    
     const fetchIntensity = async () => {
       try {
         const result = await getAnimationIntensity();
         if (isMounted) {
           setAnimationConfig({ intensity: result.animationIntensity, reasoning: result.reasoning });
-          
-          if (toastId) {
-             // Si hay una notificación existente, descártala antes de mostrar una nueva
-             const { dismiss } = useToast();
-             dismiss(toastId);
-          }
-
-          const { id } = toast({
-            title: (
-              <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-primary" />
-                <span className="font-bold">Control de Animación IA</span>
-              </div>
-            ),
-            description: (
-              <div>
-                <p>{result.reasoning}</p>
-                <p className="font-medium mt-1">Intensidad ajustada a: <span className="text-accent font-bold">{result.animationIntensity.toFixed(0)}%</span></p>
-              </div>
-            ),
-            duration: 5000,
-          });
-          toastId = id;
         }
       } catch (error) {
          console.error("No se pudo obtener la intensidad de la animación", error);
@@ -67,7 +40,7 @@ export function AnimationProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [toast]);
+  }, []);
 
   return (
     <AnimationContext.Provider value={animationConfig}>

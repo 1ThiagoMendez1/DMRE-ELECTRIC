@@ -1,4 +1,4 @@
-import { Cpu, Network, Wrench, Cable, Bot, LampDesk } from 'lucide-react';
+import { Cpu, Network, Wrench, Cable, Bot, LampDesk, User, Package, FileText, ClipboardList } from 'lucide-react';
 
 export const services = [
   {
@@ -77,3 +77,51 @@ export const projects = [
     imageId: 'project6',
   },
 ];
+
+export const dashboardNavItems = [
+  {
+    label: 'Cotizaciones',
+    href: '/dashboard',
+    icon: FileText,
+  },
+  {
+    label: 'Clientes',
+    href: '/dashboard/clients',
+    icon: User,
+  },
+  {
+    label: 'Inventario',
+    href: '/dashboard/inventory',
+    icon: Package,
+  },
+  {
+    label: 'Códigos de Trabajo',
+    href: '/dashboard/codes',
+    icon: ClipboardList,
+  },
+]
+
+export const mockQuotes = [
+  { id: 'COT-001', date: '2024-07-21', client: 'Constructora Alfa', total: 15000000, status: 'Aprobado' },
+  { id: 'COT-002', date: '2024-07-20', client: 'Inversiones Omega', total: 8500000, status: 'Pendiente' },
+  { id: 'COT-003', date: '2024-07-18', client: 'Centro Comercial El Sol', total: 25000000, status: 'No aprobado' },
+  { id: 'COT-004', date: '2024-07-17', client: 'Edificio Residencial Delta', total: 12300000, status: 'Aprobado' },
+];
+
+export const mockClients = [
+    { id: 'C001', name: 'Constructora Alfa', document: '900.123.456-7', address: 'Cra 7 # 71-21, Bogotá', email: 'proyectos@alfa.com', phone: '3101234567' },
+    { id: 'C002', name: 'Inversiones Omega', document: '900.789.012-3', address: 'Cl 100 # 19-54, Bogotá', email: 'gerencia@omega.com', phone: '3209876543' },
+    { id: 'C003', name: 'Centro Comercial El Sol', document: '800.456.789-1', address: 'Av. El Dorado # 85-53, Bogotá', email: 'admin@elsol.com', phone: '3157654321' },
+];
+
+export const mockInventory = [
+    { id: 'INV-001', description: 'Cable UTP Cat 6A', unit: 'Metro', materialDescription: 'Cobre libre de oxígeno, 4 pares trenzados', quantity: 5000, unitValue: 2500, totalValue: 12500000, plus20: 2500000, totalValue2: 15000000 },
+    { id: 'INV-002', description: 'Breaker 20A', unit: 'Unidad', materialDescription: 'Interruptor termomagnético industrial', quantity: 150, unitValue: 45000, totalValue: 6750000, plus20: 1350000, totalValue2: 8100000 },
+    { id: 'INV-003', description: 'Canaleta PVC 100x50', unit: 'Tramo 2m', materialDescription: 'Canaleta plástica de alta resistencia', quantity: 300, unitValue: 35000, totalValue: 10500000, plus20: 2100000, totalValue2: 12600000 },
+];
+
+export const mockWorkCodes = [
+    { id: 'COD-001', name: 'Punto de red certificado', description: 'Instalación y certificación de punto de red categoría 6A.', labor: 80000 },
+    { id: 'COD-002', name: 'Salida de iluminación LED', description: 'Instalación de punto de luz, incluye cableado y conexión.', labor: 65000 },
+    { id: 'COD-003', name: 'Instalación de tablero de distribución', description: 'Montaje y conexionado de tablero eléctrico principal.', labor: 250000 },
+]
