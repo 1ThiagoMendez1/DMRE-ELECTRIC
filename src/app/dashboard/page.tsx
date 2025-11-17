@@ -16,7 +16,7 @@ export default function DashboardPage() {
                     <h1 className="text-3xl font-bold text-primary font-headline tracking-tight">Vista General de Ofertas</h1>
                     <p className="text-muted-foreground">Un resumen de todas las cotizaciones y sus estados.</p>
                 </div>
-                <Button asChild className="electric-button">
+                <Button asChild size="lg" variant="outline" className="electric-button font-bold text-lg px-8 py-6 border-primary text-primary hover:bg-primary/10 hover:text-primary text-glow-primary">
                     <Link href="/dashboard/quotes/new">
                         <FilePlus />
                         <span>Crear Cotización</span>
@@ -45,7 +45,6 @@ export default function DashboardPage() {
                             {mockQuotes.map((quote, index) => (
                                 <TableRow key={quote.id}>
                                     <TableCell className="font-medium">#{index + 1}</TableCell>
-                                    <TableCell>{quote.id}</TableCell>
                                     <TableCell>{new Date(quote.date).toLocaleDateString('es-CO')}</TableCell>
                                     <TableCell>{quote.client}</TableCell>
                                     <TableCell>
