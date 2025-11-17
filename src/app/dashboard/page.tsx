@@ -4,9 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { mockQuotes } from "@/lib/data";
 import { cn } from "@/lib/utils";
-import { FilePlus, FileSearch, MoreVertical } from "lucide-react";
+import { FilePlus, FileSearch, MoreVertical, ClipboardEdit } from "lucide-react";
 import Link from "next/link";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from "@/components/ui/dropdown-menu";
 
 export default function DashboardPage() {
     return (
@@ -75,6 +75,19 @@ export default function DashboardPage() {
                                                         Ver Oferta
                                                     </Link>
                                                 </DropdownMenuItem>
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <ClipboardEdit className="mr-2" />
+                                                        Cambiar Estado
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuPortal>
+                                                        <DropdownMenuSubContent>
+                                                            <DropdownMenuItem>Aprobado</DropdownMenuItem>
+                                                            <DropdownMenuItem>Pendiente</DropdownMenuItem>
+                                                            <DropdownMenuItem>No aprobado</DropdownMenuItem>
+                                                        </DropdownMenuSubContent>
+                                                    </DropdownMenuPortal>
+                                                </DropdownMenuSub>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
