@@ -53,7 +53,7 @@ function ClientForm({ onSave, client, onCancel }: { onSave: (data: any) => void;
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-                    <Button type="submit">Guardar Cliente</Button>
+                    <Button type="submit" className="electric-button">Guardar Cliente</Button>
                 </DialogFooter>
             </DialogContent>
         </form>

@@ -130,7 +130,7 @@ function WorkCodeForm({ onSave, code, onCancel }: { onSave: (data: any) => void;
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-                    <Button type="submit">Guardar Código</Button>
+                    <Button type="submit" className="electric-button">Guardar Código</Button>
                 </DialogFooter>
             </DialogContent>
         </form>

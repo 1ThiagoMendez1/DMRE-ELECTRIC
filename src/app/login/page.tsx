@@ -45,7 +45,7 @@ export default function LoginPage() {
                 className="bg-background/50 text-base p-5 focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
               />
             </div>
-            <Button type="submit" asChild className="w-full electric-button font-bold text-lg p-6 bg-primary text-primary-foreground hover:text-primary-foreground">
+            <Button type="submit" asChild className="w-full electric-button font-bold text-lg p-6">
               <Link href="/dashboard">Ingresar</Link>
             </Button>
           </div>

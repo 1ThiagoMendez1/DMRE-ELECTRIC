@@ -56,7 +56,7 @@ function InventoryForm({ onSave, item, onCancel }: { onSave: (data: any) => void
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-                    <Button type="submit">Guardar Ítem</Button>
+                    <Button type="submit" className="electric-button">Guardar Ítem</Button>
                 </DialogFooter>
             </DialogContent>
         </form>

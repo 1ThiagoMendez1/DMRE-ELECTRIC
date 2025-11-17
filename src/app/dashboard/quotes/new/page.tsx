@@ -184,7 +184,7 @@ export default function NewQuotePage() {
                                 <Save />
                                 Guardar Cotización
                             </Button>
-                            <Button size="lg" variant="outline" className="w-full">
+                            <Button size="lg" variant="outline" className="w-full electric-button">
                                 <FileDown />
                                 Exportar a PDF
                             </Button>

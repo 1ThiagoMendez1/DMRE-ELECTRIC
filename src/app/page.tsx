@@ -145,7 +145,7 @@ export default function Home() {
                   placeholder="Tu Mensaje"
                   className="bg-background/50 text-lg p-6 min-h-[150px] focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
                 />
-                <Button type="submit" size="lg" className="w-full electric-button font-bold text-lg p-6 bg-primary text-primary-foreground hover:text-primary-foreground">
+                <Button type="submit" size="lg" className="w-full electric-button font-bold text-lg p-6">
                   Enviar Mensaje
                 </Button>
               </form>
