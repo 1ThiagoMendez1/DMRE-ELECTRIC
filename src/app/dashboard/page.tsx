@@ -16,7 +16,7 @@ export default function DashboardPage() {
                     <h1 className="text-3xl font-bold text-primary font-headline tracking-tight">Vista General de Ofertas</h1>
                     <p className="text-muted-foreground">Un resumen de todas las cotizaciones y sus estados.</p>
                 </div>
-                <Button asChild size="lg" variant="outline" className="electric-button font-bold text-lg px-8 py-6 border-primary text-primary hover:bg-primary/10 hover:text-primary text-glow-primary">
+                <Button asChild size="lg" className="electric-button font-bold text-lg px-8 py-6">
                     <Link href="/dashboard/quotes/new">
                         <FilePlus />
                         <span>Crear Cotización</span>
@@ -69,9 +69,11 @@ export default function DashboardPage() {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent>
-                                                <DropdownMenuItem>
-                                                    <FileSearch className="mr-2"/>
-                                                    Ver Oferta
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/dashboard/quotes/${quote.id}`}>
+                                                        <FileSearch className="mr-2"/>
+                                                        Ver Oferta
+                                                    </Link>
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
