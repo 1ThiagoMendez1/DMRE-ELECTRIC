@@ -1,0 +1,221 @@
+"use client";
+
+import { useState } from "react";
+import { Cliente } from "@/types/sistema";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Edit, Trash2, Plus, Search } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+
+interface ClientTableProps {
+    data: Cliente[];
+}
+
+export function ClientTable({ data: initialData }: ClientTableProps) {
+    const [data, setData] = useState<Cliente[]>(initialData);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [currentCliente, setCurrentCliente] = useState<Partial<Cliente>>({});
+
+    // Filter logic
+    const filteredData = data.filter((item) =>
+        item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.documento.includes(searchTerm) ||
+        item.telefono.includes(searchTerm)
+    );
+
+    const handleDelete = (id: string) => {
+        if (confirm("¿Estás seguro de eliminar este cliente?")) {
+            setData(data.filter((c) => c.id !== id));
+        }
+    };
+
+    const handleEdit = (cliente: Cliente) => {
+        setCurrentCliente(cliente);
+        setIsDialogOpen(true);
+    };
+
+    const handleAddNew = () => {
+        setCurrentCliente({});
+        setIsDialogOpen(true);
+    };
+
+    const handleSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (currentCliente.id) {
+            // Update
+            setData(data.map(c => c.id === currentCliente.id ? currentCliente as Cliente : c));
+        } else {
+            // Create
+            const newCliente = { ...currentCliente, id: Math.random().toString(36).substr(2, 9) } as Cliente;
+            setData([...data, newCliente]);
+        }
+        setIsDialogOpen(false);
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Buscar por nombre, documento..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 bg-background/50"
+                    />
+                </div>
+                <Button onClick={handleAddNew} className="electric-button font-bold w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" /> Nuevo Cliente
+                </Button>
+            </div>
+
+            <div className="rounded-md border bg-card text-card-foreground shadow-sm">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="pl-4">Cliente</TableHead>
+                            <TableHead>Documento</TableHead>
+                            <TableHead>Teléfono</TableHead>
+                            <TableHead>Correo</TableHead>
+                            <TableHead className="text-right pr-4">Acciones</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredData.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                    No se encontraron resultados.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            filteredData.map((item) => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="font-medium pl-4">
+                                        <div className="text-base">{item.nombre}</div>
+                                        <div className="text-xs text-muted-foreground">{item.direccion}</div>
+                                    </TableCell>
+                                    <TableCell>{item.documento}</TableCell>
+                                    <TableCell>{item.telefono}</TableCell>
+                                    <TableCell>{item.correo}</TableCell>
+                                    <TableCell className="text-right pr-4">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleEdit(item)}
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                            onClick={() => handleDelete(item.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {currentCliente.id ? "Editar Cliente" : "Nuevo Cliente"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Ingresa los datos del cliente. Click en guardar cuando termines.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSave}>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="nombre" className="text-right">
+                                    Nombre
+                                </Label>
+                                <Input
+                                    id="nombre"
+                                    value={currentCliente.nombre || ""}
+                                    onChange={(e) => setCurrentCliente({ ...currentCliente, nombre: e.target.value })}
+                                    className="col-span-3"
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="documento" className="text-right">
+                                    Documento
+                                </Label>
+                                <Input
+                                    id="documento"
+                                    value={currentCliente.documento || ""}
+                                    onChange={(e) => setCurrentCliente({ ...currentCliente, documento: e.target.value })}
+                                    className="col-span-3"
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="telefono" className="text-right">
+                                    Teléfono
+                                </Label>
+                                <Input
+                                    id="telefono"
+                                    value={currentCliente.telefono || ""}
+                                    onChange={(e) => setCurrentCliente({ ...currentCliente, telefono: e.target.value })}
+                                    className="col-span-3"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="correo" className="text-right">
+                                    Correo
+                                </Label>
+                                <Input
+                                    id="correo"
+                                    type="email"
+                                    value={currentCliente.correo || ""}
+                                    onChange={(e) => setCurrentCliente({ ...currentCliente, correo: e.target.value })}
+                                    className="col-span-3"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="direccion" className="text-right">
+                                    Dirección
+                                </Label>
+                                <Input
+                                    id="direccion"
+                                    value={currentCliente.direccion || ""}
+                                    onChange={(e) => setCurrentCliente({ ...currentCliente, direccion: e.target.value })}
+                                    className="col-span-3"
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit">Guardar Cambios</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
