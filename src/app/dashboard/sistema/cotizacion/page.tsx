@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { FilePlus, FileSearch, MoreVertical, Search, Filter } from "lucide-react";
+import { cn, formatDateES } from "@/lib/utils";
+import { FilePlus, Search, Filter, Edit, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -16,8 +16,10 @@ import { Cotizacion } from "@/types/sistema";
 
 export default function CotizacionPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [quotes, setQuotes] = useState<Cotizacion[]>(initialQuotes);
     const [selectedQuote, setSelectedQuote] = useState<Cotizacion | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
 
     const handleOpenNew = () => {
         setSelectedQuote(null);
@@ -29,10 +31,12 @@ export default function CotizacionPage() {
         setIsModalOpen(true);
     };
 
-    const filteredQuotes = initialQuotes.filter(q =>
+    const filteredQuotes = quotes.filter(q =>
         q.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         q.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const paginatedQuotes = filteredQuotes.slice((currentPage - 1) * 10, currentPage * 10);
 
     return (
         <div className="space-y-6">
@@ -79,20 +83,20 @@ export default function CotizacionPage() {
                                 <TableHead>Items</TableHead>
                                 <TableHead>Estado</TableHead>
                                 <TableHead className="text-right">Total</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
+                                <TableHead className="text-right pr-4">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredQuotes.length === 0 ? (
+                            {paginatedQuotes.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                                         No se encontraron cotizaciones.
                                     </TableCell>
                                 </TableRow>
-                            ) : filteredQuotes.map((quote) => (
+                            ) : paginatedQuotes.map((quote) => (
                                 <TableRow key={quote.id}>
                                     <TableCell className="font-medium pl-6">{quote.id}</TableCell>
-                                    <TableCell>{new Date(quote.fecha).toLocaleDateString('es-CO')}</TableCell>
+                                    <TableCell>{formatDateES(quote.fecha)}</TableCell>
                                     <TableCell className="font-medium">{quote.cliente.nombre}</TableCell>
                                     <TableCell>{quote.items.length} items</TableCell>
                                     <TableCell>
@@ -101,7 +105,6 @@ export default function CotizacionPage() {
                                             className={cn({
                                                 "border-green-500 text-green-500 bg-green-500/10": quote.estado === 'APROBADA',
                                                 "border-yellow-500 text-yellow-500 bg-yellow-500/10": quote.estado === 'ENVIADA',
-                                                // Assuming 'ENVIADA' maps to Pending conceptually or just use default
                                                 "border-muted text-muted-foreground": quote.estado === 'BORRADOR',
                                                 "border-red-500 text-red-500 bg-red-500/10": quote.estado === 'RECHAZADA'
                                             })}
@@ -112,25 +115,47 @@ export default function CotizacionPage() {
                                     <TableCell className="text-right font-mono">
                                         {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(quote.total)}
                                     </TableCell>
-                                    <TableCell>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleOpenEdit(quote)}>
-                                                    <FileSearch className="mr-2 h-4 w-4" /> Ver / Editar
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                    <TableCell className="text-right pr-4">
+                                        <div className="flex justify-end space-x-2">
+                                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(quote)}>
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => {
+                                                if (confirm("¿Estás seguro de eliminar esta cotización?")) {
+                                                    setQuotes(quotes.filter(q => q.id !== quote.id));
+                                                }
+                                            }}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                 </CardContent>
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-end space-x-2 p-4 border-t">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                    >
+                        Anterior
+                    </Button>
+                    <div className="text-sm text-muted-foreground">
+                        Página {currentPage} de {Math.ceil(filteredQuotes.length / 10) || 1}
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredQuotes.length / 10), p + 1))}
+                        disabled={currentPage >= Math.ceil(filteredQuotes.length / 10)}
+                    >
+                        Siguiente
+                    </Button>
+                </div>
             </Card>
 
             {/* Modal de Cotizador */}

@@ -25,11 +25,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Button } from './ui/button';
-import { LogOut, LayoutDashboard as LayoutDashboardIcon, Users as UsersIcon, Package as PackageIcon, FileText as FileTextIcon, ClipboardList as ClipboardListIcon, ChevronDown } from 'lucide-react';
+import { LogOut, LayoutDashboard as LayoutDashboardIcon, Users as UsersIcon, Package as PackageIcon, FileText as FileTextIcon, ClipboardList as ClipboardListIcon, ChevronDown, DollarSign, Truck, Car, Briefcase } from 'lucide-react';
 import { dashboardNavItems } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import Image from 'next/image';
+import { ThemeToggle } from './theme-toggle';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -122,7 +123,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/cotizacion")} tooltip="Cotizador">
                         <Link href="/dashboard/sistema/cotizacion">
                           <FileTextIcon className="h-4 w-4" />
-                          <span>Cotizador (Kardex)</span>
+                          <span>Cotizador</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -131,6 +132,55 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         <Link href="/dashboard/sistema/registro">
                           <ClipboardListIcon className="h-4 w-4" />
                           <span>Registro Obras</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/comercial")} tooltip="Gestión Comercial">
+                        <Link href="/dashboard/sistema/comercial">
+                          <UsersIcon className="h-4 w-4" />
+                          <span>Comercial</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/financiera")} tooltip="Gestión Financiera">
+                        <Link href="/dashboard/sistema/financiera">
+                          <DollarSign className="h-4 w-4" />
+                          <span>Financiera</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/operaciones")} tooltip="Operaciones">
+                        <Link href="/dashboard/sistema/operaciones">
+                          <PackageIcon className="h-4 w-4" />
+                          <span>Operaciones</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/suministro")} tooltip="Suministro">
+                        <Link href="/dashboard/sistema/suministro">
+                          <Truck className="h-4 w-4" />
+                          <span>Suministro</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/activos")} tooltip="Activos">
+                        <Link href="/dashboard/sistema/activos">
+                          <Car className="h-4 w-4" />
+                          <span>Activos</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/talento-humano")} tooltip="Talento Humano">
+                        <Link href="/dashboard/sistema/talento-humano">
+                          <Briefcase className="h-4 w-4" />
+                          <span>Talento Humano</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -162,7 +212,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <div className="p-4 sm:p-6 lg:p-8">
+        <header className="flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 shadow-sm transition-colors duration-300">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="-ml-1 h-8 w-8 hover:bg-accent/50 hover:text-accent-foreground transition-colors" />
+            <Separator orientation="vertical" className="mr-2 h-4 mx-2" />
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <span className="hidden sm:inline-block">Panel de Control</span>
+            </div>
+          </div>
+          <ThemeToggle />
+        </header>
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 pt-6">
           {children}
         </div>
       </SidebarInset>

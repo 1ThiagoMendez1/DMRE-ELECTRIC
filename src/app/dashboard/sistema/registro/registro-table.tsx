@@ -16,9 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarIcon, DollarSign, Plus } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatDateES } from "@/lib/utils";
 
 interface RegistroTableProps {
     data: RegistroObra[];
@@ -103,7 +101,7 @@ export function RegistroTable({ data: initialData }: RegistroTableProps) {
                         {data.map((registro) => (
                             <TableRow key={registro.id}>
                                 <TableCell className="font-medium pl-6">
-                                    {format(new Date(registro.cotizacion.fecha), "dd MMM yyyy", { locale: es })}
+                                    {formatDateES(registro.cotizacion.fecha)}
                                 </TableCell>
                                 <TableCell>
                                     <div
@@ -261,7 +259,7 @@ export function RegistroTable({ data: initialData }: RegistroTableProps) {
                                     <TableBody>
                                         {clientHistory.map((hist) => (
                                             <TableRow key={hist.id}>
-                                                <TableCell>{format(new Date(hist.cotizacion.fecha), "dd/MM/yyyy")}</TableCell>
+                                                <TableCell>{formatDateES(hist.cotizacion.fecha)}</TableCell>
                                                 <TableCell>{hist.nombreObra}</TableCell>
                                                 <TableCell>{hist.cotizacion.numero}</TableCell>
                                                 <TableCell className="text-right">

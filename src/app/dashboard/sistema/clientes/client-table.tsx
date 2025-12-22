@@ -23,6 +23,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { formatDateES } from "@/lib/utils";
 
 interface ClientTableProps {
     data: Cliente[];
@@ -64,7 +65,7 @@ export function ClientTable({ data: initialData }: ClientTableProps) {
             setData(data.map(c => c.id === currentCliente.id ? currentCliente as Cliente : c));
         } else {
             // Create
-            const newCliente = { ...currentCliente, id: Math.random().toString(36).substr(2, 9) } as Cliente;
+            const newCliente = { ...currentCliente, id: Math.random().toString(36).substr(2, 9), fechaCreacion: new Date() } as Cliente;
             setData([...data, newCliente]);
         }
         setIsDialogOpen(false);
@@ -92,6 +93,7 @@ export function ClientTable({ data: initialData }: ClientTableProps) {
                     <TableHeader>
                         <TableRow>
                             <TableHead className="pl-4">Cliente</TableHead>
+                            <TableHead>Fecha Creación</TableHead>
                             <TableHead>Documento</TableHead>
                             <TableHead>Teléfono</TableHead>
                             <TableHead>Correo</TableHead>
@@ -101,7 +103,7 @@ export function ClientTable({ data: initialData }: ClientTableProps) {
                     <TableBody>
                         {filteredData.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                                     No se encontraron resultados.
                                 </TableCell>
                             </TableRow>
@@ -111,6 +113,9 @@ export function ClientTable({ data: initialData }: ClientTableProps) {
                                     <TableCell className="font-medium pl-4">
                                         <div className="text-base">{item.nombre}</div>
                                         <div className="text-xs text-muted-foreground">{item.direccion}</div>
+                                    </TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">
+                                        {formatDateES(item.fechaCreacion)}
                                     </TableCell>
                                     <TableCell>{item.documento}</TableCell>
                                     <TableCell>{item.telefono}</TableCell>

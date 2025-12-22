@@ -4,6 +4,47 @@
 
 @layer base {
   :root {
+    /* Light Mode (Corporate Clean) */
+    --background: 0 0% 100%; /* #FFFFFF */
+    --foreground: 0 0% 10%; /* #1A1A1A */
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 0 0% 0%; /* Black Buttons */
+    --primary-foreground: 0 0% 100%; /* White Text */
+
+    --secondary: 210 20% 96%; /* #F3F4F6 */
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 182 100% 35%; /* Darker cyan for light mode accents if needed, or keeping corporate blue/green? User said Black buttons. Let's keep accent distinct or subtle. */
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 91%; /* Light Gray lines */
+    --input: 220 13% 91%;
+    --ring: 0 0% 0%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%; /* Slightly off-white for sidebar in light mode */
+    --sidebar-foreground: 0 0% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-accent: 210 20% 90%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-ring: 0 0% 0%;
+  }
+
+  .dark {
+    /* Dark Mode (Preserved from original :root) */
     --background: 0 0% 13.3%; /* #222222 */
     --foreground: 0 0% 98%; /* #fafafa */
 
@@ -31,8 +72,6 @@
     --border: 0 0% 25%;
     --input: 0 0% 25%;
     --ring: 182 100% 74.3%;
-
-    --radius: 0.5rem;
 
     --sidebar-background: 0 0% 10%;
     --sidebar-foreground: 0 0% 98%;

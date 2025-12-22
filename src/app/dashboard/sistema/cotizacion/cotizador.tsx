@@ -34,13 +34,14 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
     const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [showProductsInPdf, setShowProductsInPdf] = useState(true);
+    const [fechaCotizacion, setFechaCotizacion] = useState<string>(new Date().toISOString().split('T')[0]);
 
     // Cargar datos iniciales si existen (Modo Edición/Visualización)
     useEffect(() => {
         if (initialData) {
             setSelectedCliente(initialData.cliente);
             setItems(initialData.items);
-            // mock logic: if it was approved/sent, maybe we default standard visibility, but here we keep true
+            setFechaCotizacion(new Date(initialData.fecha).toISOString().split('T')[0]);
         }
     }, [initialData]);
 
@@ -110,6 +111,25 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
                 {/* Left Column: Quote Details */}
                 <div className="lg:col-span-2 space-y-4 flex flex-col h-full overflow-hidden">
+                    {/* Header Info Section */}
+                    <Card className="shrink-0">
+                        <CardHeader className="py-3">
+                            <CardTitle className="text-sm font-medium">Información General</CardTitle>
+                        </CardHeader>
+                        <CardContent className="py-2 grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="fecha" className="text-xs">Fecha de Emisión</Label>
+                                <Input
+                                    id="fecha"
+                                    type="date"
+                                    value={fechaCotizacion}
+                                    onChange={(e) => setFechaCotizacion(e.target.value)}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Client Section */}
                     <Card className="shrink-0">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 py-3">
