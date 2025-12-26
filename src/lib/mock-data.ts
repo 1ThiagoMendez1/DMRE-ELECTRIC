@@ -22,9 +22,41 @@ import {
     TipoMovimientoInventario,
     NovedadNomina,
     TipoNovedad,
-    TipoGastoVehiculo
+    TipoGastoVehiculo,
+    User,
+    UserRole,
+    DotacionItem,
+    EntregaDotacion,
+    CreditoEmpleado,
+    TareaAgenda,
+    Role,
+    Permission
 } from "@/types/sistema";
 import { addDays, subDays } from "date-fns";
+
+export const initialUsers: User[] = [
+    {
+        id: "USR-001",
+        name: "Admin Sistema",
+        email: "admin@dmre.com",
+        role: "ADMIN",
+        avatar: "https://github.com/shadcn.png"
+    },
+    {
+        id: "USR-002",
+        name: "Ingeniero Jefe",
+        email: "ingenieria@dmre.com",
+        role: "ENGINEER",
+        avatar: ""
+    },
+    {
+        id: "USR-003",
+        name: "Cliente Demo",
+        email: "cliente@empresa.com",
+        role: "CLIENT",
+        avatar: ""
+    }
+];
 
 // Generador Determinista de Números Aleatorios
 let seed = 123456;
@@ -155,7 +187,7 @@ const generateCotizaciones = (count: number, clientes: Cliente[], inventario: In
 
 const generateFacturas = (cotizaciones: Cotizacion[]): Factura[] => {
     return cotizaciones
-        .filter(c => c.estado === 'FINALIZADO' || c.estado === 'EN_EJECUCION' || c.estado === 'APROBADA')
+        .filter(c => c.estado === 'FINALIZADA' || c.estado === 'EN_EJECUCION' || c.estado === 'APROBADA')
         .map((c, i) => {
             const valorFacturado = c.total;
             const anticipo = valorFacturado * 0.3;
@@ -369,17 +401,70 @@ const generateLiquidaciones = (count: number, empleados: Empleado[]): Liquidacio
 };
 
 
+// --- NEW GENERATORS ---
+
+const generateDotacionItems = (): DotacionItem[] => [
+    { id: 'DOT-1', descripcion: 'Camisa Polo Institucional', talla: 'M', cantidadDisponible: 50 },
+    { id: 'DOT-2', descripcion: 'Botas de Seguridad Dielectricas', talla: '40', cantidadDisponible: 20 },
+    { id: 'DOT-3', descripcion: 'Casco de Seguridad', talla: 'Unica', cantidadDisponible: 30 },
+    { id: 'DOT-4', descripcion: 'Guantes de Carnaza', talla: 'L', cantidadDisponible: 100 },
+];
+
+const generateEntregasDotacion = (count: number, empleados: Empleado[], items: DotacionItem[]): EntregaDotacion[] => {
+    return Array.from({ length: count }, (_, i) => ({
+        id: `ENT-DOT-${i + 1}`,
+        fecha: randomDate(2024, 2025),
+        empleadoId: randomItem(empleados).id,
+        empleado: randomItem(empleados),
+        items: [{
+            dotacionId: items[0].id,
+            descripcion: items[0].descripcion,
+            cantidad: randomInt(1, 2)
+        }],
+        observacion: "Entrega trimestral"
+    }));
+};
+
+const generateCreditosEmpleados = (count: number, empleados: Empleado[]): CreditoEmpleado[] => {
+    return Array.from({ length: count }, (_, i) => {
+        const monto = randomInt(500000, 2000000);
+        const plazo = randomInt(3, 12);
+        return {
+            id: `CRE-EMP-${i + 1}`,
+            empleadoId: randomItem(empleados).id,
+            empleado: randomItem(empleados),
+            montoPrestado: monto,
+            plazoMeses: plazo,
+            cuotaMensual: monto / plazo,
+            saldoPendiente: monto * (randomInt(10, 90) / 100),
+            fechaOtorgado: randomDate(2023, 2024),
+            estado: randomItem(['ACTIVO', 'PAGADO']) as any
+        };
+    });
+};
+
+const generateAgenda = (count: number): TareaAgenda[] => {
+    return Array.from({ length: count }, (_, i) => ({
+        id: `TSK-${i + 1}`,
+        titulo: `Tarea ${randomInt(1, 100)}: ${randomItem(['Revisión de Obra', 'Compra Materiales', 'Reunión Cliente', 'Mantenimiento Vehículo'])}`,
+        descripcion: "Detalles de la tarea pendientes de confirmar con el encargado.",
+        fechaVencimiento: addDays(new Date(), randomInt(-5, 15)),
+        prioridad: randomItem(['ALTA', 'MEDIA', 'BAJA']) as any,
+        estado: randomItem(['PENDIENTE', 'EN_PROCESO', 'COMPLETADA']) as any
+    }));
+};
+
 // --- EXPORTS ---
 
 export const initialClients = generateClientes(50);
 export const initialInventory = generateInventario(100);
 export const initialQuotes = generateCotizaciones(40, initialClients, initialInventory);
-export const initialRegistros = initialQuotes.filter(q => q.estado === 'EN_EJECUCION' || q.estado === 'FINALIZADO').map(q => ({
+export const initialRegistros = initialQuotes.filter(q => q.estado === 'EN_EJECUCION' || q.estado === 'FINALIZADA').map(q => ({
     id: `REG-${q.id}`,
     cotizacionId: q.id,
     cotizacion: q,
     fechaInicio: q.fecha,
-    estado: q.estado === 'FINALIZADO' ? 'FINALIZADO' : 'EN_PROCESO',
+    estado: q.estado === 'FINALIZADA' ? 'FINALIZADO' : 'EN_PROCESO',
     anticipos: [],
     saldoPendiente: q.total,
     nombreObra: q.descripcionTrabajo.substring(0, 30) + "...",
@@ -399,3 +484,37 @@ export const initialVehiculos = generateVehiculos(5);
 export const initialGastosVehiculos = generateGastosVehiculos(50, initialVehiculos);
 export const initialNovedades = generateNovedadesNomina(30, initialEmpleados);
 export const initialLiquidaciones = generateLiquidaciones(40, initialEmpleados);
+
+// New Data
+export const initialDotacionItems = generateDotacionItems();
+export const initialEntregasDotacion = generateEntregasDotacion(20, initialEmpleados, initialDotacionItems);
+export const initialCreditosEmpleados = generateCreditosEmpleados(10, initialEmpleados);
+export const initialAgenda = generateAgenda(25);
+
+// Roles Data
+export const initialRoles: Role[] = [
+    {
+        id: "ROLE-ADMIN",
+        nombre: "Administrador",
+        descripcion: "Acceso total al sistema",
+        permisos: [],
+        color: "bg-red-500",
+        isSystemRole: true
+    },
+    {
+        id: "ROLE-ENGINEER",
+        nombre: "Ingeniero",
+        descripcion: "Gestión de operaciones y proyectos",
+        permisos: [],
+        color: "bg-blue-500",
+        isSystemRole: true
+    },
+    {
+        id: "ROLE-VIEWER",
+        nombre: "Visualizador",
+        descripcion: "Solo lectura en todos los módulos",
+        permisos: [],
+        color: "bg-gray-500",
+        isSystemRole: true
+    }
+];

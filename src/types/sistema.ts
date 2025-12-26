@@ -264,3 +264,69 @@ export interface RegistroObra {
     cliente: string;
     valorTotal: number;
 }
+
+// 7. DOTACIÓN
+export interface DotacionItem {
+    id: string;
+    descripcion: string;
+    talla: string;
+    cantidadDisponible: number;
+}
+
+export interface EntregaDotacion {
+    id: string;
+    fecha: Date;
+    empleadoId: string;
+    empleado: Empleado;
+    items: {
+        dotacionId: string;
+        descripcion: string;
+        cantidad: number;
+    }[];
+    observacion: string;
+}
+
+// 8. CRÉDITOS
+export interface CreditoEmpleado {
+    id: string;
+    empleadoId: string;
+    empleado: Empleado;
+    montoPrestado: number;
+    plazoMeses: number;
+    cuotaMensual: number;
+    saldoPendiente: number;
+    fechaOtorgado: Date;
+    estado: 'ACTIVO' | 'PAGADO';
+}
+
+// 9. AGENDA
+export type PrioridadTarea = 'ALTA' | 'MEDIA' | 'BAJA';
+export type EstadoTarea = 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADA';
+
+export interface TareaAgenda {
+    id: string;
+    titulo: string;
+    descripcion: string;
+    fechaVencimiento: Date;
+    asignadoA?: string;
+    prioridad: PrioridadTarea;
+    estado: EstadoTarea;
+}
+
+
+// 10. ROLES Y PERMISOS
+export interface Permission {
+    id: string;
+    modulo: string; // 'comercial', 'financiera', 'operaciones', etc.
+    accion: 'ver' | 'crear' | 'editar' | 'eliminar' | 'exportar';
+}
+
+export interface Role {
+    id: string;
+    nombre: string;
+    descripcion: string;
+    permisos: Permission[];
+    color: string; // For badge display
+    isSystemRole: boolean; // Cannot be deleted if true
+}
+

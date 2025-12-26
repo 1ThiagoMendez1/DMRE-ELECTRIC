@@ -71,6 +71,7 @@ import { CreateProjectDialog } from "@/components/erp/create-project-dialog";
 import { EditClientDialog } from "@/components/erp/edit-client-dialog";
 import { ClientProfileDialog } from "@/components/erp/client-profile-dialog";
 import { EditQuoteDialog } from "@/components/erp/edit-quote-dialog";
+import { generateQuotePDF } from "@/utils/pdf-generator";
 
 export default function CommercialPage() {
     const { toast } = useToast();
@@ -461,7 +462,7 @@ export default function CommercialPage() {
                                                             cotizacion={quote}
                                                             onQuoteUpdated={(updated) => setCotizaciones(prev => prev.map(q => q.id === updated.id ? updated : q))}
                                                         />
-                                                        <DropdownMenuItem onClick={() => toast({ title: "PDF", description: "Generación de PDF en desarrollo" })}>Generar PDF</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => generateQuotePDF(quote)}>Generar PDF</DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>

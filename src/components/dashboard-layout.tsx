@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import Image from 'next/image';
 import { ThemeToggle } from './theme-toggle';
+import { NotificationCenter } from './notification-center';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -184,6 +185,46 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/usuarios")} tooltip="Usuarios">
+                        <Link href="/dashboard/sistema/usuarios">
+                          <UsersIcon className="h-4 w-4" />
+                          <span>Usuarios</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/roles")} tooltip="Roles">
+                        <Link href="/dashboard/sistema/roles">
+                          <ClipboardListIcon className="h-4 w-4" />
+                          <span>Roles</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/creditos")} tooltip="Créditos">
+                        <Link href="/dashboard/sistema/creditos">
+                          <DollarSign className="h-4 w-4" />
+                          <span>Créditos</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/dotacion")} tooltip="Dotación">
+                        <Link href="/dashboard/sistema/dotacion">
+                          <PackageIcon className="h-4 w-4" />
+                          <span>Dotación</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/agenda")} tooltip="Agenda">
+                        <Link href="/dashboard/sistema/agenda">
+                          <ClipboardListIcon className="h-4 w-4" />
+                          <span>Agenda</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
@@ -220,7 +261,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <span className="hidden sm:inline-block">Panel de Control</span>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <NotificationCenter />
+            <ThemeToggle />
+          </div>
         </header>
         <div className="flex-1 p-4 sm:p-6 lg:p-8 pt-6">
           {children}

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Cotizacion } from "@/types/sistema";
+import { generateQuotePDF } from "@/utils/pdf-generator";
 
 export default function CotizacionPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -117,6 +118,9 @@ export default function CotizacionPage() {
                                     </TableCell>
                                     <TableCell className="text-right pr-4">
                                         <div className="flex justify-end space-x-2">
+                                            <Button variant="ghost" size="icon" onClick={() => generateQuotePDF(quote)} title="Descargar PDF">
+                                                <FileText className="h-4 w-4 text-blue-600" />
+                                            </Button>
                                             <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(quote)}>
                                                 <Edit className="h-4 w-4" />
                                             </Button>

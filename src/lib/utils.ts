@@ -12,3 +12,11 @@ export function formatDateES(date: Date | string | number): string {
   const formattedDate = d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
   return `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} ${formattedDate}`;
 }
+
+export function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0
+  }).format(value);
+}
