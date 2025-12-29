@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { addDays, isWithinInterval, startOfYear, endOfYear } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
@@ -188,7 +189,7 @@ export default function SistemaPage() {
     const totalRevenue = revenueData.reduce((acc, curr) => acc + curr.total, 0);
     const totalQuotesValue = filteredQuotes.reduce((acc, q) => acc + q.total, 0);
 
-    const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-10">

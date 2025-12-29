@@ -1,0 +1,176 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Factura, Cliente } from "@/types/sistema";
+import { initialClients } from "@/lib/mock-data";
+
+interface CreateFacturaDialogProps {
+    onFacturaCreated: (factura: Factura) => void;
+    nextId?: string;
+}
+
+export function CreateFacturaDialog({ onFacturaCreated, nextId }: CreateFacturaDialogProps) {
+    const [open, setOpen] = useState(false);
+    const [clienteId, setClienteId] = useState("");
+    const [numero, setNumero] = useState(nextId || "");
+    const [fechaEmision, setFechaEmision] = useState("");
+    const [fechaVencimiento, setFechaVencimiento] = useState("");
+    const [valor, setValor] = useState("");
+    const [estado, setEstado] = useState<"PENDIENTE" | "PARCIAL" | "CANCELADA">("PENDIENTE");
+
+    useEffect(() => {
+        if (open && nextId) {
+            setNumero(nextId);
+        }
+    }, [open, nextId]);
+
+    const handleSave = () => {
+        if (!clienteId || !numero || !fechaEmision || !valor) return;
+
+        const cliente = initialClients.find(c => c.id === clienteId);
+
+        const newFactura: Factura = {
+            id: numero,
+            fechaEmision: new Date(fechaEmision),
+            fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : new Date(fechaEmision),
+            valorFacturado: parseFloat(valor),
+            saldoPendiente: estado === "CANCELADA" ? 0 : parseFloat(valor),
+            estado: estado,
+            cotizacionId: "MANUAL",
+            cotizacion: {
+                id: "MANUAL",
+                numero: "N/A",
+                clienteId: clienteId,
+                cliente: cliente as Cliente,
+            } as any,
+            anticipoRecibido: 0,
+            retencionRenta: 0,
+            retencionIca: 0,
+            retencionIva: 0
+        };
+
+        onFacturaCreated(newFactura);
+        setOpen(false);
+        setClienteId("");
+        // numero keep as is until next open
+        setFechaEmision("");
+        setFechaVencimiento("");
+        setValor("");
+        setEstado("PENDIENTE");
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nueva Factura
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Crear Nueva Factura</DialogTitle>
+                    <DialogDescription>
+                        Consecutivo asignado automáticamente.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="numero" className="text-right">No. Factura</Label>
+                        <Input
+                            id="numero"
+                            value={numero}
+                            readOnly
+                            className="col-span-3 bg-muted font-mono"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="cliente" className="text-right">Cliente</Label>
+                        <Select value={clienteId} onValueChange={setClienteId}>
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Seleccione cliente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {initialClients?.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                                )) || <SelectItem value="dev">Modo Desarrollo</SelectItem>}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="emision" className="text-right">Emisión</Label>
+                        <Input
+                            id="emision"
+                            type="date"
+                            value={fechaEmision}
+                            onChange={(e) => setFechaEmision(e.target.value)}
+                            className="col-span-3"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="vencimiento" className="text-right">Vencimiento</Label>
+                        <Input
+                            id="vencimiento"
+                            type="date"
+                            value={fechaVencimiento}
+                            onChange={(e) => setFechaVencimiento(e.target.value)}
+                            className="col-span-3"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="valor" className="text-right">Valor Total</Label>
+                        <Input
+                            id="valor"
+                            type="number"
+                            value={valor}
+                            onChange={(e) => setValor(e.target.value)}
+                            placeholder="0"
+                            className="col-span-3"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="estado" className="text-right">Estado</Label>
+                        <Select value={estado} onValueChange={(v) => setEstado(v as any)}>
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="PENDIENTE">Pendiente</SelectItem>
+                                <SelectItem value="PARCIAL">Parcial</SelectItem>
+                                <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleSave}>Crear Factura</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}

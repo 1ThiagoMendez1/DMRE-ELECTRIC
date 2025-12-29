@@ -96,87 +96,57 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
+                    {/* Dashboard General */}
                     <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname === "/dashboard/sistema"} tooltip="Resumen">
+                      <SidebarMenuButton asChild isActive={pathname === "/dashboard/sistema"} tooltip="Dashboard">
                         <Link href="/dashboard/sistema">
                           <LayoutDashboardIcon className="h-4 w-4" />
-                          <span>Resumen</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/clientes")} tooltip="Clientes">
-                        <Link href="/dashboard/sistema/clientes">
-                          <UsersIcon className="h-4 w-4" />
-                          <span>Clientes</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/inventario")} tooltip="Inventario">
-                        <Link href="/dashboard/sistema/inventario">
-                          <PackageIcon className="h-4 w-4" />
-                          <span>Inventario</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/cotizacion")} tooltip="Cotizador">
-                        <Link href="/dashboard/sistema/cotizacion">
-                          <FileTextIcon className="h-4 w-4" />
-                          <span>Cotizador</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/registro")} tooltip="Registro">
-                        <Link href="/dashboard/sistema/registro">
-                          <ClipboardListIcon className="h-4 w-4" />
-                          <span>Registro Obras</span>
+                          <span>Dashboard</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
+                    {/* A. COMERCIAL - includes Cotizador */}
                     <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/comercial")} tooltip="Gestión Comercial">
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/comercial") || pathname.startsWith("/dashboard/sistema/cotizacion")} tooltip="Comercial">
                         <Link href="/dashboard/sistema/comercial">
                           <UsersIcon className="h-4 w-4" />
                           <span>Comercial</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+
+                    {/* B. FINANCIERA - includes Créditos */}
                     <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/financiera")} tooltip="Gestión Financiera">
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/financiera") || pathname.startsWith("/dashboard/sistema/creditos")} tooltip="Financiera">
                         <Link href="/dashboard/sistema/financiera">
                           <DollarSign className="h-4 w-4" />
                           <span>Financiera</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+
+                    {/* C. LOGÍSTICA */}
                     <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/operaciones")} tooltip="Operaciones">
-                        <Link href="/dashboard/sistema/operaciones">
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/logistica") || pathname.startsWith("/dashboard/sistema/inventario") || pathname.startsWith("/dashboard/sistema/suministro") || pathname.startsWith("/dashboard/sistema/dotacion") || pathname.startsWith("/dashboard/sistema/activos")} tooltip="Logística">
+                        <Link href="/dashboard/sistema/logistica">
                           <PackageIcon className="h-4 w-4" />
+                          <span>Logística</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    {/* D. OPERACIONES - includes Registro, Códigos */}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/operaciones") || pathname.startsWith("/dashboard/sistema/registro") || pathname.startsWith("/dashboard/sistema/codigos-trabajo")} tooltip="Operaciones">
+                        <Link href="/dashboard/sistema/operaciones">
+                          <ClipboardListIcon className="h-4 w-4" />
                           <span>Operaciones</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/suministro")} tooltip="Suministro">
-                        <Link href="/dashboard/sistema/suministro">
-                          <Truck className="h-4 w-4" />
-                          <span>Suministro</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/activos")} tooltip="Activos">
-                        <Link href="/dashboard/sistema/activos">
-                          <Car className="h-4 w-4" />
-                          <span>Activos</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+
+                    {/* E. TALENTO HUMANO */}
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/talento-humano")} tooltip="Talento Humano">
                         <Link href="/dashboard/sistema/talento-humano">
@@ -185,43 +155,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+
+                    {/* F. CONTROL Y SISTEMA */}
                     <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/usuarios")} tooltip="Usuarios">
-                        <Link href="/dashboard/sistema/usuarios">
-                          <UsersIcon className="h-4 w-4" />
-                          <span>Usuarios</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/roles")} tooltip="Roles">
-                        <Link href="/dashboard/sistema/roles">
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/control") || pathname.startsWith("/dashboard/sistema/usuarios") || pathname.startsWith("/dashboard/sistema/roles") || pathname.startsWith("/dashboard/sistema/agenda")} tooltip="Control">
+                        <Link href="/dashboard/sistema/control">
                           <ClipboardListIcon className="h-4 w-4" />
-                          <span>Roles</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/creditos")} tooltip="Créditos">
-                        <Link href="/dashboard/sistema/creditos">
-                          <DollarSign className="h-4 w-4" />
-                          <span>Créditos</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/dotacion")} tooltip="Dotación">
-                        <Link href="/dashboard/sistema/dotacion">
-                          <PackageIcon className="h-4 w-4" />
-                          <span>Dotación</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/agenda")} tooltip="Agenda">
-                        <Link href="/dashboard/sistema/agenda">
-                          <ClipboardListIcon className="h-4 w-4" />
-                          <span>Agenda</span>
+                          <span>Control</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

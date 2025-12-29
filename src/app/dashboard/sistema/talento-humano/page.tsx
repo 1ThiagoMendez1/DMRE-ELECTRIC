@@ -10,24 +10,26 @@ import {
     Banknote,
     UserPlus,
     LayoutDashboard as LayoutDashboardIcon,
-    PieChart as PieChartIcon,
-    BarChart3,
-    LineChart as LineChartIcon,
-    Activity
+    Search,
+    FileText,
+    CheckCircle2,
+    ArrowRight
 } from "lucide-react";
 
+import { useToast } from "@/hooks/use-toast";
 import { DynamicChart, DashboardPanel } from "@/components/erp/charts";
-import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
     Card,
     CardContent,
     CardHeader,
     CardTitle,
+    CardDescription,
 } from "@/components/ui/card";
 import {
     Tabs,
@@ -43,14 +45,40 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter
+} from "@/components/ui/dialog";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
-import { initialEmpleados, initialNovedades, initialLiquidaciones } from "@/lib/mock-data";
+import { initialEmpleados, initialNovedades, initialLiquidaciones, initialCuentas } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/utils";
 import { CreateEmployeeDialog } from "@/components/erp/create-employee-dialog";
 import { RegisterNovedadDialog } from "@/components/erp/register-novedad-dialog";
+import { Empleado, LiquidacionNomina, NovedadNomina } from "@/types/sistema";
+import { PayrollDetailDialog } from "@/components/erp/payroll-detail-dialog";
+import { EmployeeDetailDialog } from "@/components/erp/employee-detail-dialog";
 
 export default function TalentoHumanoPage() {
+    const { toast } = useToast();
     const [empleados, setEmpleados] = useState(initialEmpleados);
-    const [novedades, setNovedades] = useState(initialNovedades);
+    const [novedades, setNovedades] = useState<NovedadNomina[]>(initialNovedades as any);
+    // Casting initialNovedades as any because mock data might lack new fields yet
+    const [liquidaciones, setLiquidaciones] = useState<LiquidacionNomina[]>(initialLiquidaciones as any);
+
+    const [searchTerm, setSearchTerm] = useState("");
 
     const handleCreateEmployee = (newEmp: any) => {
         setEmpleados([newEmp, ...empleados]);
@@ -60,173 +88,192 @@ export default function TalentoHumanoPage() {
         setNovedades([newNov, ...novedades]);
     };
 
-    // --- DASHBOARD STATE ---
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: startOfYear(new Date()),
-        to: endOfYear(new Date()),
-    });
+    // --- EMPLOYEE DETAIL ---
+    const [selectedEmployee, setSelectedEmployee] = useState<Empleado | null>(null);
+    const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
 
-    const [payrollType, setPayrollType] = useState("area");
-    const [departmentType, setDepartmentType] = useState("pie");
-    const [absenteeismType, setAbsenteeismType] = useState("bar");
-
-    const filterData = (date: Date | string) => {
-        const d = new Date(date);
-        if (dateRange?.from) {
-            if (dateRange.to) return isWithinInterval(d, { start: dateRange.from, end: dateRange.to });
-            return d >= dateRange.from;
-        }
-        return true;
+    const handleEmployeeClick = (emp: Empleado) => {
+        setSelectedEmployee(emp);
+        setEmployeeDialogOpen(true);
     };
 
-    const dashboardFilteredLiquidations = initialLiquidaciones.filter(l => true); // Mock data has period string, difficult to filter by date exactly without parsing. Logic simplified for demo.
+    const handleEmployeeUpdate = (updated: Empleado) => {
+        setEmpleados(prev => prev.map(e => e.id === updated.id ? updated : e));
+    };
 
-    // Derived Data
-    // 1. Payroll Trend
-    const payrollTrendData = useMemo(() => {
-        // Mocking trend based on liquidations
-        const agg: Record<string, number> = {};
-        initialLiquidaciones.forEach(l => {
-            agg[l.periodo] = (agg[l.periodo] || 0) + l.netoPagar;
-        });
-        return Object.keys(agg).map(key => ({ name: key, value: agg[key] })).sort((a, b) => a.name.localeCompare(b.name));
-    }, []);
+    // --- FILTERS ---
+    const filteredEmpleados = empleados.filter(e =>
+        e.nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.cedula.includes(searchTerm)
+    );
 
-    // 2. Department Distribution
-    const departmentDistData = useMemo(() => {
-        const agg: Record<string, number> = {};
-        initialEmpleados.forEach(e => {
-            agg[e.cargo] = (agg[e.cargo] || 0) + 1;
-        });
-        return Object.keys(agg).map(k => ({ name: k, value: agg[k] })).sort((a, b) => b.value - a.value);
-    }, []);
+    const filteredNovedades = novedades.filter(n => {
+        const emp = empleados.find(e => e.id === n.empleadoId);
+        return emp?.nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) || n.tipo.includes(searchTerm);
+    });
 
+    const filteredLiquidaciones = liquidaciones.filter(l => {
+        const emp = empleados.find(e => e.id === l.empleadoId);
+        return emp?.nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) || l.periodo.includes(searchTerm);
+    });
 
-    // 3. Absenteeism (Novedades)
-    const absenteeismData = useMemo(() => {
-        const agg: Record<string, number> = {};
-        novedades.forEach(n => {
-            const typeName = n.tipo.replace(/_/g, " ");
-            agg[typeName] = (agg[typeName] || 0) + 1;
-        });
-        return Object.keys(agg).map(k => ({ name: k, value: agg[k] })).sort((a, b) => b.value - a.value);
-    }, [novedades]);
+    // --- PAYROLL GENERATION ---
+    const [isGenPayrollOpen, setIsGenPayrollOpen] = useState(false);
+    const [genPeriod, setGenPeriod] = useState(format(new Date(), "yyyy-MM"));
 
-    const kpiTotalEmployees = initialEmpleados.length;
-    const kpiTotalPayroll = initialLiquidaciones.reduce((acc, l) => acc + l.netoPagar, 0); // Total historical for demo
-    const kpiAvgSalary = kpiTotalPayroll / (initialLiquidaciones.length || 1);
+    const handleGeneratePayroll = () => {
+        if (!genPeriod) return;
 
+        const newLiquidaciones: LiquidacionNomina[] = empleados
+            .filter(e => e.estado === 'ACTIVO')
+            .map(emp => {
+                // Find novedades for this employee (ignoring date filter for mock simplicity, in real app filter by month)
+                const empNovedades = novedades.filter(n => n.empleadoId === emp.id);
 
-    const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+                const totalDevengadoExtras = empNovedades
+                    .filter(n => n.efecto === 'SUMA')
+                    .reduce((acc, n) => acc + n.valorCalculado, 0);
 
-    const totalNominaEstimada = initialEmpleados.reduce((acc, e) => acc + e.salarioBase, 0);
+                const totalDeducciones = empNovedades
+                    .filter(n => n.efecto === 'RESTA')
+                    .reduce((acc, n) => acc + n.valorCalculado, 0);
+
+                const totalDevengado = emp.salarioBase + totalDevengadoExtras;
+                const netoPagar = totalDevengado - totalDeducciones;
+
+                return {
+                    id: `LIQ-${Date.now()}-${emp.id}`,
+                    periodo: genPeriod,
+                    empleadoId: emp.id,
+                    empleado: emp,
+                    totalDevengado: totalDevengado,
+                    totalDeducido: totalDeducciones,
+                    netoPagar: netoPagar,
+                    estado: 'PENDIENTE',
+                    detalle: JSON.stringify({
+                        base: emp.salarioBase,
+                        extras: totalDevengadoExtras,
+                        novedades: empNovedades.map(n => ({ tipo: n.tipo, valor: n.valorCalculado, efecto: n.efecto }))
+                    })
+                };
+            });
+
+        setLiquidaciones(prev => [...newLiquidaciones, ...prev]);
+        toast({ title: "Nómina Generada", description: `Se han generado ${newLiquidaciones.length} desprendibles para el periodo ${genPeriod}` });
+        setIsGenPayrollOpen(false);
+    };
+
+    // --- PAYROLL PAYMENT ---
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [selectedLiq, setSelectedLiq] = useState<LiquidacionNomina | null>(null);
+    const [selectedAccount, setSelectedAccount] = useState("");
+
+    const handlePayClick = (liq: LiquidacionNomina) => {
+        setSelectedLiq(liq);
+        setPaymentModalOpen(true);
+    };
+
+    const handleConfirmPayment = () => {
+        if (!selectedLiq || !selectedAccount) return;
+
+        setLiquidaciones(prev => prev.map(l => l.id === selectedLiq.id ? { ...l, estado: 'PAGADO' as any } : l));
+
+        toast({ title: "Pago Realizado", description: `Se ha registrado el pago de ${formatCurrency(selectedLiq.netoPagar)} desde la cuenta seleccionada.` });
+        setPaymentModalOpen(false);
+        setSelectedLiq(null);
+        setSelectedAccount("");
+    };
+
+    // --- DETALLE NOMINA ---
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [detailNomina, setDetailNomina] = useState<LiquidacionNomina | null>(null);
+
+    const handleViewDetail = (liq: LiquidacionNomina) => {
+        setDetailNomina(liq);
+        setDetailOpen(true);
+    };
+
+    // --- KPI MOCKS ---
+    const kpiTotalEmployees = empleados.length;
+    const kpiTotalPayroll = liquidaciones.reduce((acc, l) => acc + l.netoPagar, 0);
+    const kpiAvgSalary = kpiTotalPayroll / (liquidaciones.length || 1);
 
     return (
         <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Talento Humano</h1>
-                <p className="text-muted-foreground">Gestión de personal, novedades y nómina.</p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Talento Humano</h1>
+                    <p className="text-muted-foreground">Gestión de personal, novedades y nómina.</p>
+                </div>
+                <div className="relative w-64">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Buscar empleado..."
+                        className="pl-8"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
             </div>
 
-            {/* KPIs Moved to Resumen Tab */}
-
-
-            {/* Main Tabs */}
-            <Tabs defaultValue="resumen" className="space-y-4">
+            <Tabs defaultValue="nomina" className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="resumen" className="gap-2"><LayoutDashboardIcon className="h-4 w-4" /> Resumen</TabsTrigger>
-                    <TabsTrigger value="empleados" className="gap-2"><Users className="h-4 w-4" /> Empleados</TabsTrigger>
-                    <TabsTrigger value="novedades" className="gap-2"><CalendarDays className="h-4 w-4" /> Novedades</TabsTrigger>
-                    <TabsTrigger value="nomina" className="gap-2"><Banknote className="h-4 w-4" /> Pagos de Nómina</TabsTrigger>
+                    <TabsTrigger value="resumen">Resumen</TabsTrigger>
+                    <TabsTrigger value="empleados">Empleados</TabsTrigger>
+                    <TabsTrigger value="novedades">Novedades</TabsTrigger>
+                    <TabsTrigger value="nomina">Pagos de Nómina</TabsTrigger>
+                    <TabsTrigger value="liquidaciones">Liquidaciones</TabsTrigger>
                 </TabsList>
 
-                {/* --- RESUMEN TAB --- */}
+                {/* RESUMEN TAB */}
                 <TabsContent value="resumen" className="space-y-6">
-                    {/* Filters NOT APPLIED for this mock demo as dates are strings/non-standard */}
-
-                    {/* KPIs */}
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        <Card className="shadow-sm border-l-4 border-l-primary bg-card">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium">Personal Activo</CardTitle>
-                                <Users className="h-4 w-4 text-primary" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{kpiTotalEmployees}</div>
-                                <p className="text-xs text-muted-foreground">Colaboradores registrados</p>
-                            </CardContent>
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <Card className="border-l-4 border-l-blue-500">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm">Personal Activo</CardTitle></CardHeader>
+                            <CardContent><div className="text-2xl font-bold">{kpiTotalEmployees}</div></CardContent>
                         </Card>
-                        <Card className="shadow-sm border-l-4 border-l-green-600 bg-card">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium">Total Nómina (Histórico)</CardTitle>
-                                <Banknote className="h-4 w-4 text-green-600" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{formatCurrency(kpiTotalPayroll)}</div>
-                                <p className="text-xs text-muted-foreground">Valor neto desembolsado</p>
-                            </CardContent>
+                        <Card className="border-l-4 border-l-green-500">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm">Nómina Acumulada</CardTitle></CardHeader>
+                            <CardContent><div className="text-2xl font-bold">{formatCurrency(kpiTotalPayroll)}</div></CardContent>
                         </Card>
-                        <Card className="shadow-sm border-l-4 border-l-purple-500 bg-card">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium">Promedio Pago</CardTitle>
-                                <Briefcase className="h-4 w-4 text-purple-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{formatCurrency(kpiAvgSalary)}</div>
-                                <p className="text-xs text-muted-foreground">Por liquidación</p>
-                            </CardContent>
+                        <Card className="border-l-4 border-l-purple-500">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm">Promedio Salarial</CardTitle></CardHeader>
+                            <CardContent><div className="text-2xl font-bold">{formatCurrency(kpiAvgSalary)}</div></CardContent>
                         </Card>
-                    </div>
-
-                    {/* Charts */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <DashboardPanel title="Evolución de Pago de Nómina" sub="Histórico por periodo" typeState={[payrollType, setPayrollType]}>
-                            <DynamicChart type={payrollType} data={payrollTrendData} dataKey="value" xAxisKey="name" color="#16A34A" />
-                        </DashboardPanel>
-                        <DashboardPanel title="Distribución por Cargo" sub="Personal según rol" typeState={[departmentType, setDepartmentType]}>
-                            <DynamicChart type={departmentType} data={departmentDistData} dataKey="value" xAxisKey="name" color="#8B5CF6" />
-                        </DashboardPanel>
-                        <DashboardPanel title="Tipos de Novedades" sub="Frecuencia de incidencias" typeState={[absenteeismType, setAbsenteeismType]}>
-                            <DynamicChart type={absenteeismType} data={absenteeismData} dataKey="value" xAxisKey="name" color="#F43F5E" />
-                        </DashboardPanel>
                     </div>
                 </TabsContent>
 
-                {/* --- EMPLEADOS TAB --- */}
+                {/* EMPLEADOS TAB */}
                 <TabsContent value="empleados" className="space-y-4">
                     <Card>
-                        <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle>Directorio de Personal</CardTitle>
-                                <CreateEmployeeDialog onEmployeeCreated={handleCreateEmployee} />
-                            </div>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Directorio de Personal</CardTitle>
+                            <CreateEmployeeDialog onEmployeeCreated={handleCreateEmployee} />
                         </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Nombre Completo</TableHead>
+                                        <TableHead>Nombre</TableHead>
                                         <TableHead>Cédula</TableHead>
                                         <TableHead>Cargo</TableHead>
-                                        <TableHead>Fecha Ingreso</TableHead>
                                         <TableHead>Salario Base</TableHead>
                                         <TableHead>Estado</TableHead>
-                                        <TableHead></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {empleados.map((emp) => (
-                                        <TableRow key={emp.id}>
+                                    {filteredEmpleados.map((emp) => (
+                                        <TableRow
+                                            key={emp.id}
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => handleEmployeeClick(emp)}
+                                        >
                                             <TableCell className="font-medium">{emp.nombreCompleto}</TableCell>
                                             <TableCell>{emp.cedula}</TableCell>
                                             <TableCell><Badge variant="outline">{emp.cargo}</Badge></TableCell>
-                                            <TableCell>{format(emp.fechaIngreso, "dd/MM/yyyy")}</TableCell>
                                             <TableCell>{formatCurrency(emp.salarioBase)}</TableCell>
-                                            <TableCell><Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">ACTIVO</Badge></TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm">Perfil</Button>
-                                            </TableCell>
+                                            <TableCell><Badge className="bg-green-100 text-green-800">ACTIVO</Badge></TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -235,14 +282,12 @@ export default function TalentoHumanoPage() {
                     </Card>
                 </TabsContent>
 
-                {/* --- NOVEDADES TAB --- */}
+                {/* NOVEDADES TAB */}
                 <TabsContent value="novedades" className="space-y-4">
                     <Card>
-                        <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle>Registro de Novedades (Extras, Recargos, Ausencias)</CardTitle>
-                                <RegisterNovedadDialog empleados={empleados} onNovedadCreated={handleCreateNovedad} />
-                            </div>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Registro de Novedades</CardTitle>
+                            <RegisterNovedadDialog empleados={empleados} onNovedadCreated={handleCreateNovedad} />
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -250,19 +295,25 @@ export default function TalentoHumanoPage() {
                                     <TableRow>
                                         <TableHead>Fecha</TableHead>
                                         <TableHead>Empleado</TableHead>
-                                        <TableHead>Tipo Novedad</TableHead>
-                                        <TableHead>Cantidad (Horas/Días)</TableHead>
-                                        <TableHead>Valor Calculado</TableHead>
+                                        <TableHead>Tipo</TableHead>
+                                        <TableHead>Detalle</TableHead>
+                                        <TableHead>Valor</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {novedades.map((nov) => (
+                                    {filteredNovedades.map((nov) => (
                                         <TableRow key={nov.id}>
-                                            <TableCell>{format(nov.fecha, "dd MMM yyyy", { locale: es })}</TableCell>
-                                            <TableCell className="font-medium">{initialEmpleados.find(e => e.id === nov.empleadoId)?.nombreCompleto || nov.empleadoId}</TableCell>
-                                            <TableCell><Badge variant="secondary">{nov.tipo.replace(/_/g, " ")}</Badge></TableCell>
-                                            <TableCell>{nov.cantidad}</TableCell>
-                                            <TableCell>{formatCurrency(nov.valorCalculado)}</TableCell>
+                                            <TableCell>{format(nov.fecha, "dd/MM/yyyy")}</TableCell>
+                                            <TableCell className="font-medium">{empleados.find(e => e.id === nov.empleadoId)?.nombreCompleto}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={nov.efecto === 'RESTA' ? 'destructive' : 'secondary'}>
+                                                    {nov.tipo.replace(/_/g, " ")}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{nov.cantidad} (Rate: {formatCurrency(nov.valorUnitario || 0)})</TableCell>
+                                            <TableCell className={nov.efecto === 'RESTA' ? "text-red-500" : "text-green-600"}>
+                                                {nov.efecto === 'RESTA' ? '-' : '+'}{formatCurrency(nov.valorCalculado)}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -271,35 +322,117 @@ export default function TalentoHumanoPage() {
                     </Card>
                 </TabsContent>
 
-                {/* --- NOMINA TAB --- */}
+                {/* NOMINA TAB (Massive Gen & Pay) */}
                 <TabsContent value="nomina" className="space-y-4">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Historial de Pagos</CardTitle>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Pagos de Nómina</CardTitle>
+                                <CardDescription>Gestionar pagos masivos y ver desprendibles.</CardDescription>
+                            </div>
+                            <Dialog open={isGenPayrollOpen} onOpenChange={setIsGenPayrollOpen}>
+                                <DialogTrigger asChild>
+                                    <Button><Banknote className="mr-2 h-4 w-4" /> Generar Nómina Mensual</Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Generar Desprendibles</DialogTitle>
+                                        <CardDescription>Esto calculará la nómina para todos los empleados activos.</CardDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                            <Label>Periodo (Mes/Año)</Label>
+                                            <Input type="month" value={genPeriod} onChange={(e) => setGenPeriod(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button onClick={handleGeneratePayroll}>Generar</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </CardHeader>
+                        <CardContent>
+                            {/* Group by Period using Accordion */}
+                            <Accordion type="single" collapsible className="w-full">
+                                {Array.from(new Set(filteredLiquidaciones.map(l => l.periodo))).sort().reverse().map(period => (
+                                    <AccordionItem key={period} value={period}>
+                                        <AccordionTrigger className="hover:no-underline">
+                                            <div className="flex justify-between w-full pr-4">
+                                                <span>Periodo: {period}</span>
+                                                <Badge variant="outline">{filteredLiquidaciones.filter(l => l.periodo === period).length} Empleados</Badge>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Empleado</TableHead>
+                                                        <TableHead>Base</TableHead>
+                                                        <TableHead>Novedades</TableHead>
+                                                        <TableHead>Neto</TableHead>
+                                                        <TableHead>Estado</TableHead>
+                                                        <TableHead className="text-right">Acciones</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {filteredLiquidaciones.filter(l => l.periodo === period).map(liq => (
+                                                        <TableRow key={liq.id}>
+                                                            <TableCell className="font-medium">{liq.empleado.nombreCompleto}</TableCell>
+                                                            <TableCell>{formatCurrency(liq.empleado.salarioBase)}</TableCell>
+                                                            <TableCell className="text-xs">
+                                                                <span className="text-green-600">+{formatCurrency(liq.totalDevengado - liq.empleado.salarioBase)}</span>
+                                                                {" / "}
+                                                                <span className="text-red-500">-{formatCurrency(liq.totalDeducido)}</span>
+                                                            </TableCell>
+                                                            <TableCell className="font-bold">{formatCurrency(liq.netoPagar)}</TableCell>
+                                                            <TableCell>
+                                                                {liq.estado === 'PAGADO' ?
+                                                                    <Badge className="bg-green-100 text-green-800">PAGADO</Badge> :
+                                                                    <Badge variant="secondary">PENDIENTE</Badge>
+                                                                }
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <Button size="sm" variant="ghost" onClick={() => handleViewDetail(liq)}>Ver</Button>
+                                                                {liq.estado !== 'PAGADO' && (
+                                                                    <Button size="sm" onClick={() => handlePayClick(liq)}>Pagar</Button>
+                                                                )}
+                                                                {liq.estado === 'PAGADO' && (
+                                                                    <Button size="sm" variant="ghost" disabled><CheckCircle2 className="h-4 w-4 text-green-600" /></Button>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* LIQUIDACIONES TAB (Archive) */}
+                <TabsContent value="liquidaciones">
+                    <Card>
+                        <CardHeader><CardTitle>Historial Completo</CardTitle></CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Periodo</TableHead>
                                         <TableHead>Empleado</TableHead>
-                                        <TableHead>Total Devengado</TableHead>
-                                        <TableHead>Total Deducido</TableHead>
-                                        <TableHead>Neto a Pagar</TableHead>
-                                        <TableHead></TableHead>
+                                        <TableHead>Neto</TableHead>
+                                        <TableHead>Estado</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {initialLiquidaciones.map((liq) => (
+                                    {filteredLiquidaciones.map(liq => (
                                         <TableRow key={liq.id}>
-                                            <TableCell className="font-mono">{liq.periodo}</TableCell>
+                                            <TableCell>{liq.periodo}</TableCell>
                                             <TableCell>{liq.empleado.nombreCompleto}</TableCell>
-                                            <TableCell>{formatCurrency(liq.totalDevengado)}</TableCell>
-                                            <TableCell className="text-red-500">{formatCurrency(liq.totalDeducido)}</TableCell>
-                                            <TableCell className="font-bold text-green-600">{formatCurrency(liq.netoPagar)}</TableCell>
-                                            <TableCell className="text-right">
-                                                <Button size="icon" variant="ghost"><Banknote className="h-4 w-4" /></Button>
-                                            </TableCell>
+                                            <TableCell>{formatCurrency(liq.netoPagar)}</TableCell>
+                                            <TableCell>{liq.estado}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -308,6 +441,69 @@ export default function TalentoHumanoPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Payment Modal */}
+            <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirmar Pago de Nómina</DialogTitle>
+                        <DialogDescription>
+                            Seleccione la cuenta de origen para debitar el pago.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedLiq && (
+                        <div className="py-4 space-y-4">
+                            <div className="p-3 bg-muted rounded-md space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span>Empleado:</span>
+                                    <span className="font-bold">{selectedLiq.empleado.nombreCompleto}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Periodo:</span>
+                                    <span>{selectedLiq.periodo}</span>
+                                </div>
+                                <div className="flex justify-between border-t pt-2 mt-2">
+                                    <span>Total a Pagar:</span>
+                                    <span className="font-bold text-lg text-primary">{formatCurrency(selectedLiq.netoPagar)}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Cuenta Bancaria (Origen)</Label>
+                                <Select onValueChange={setSelectedAccount} value={selectedAccount}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccione cuenta..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {initialCuentas.map(acc => (
+                                            <SelectItem key={acc.id} value={acc.id}>
+                                                {acc.nombre} ({acc.banco} - {formatCurrency(acc.saldoActual)})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setPaymentModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleConfirmPayment} disabled={!selectedAccount}>Confirmar Pago</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <PayrollDetailDialog open={detailOpen} onOpenChange={setDetailOpen} nomina={detailNomina} />
+
+            <EmployeeDetailDialog
+                open={employeeDialogOpen}
+                onOpenChange={setEmployeeDialogOpen}
+                empleado={selectedEmployee}
+                liquidaciones={liquidaciones}
+                novedades={novedades}
+                onUpdate={handleEmployeeUpdate}
+            />
         </div>
     );
 }

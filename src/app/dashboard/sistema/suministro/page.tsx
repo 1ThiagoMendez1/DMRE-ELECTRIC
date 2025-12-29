@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/table";
 
 import { initialProveedores, initialCuentasPorPagar } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/utils";
 import { CreateSupplierDialog } from "@/components/erp/create-supplier-dialog";
 import { SupplierProfileDialog } from "@/components/erp/supplier-profile-dialog";
 
@@ -107,7 +108,7 @@ export default function SuministroPage() {
     const kpiTotalPaid = dashboardFilteredPayables.reduce((acc, cxp) => acc + cxp.valorPagado, 0);
 
 
-    const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+
 
     const totalDeuda = cuentasPorPagar.reduce((acc, cxp) => acc + cxp.saldoPendiente, 0);
 

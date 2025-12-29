@@ -15,17 +15,20 @@ import { es } from "date-fns/locale";
 
 interface ClientProfileDialogProps {
     cliente: any;
+    trigger?: React.ReactNode;
 }
 
-export function ClientProfileDialog({ cliente }: ClientProfileDialogProps) {
+export function ClientProfileDialog({ cliente, trigger }: ClientProfileDialogProps) {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="sm">
-                    Ver Perfil
-                </Button>
+                {trigger || (
+                    <Button variant="ghost" size="sm">
+                        Ver Perfil
+                    </Button>
+                )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[700px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Building className="h-5 w-5 text-primary" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -36,7 +36,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 // Schema
 const novedadSchema = z.object({
@@ -51,6 +51,9 @@ const novedadSchema = z.object({
     }),
     cantidad: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
         message: "La cantidad debe ser positiva.",
+    }),
+    valorUnitario: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, {
+        message: "El valor unitario debe ser válido.",
     }),
     observaciones: z.string().optional(),
 });
@@ -68,38 +71,64 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
         resolver: zodResolver(novedadSchema),
         defaultValues: {
             fecha: new Date(),
-            cantidad: "",
+            cantidad: "1",
+            valorUnitario: "0",
             observaciones: "",
         },
     });
 
+    // Auto-calculate base rate based on employee salary if selected (Mock logic)
+    const selectedEmpleadoId = form.watch("empleadoId");
+    useEffect(() => {
+        if (selectedEmpleadoId) {
+            const emp = empleados.find(e => e.id === selectedEmpleadoId);
+            if (emp) {
+                // Assume 240 hours month work (30 days * 8 hours)
+                const hourlyRate = Math.round(emp.salarioBase / 240);
+                form.setValue("valorUnitario", hourlyRate.toString());
+            }
+        }
+    }, [selectedEmpleadoId, empleados, form]);
+
     const onSubmit = async (values: z.infer<typeof novedadSchema>) => {
         // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Simple calculation logic for demo
-        const rate = 10000; // hourly/daily base rate
-        let valorCalculado = Number(values.cantidad) * rate;
-        if (values.tipo === 'AUSENCIA_INJUS' || values.tipo === 'LICENCIA_NO_REM') {
-            valorCalculado = 0; // Deduction logic handled elsewhere usually
-        }
+        const rate = Number(values.valorUnitario);
+        const qty = Number(values.cantidad);
+        let valorCalculado = qty * rate;
+
+        // Deduction Logic
+        const isDeduction = ['AUSENCIA_INJUS', 'LICENCIA_NO_REM', 'SANCION', 'PRESTAMO'].includes(values.tipo);
+        const efecto = isDeduction ? 'RESTA' : 'SUMA';
+
+        // Recargo logic (example: Recargo Nocturno = 35% extra, assuming rate is base)
+        // Check if rate provided is "Extra Value" or "Full Value". Assuming Full Value here for simplicity.
+        // If user inputs the surcharge value directly, we use that.
 
         const newNovedad = {
             id: `NOV-${Math.floor(Math.random() * 10000)}`,
             fecha: values.fecha,
             empleadoId: values.empleadoId,
             tipo: values.tipo,
-            cantidad: Number(values.cantidad),
-            valorCalculado: valorCalculado
+            cantidad: qty,
+            valorUnitario: rate,
+            valorCalculado: valorCalculado,
+            efecto: efecto,
         };
 
         onNovedadCreated(newNovedad);
         toast({
             title: "Novedad registrada",
-            description: `Se ha registrado la novedad para el empleado.`,
+            description: `Se ha registrado ${formatCurrency(valorCalculado)} (${efecto}) para el empleado.`,
         });
         setOpen(false);
-        form.reset();
+        form.reset({
+            fecha: new Date(),
+            cantidad: "1",
+            valorUnitario: "0",
+            observaciones: ""
+        });
     };
 
     return (
@@ -110,11 +139,11 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                     Registrar Novedad
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>Registrar Novedad de Nómina</DialogTitle>
                     <DialogDescription>
-                        Ingrese horas extras, recargos, ausencias o licencias.
+                        Ingrese horas extras, recargos, o deducciones. El valor se calculará automáticamente.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -189,13 +218,13 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="tipo"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Tipo Novedad</FormLabel>
+                                    <FormItem className="col-span-1">
+                                        <FormLabel>Tipo</FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl>
                                                 <SelectTrigger>
@@ -203,14 +232,15 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
-                                                <SelectItem value="HE_DIURNA">Hora Extra Diurna</SelectItem>
-                                                <SelectItem value="HE_NOCTURNA">Hora Extra Nocturna</SelectItem>
-                                                <SelectItem value="HE_DOM_FES">Hora Extra Dom/Fes</SelectItem>
+                                                <SelectItem value="HE_DIURNA">H.E. Diurna</SelectItem>
+                                                <SelectItem value="HE_NOCTURNA">H.E. Nocturna</SelectItem>
+                                                <SelectItem value="HE_DOM_FES">H.E. Dom/Fes</SelectItem>
                                                 <SelectItem value="RECARGO_NOCTURNO">Recargo Nocturno</SelectItem>
-                                                <SelectItem value="AUSENCIA_INJUS">Ausencia Injustificada</SelectItem>
+                                                <SelectItem value="BONIFICACION">Bonificación</SelectItem>
+                                                <SelectItem value="AUSENCIA_INJUS">Ausencia (Deducción)</SelectItem>
                                                 <SelectItem value="INCAPACIDAD">Incapacidad</SelectItem>
-                                                <SelectItem value="LICENCIA_REM">Licencia Remunerada</SelectItem>
-                                                <SelectItem value="LICENCIA_NO_REM">Licencia No Remunerada</SelectItem>
+                                                <SelectItem value="LICENCIA_NO_REM">Licencia NR (Deducción)</SelectItem>
+                                                <SelectItem value="PRESTAMO">Préstamo (Deducción)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -223,14 +253,35 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                                 name="cantidad"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Cantidad (Horas/Días)</FormLabel>
+                                        <FormLabel>Cant (Horas/Días)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" placeholder="Ej: 2" {...field} />
+                                            <Input type="number" placeholder="Ej: 8" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
+
+                            <FormField
+                                control={form.control}
+                                name="valorUnitario"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Valor por Hora/Día</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="bg-muted p-3 rounded-md text-sm flex justify-between items-center">
+                            <span>Total Estimado:</span>
+                            <span className="font-bold text-lg">
+                                {formatCurrency(Number(form.watch("cantidad")) * Number(form.watch("valorUnitario")))}
+                            </span>
                         </div>
 
                         <DialogFooter>

@@ -30,7 +30,9 @@ import {
     CreditoEmpleado,
     TareaAgenda,
     Role,
-    Permission
+    Permission,
+    CodigoTrabajo,
+    MaterialAsociado
 } from "@/types/sistema";
 import { addDays, subDays } from "date-fns";
 
@@ -123,6 +125,7 @@ const generateInventario = (count: number): InventarioItem[] => {
             tipo: isCompuesto ? 'COMPUESTO' : 'SIMPLE',
             materiales: isCompuesto ? Array.from({ length: randomInt(2, 4) }, (_, j) => ({
                 id: `MAT-${i}-${j}`,
+                inventarioId: `INV-MOCK-${j}`,
                 descripcion: randomItem(materialesNames),
                 unidad: 'KG',
                 cantidad: randomInt(1, 5),
@@ -404,25 +407,69 @@ const generateLiquidaciones = (count: number, empleados: Empleado[]): Liquidacio
 // --- NEW GENERATORS ---
 
 const generateDotacionItems = (): DotacionItem[] => [
-    { id: 'DOT-1', descripcion: 'Camisa Polo Institucional', talla: 'M', cantidadDisponible: 50 },
-    { id: 'DOT-2', descripcion: 'Botas de Seguridad Dielectricas', talla: '40', cantidadDisponible: 20 },
-    { id: 'DOT-3', descripcion: 'Casco de Seguridad', talla: 'Unica', cantidadDisponible: 30 },
-    { id: 'DOT-4', descripcion: 'Guantes de Carnaza', talla: 'L', cantidadDisponible: 100 },
+    {
+        id: 'DOT-1',
+        descripcion: 'Camisa Polo Institucional',
+        categoria: 'UNIFORME',
+        genero: 'UNISEX',
+        variantes: [
+            { id: 'v1', talla: 'S', color: 'Azul', cantidadDisponible: 15 },
+            { id: 'v2', talla: 'M', color: 'Azul', cantidadDisponible: 50 },
+            { id: 'v3', talla: 'L', color: 'Azul', cantidadDisponible: 40 },
+        ]
+    },
+    {
+        id: 'DOT-2',
+        descripcion: 'Botas de Seguridad Dielectricas',
+        categoria: 'EPP',
+        genero: 'UNISEX',
+        variantes: [
+            { id: 'v4', talla: '38', color: 'Negro', cantidadDisponible: 10 },
+            { id: 'v5', talla: '40', color: 'Negro', cantidadDisponible: 20 },
+            { id: 'v6', talla: '42', color: 'Negro', cantidadDisponible: 15 },
+        ]
+    },
+    {
+        id: 'DOT-3',
+        descripcion: 'Casco de Seguridad',
+        categoria: 'EPP',
+        genero: 'UNISEX',
+        variantes: [
+            { id: 'v7', talla: 'Unica', color: 'Blanco', cantidadDisponible: 30 },
+            { id: 'v8', talla: 'Unica', color: 'Amarillo', cantidadDisponible: 10 },
+        ]
+    },
+    {
+        id: 'DOT-4',
+        descripcion: 'Guantes de Carnaza',
+        categoria: 'EPP',
+        genero: 'UNISEX',
+        variantes: [
+            { id: 'v9', talla: 'Unica', color: 'Gris', cantidadDisponible: 100 },
+        ]
+    },
 ];
 
 const generateEntregasDotacion = (count: number, empleados: Empleado[], items: DotacionItem[]): EntregaDotacion[] => {
-    return Array.from({ length: count }, (_, i) => ({
-        id: `ENT-DOT-${i + 1}`,
-        fecha: randomDate(2024, 2025),
-        empleadoId: randomItem(empleados).id,
-        empleado: randomItem(empleados),
-        items: [{
-            dotacionId: items[0].id,
-            descripcion: items[0].descripcion,
-            cantidad: randomInt(1, 2)
-        }],
-        observacion: "Entrega trimestral"
-    }));
+    return Array.from({ length: count }, (_, i) => {
+        const item = randomItem(items);
+        const variant = randomItem(item.variantes);
+        return {
+            id: `ENT-DOT-${i + 1}`,
+            fecha: randomDate(2024, 2025),
+            empleadoId: randomItem(empleados).id,
+            empleado: randomItem(empleados),
+            items: [{
+                dotacionId: item.id,
+                varianteId: variant.id,
+                descripcion: item.descripcion,
+                detalle: `${variant.talla} - ${variant.color}`,
+                cantidad: randomInt(1, 2)
+            }],
+            estado: randomItem(['ASIGNADO', 'ENTREGADO']) as any,
+            observacion: "Entrega trimestral"
+        };
+    });
 };
 
 const generateCreditosEmpleados = (count: number, empleados: Empleado[]): CreditoEmpleado[] => {
@@ -516,5 +563,52 @@ export const initialRoles: Role[] = [
         permisos: [],
         color: "bg-gray-500",
         isSystemRole: true
+    }
+];
+
+// Códigos de Trabajo
+export const initialCodigosTrabajo: CodigoTrabajo[] = [
+    {
+        id: "COD-001",
+        codigo: "COD-001",
+        nombre: "Punto de red certificado Cat 6A",
+        descripcion: "Instalación y certificación de punto de red categoría 6A, incluye cableado hasta 30 metros.",
+        manoDeObra: 85000,
+        materiales: [
+            { id: "M1", inventarioId: "INV-001", nombre: "Cable UTP Cat 6A", cantidad: 30, valorUnitario: 2500 },
+            { id: "M2", nombre: "Conector RJ45", cantidad: 2, valorUnitario: 3500 },
+            { id: "M3", nombre: "Face Plate", cantidad: 1, valorUnitario: 8000 }
+        ],
+        costoTotalMateriales: 90000,
+        costoTotal: 175000,
+        fechaCreacion: new Date(2024, 0, 15)
+    },
+    {
+        id: "COD-002",
+        codigo: "COD-002",
+        nombre: "Salida de iluminación LED",
+        descripcion: "Instalación de punto de luz LED, incluye cableado y conexión a tablero.",
+        manoDeObra: 65000,
+        materiales: [
+            { id: "M4", nombre: "Cable #12 THHN", cantidad: 15, valorUnitario: 1800 },
+            { id: "M5", nombre: "Interruptor sencillo", cantidad: 1, valorUnitario: 12000 }
+        ],
+        costoTotalMateriales: 39000,
+        costoTotal: 104000,
+        fechaCreacion: new Date(2024, 1, 10)
+    },
+    {
+        id: "COD-003",
+        codigo: "COD-003",
+        nombre: "Tablero de distribución 12 circuitos",
+        descripcion: "Montaje y conexionado de tablero eléctrico principal con protecciones.",
+        manoDeObra: 250000,
+        materiales: [
+            { id: "M7", nombre: "Tablero 12 circuitos", cantidad: 1, valorUnitario: 180000 },
+            { id: "M8", nombre: "Breaker 20A", cantidad: 6, valorUnitario: 25000 }
+        ],
+        costoTotalMateriales: 330000,
+        costoTotal: 580000,
+        fechaCreacion: new Date(2024, 2, 5)
     }
 ];

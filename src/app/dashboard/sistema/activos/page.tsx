@@ -17,6 +17,7 @@ import {
     Activity
 } from "lucide-react";
 
+import { useToast } from "@/hooks/use-toast";
 import { DynamicChart, DashboardPanel } from "@/components/erp/charts";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
@@ -46,12 +47,14 @@ import {
 } from "@/components/ui/table";
 
 import { initialVehiculos, initialGastosVehiculos } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/utils";
 import { CreateVehicleDialog } from "@/components/erp/create-vehicle-dialog";
 import { RegisterExpenseDialog } from "@/components/erp/register-expense-dialog";
 
 export default function ActivosPage() {
     const [vehiculos, setVehiculos] = useState(initialVehiculos);
     const [gastos, setGastos] = useState(initialGastosVehiculos);
+    const { toast } = useToast();
 
     const handleCreateVehicle = (newVeh: any) => {
         setVehiculos([newVeh, ...vehiculos]);
@@ -116,7 +119,7 @@ export default function ActivosPage() {
     const kpiTotalMaintenace = dashboardFilteredExpenses.filter(g => g.tipo !== 'COMBUSTIBLE').reduce((acc, g) => acc + g.valor, 0);
 
 
-    const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+
 
     const checkExpiration = (date: Date) => {
         const daysLeft = Math.ceil((new Date(date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -259,7 +262,7 @@ export default function ActivosPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="sm">Historial</Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => toast({ title: `Historial: ${veh.placa}`, description: `Gastos registrados: ${gastos.filter(g => g.vehiculo.id === veh.id).length}. Revise la pestaña 'Bitácora de Gastos'.` })}>Historial</Button>
                                                 </TableCell>
                                             </TableRow>
                                         )

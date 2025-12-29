@@ -19,7 +19,10 @@ import {
     PieChart as PieChartIcon,
     BarChart3,
     LineChart as LineChartIcon,
-    Table as TableIcon
+    Table as TableIcon,
+    Pencil,
+    Trash2,
+    Briefcase
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 import {
     Card,
     CardContent,
@@ -64,7 +68,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { initialClients, initialQuotes, initialFacturas } from "@/lib/mock-data";
+import { initialClients, initialQuotes, initialFacturas, initialInventory } from "@/lib/mock-data";
 import { EstadoCotizacion } from "@/types/sistema";
 import { CreateClientDialog } from "@/components/erp/create-client-dialog";
 import { CreateProjectDialog } from "@/components/erp/create-project-dialog";
@@ -72,12 +76,34 @@ import { EditClientDialog } from "@/components/erp/edit-client-dialog";
 import { ClientProfileDialog } from "@/components/erp/client-profile-dialog";
 import { EditQuoteDialog } from "@/components/erp/edit-quote-dialog";
 import { generateQuotePDF } from "@/utils/pdf-generator";
+import { Cotizador } from "../cotizacion/cotizador";
+import { TrabajoHistoryDialog } from "@/components/erp/trabajo-history-dialog";
+import { FacturaHistoryDialog } from "@/components/erp/factura-history-dialog";
+import { CreateFacturaDialog } from "@/components/erp/create-factura-dialog";
+import { Factura } from "@/types/sistema";
 
 export default function CommercialPage() {
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState("");
     const [clientes, setClientes] = useState(initialClients);
     const [cotizaciones, setCotizaciones] = useState(initialQuotes);
+    const [facturas, setFacturas] = useState(initialFacturas);
+
+    // Calculate next Invoice ID (Synced with Financiera Logic)
+    const nextInvoiceId = useMemo(() => {
+        if (facturas.length === 0) return "Fac-0001";
+        const ids = facturas.map(f => {
+            const num = parseInt(f.id.replace(/[^0-9]/g, ''));
+            return isNaN(num) ? 0 : num;
+        });
+        const maxId = Math.max(0, ...ids);
+        return `Fac-${String(maxId + 1).padStart(4, '0')}`;
+    }, [facturas]);
+
+    const handleCreateInvoice = (newInvoice: Factura) => {
+        setFacturas([newInvoice, ...facturas]);
+        toast({ title: "Factura Creada", description: `Factura ${newInvoice.id} registrada exitosamente.` });
+    };
 
     // --- DASHBOARD STATE ---
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -147,14 +173,7 @@ export default function CommercialPage() {
 
 
 
-    // --- HELPER FUNCTIONS ---
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            maximumFractionDigits: 0
-        }).format(value);
-    };
+
 
     const formatDate = (date: Date) => {
         return format(new Date(date), "dd MMM yyyy", { locale: es });
@@ -215,11 +234,11 @@ export default function CommercialPage() {
     }, [searchTerm, projects]);
 
     const filteredInvoices = useMemo(() => {
-        return initialFacturas.filter(f =>
+        return facturas.filter(f =>
             f.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
             f.cotizacion.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [searchTerm]);
+    }, [searchTerm, facturas]);
 
     return (
         <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
@@ -239,8 +258,9 @@ export default function CommercialPage() {
                 <TabsList>
                     <TabsTrigger value="resumen" className="gap-2"><LayoutDashboardIcon className="h-4 w-4" /> Resumen</TabsTrigger>
                     <TabsTrigger value="clientes" className="gap-2"><Users className="h-4 w-4" /> Clientes</TabsTrigger>
-                    <TabsTrigger value="ofertas" className="gap-2"><FileText className="h-4 w-4" /> Ofertas y Proyectos</TabsTrigger>
-                    <TabsTrigger value="facturacion" className="gap-2"><Receipt className="h-4 w-4" /> Facturación y Cartera</TabsTrigger>
+                    <TabsTrigger value="trabajos" className="gap-2"><Briefcase className="h-4 w-4" /> Trabajos</TabsTrigger>
+                    <TabsTrigger value="cotizador" className="gap-2"><FileText className="h-4 w-4" /> Cotizador</TabsTrigger>
+                    <TabsTrigger value="facturacion" className="gap-2"><Receipt className="h-4 w-4" /> Facturación</TabsTrigger>
                 </TabsList>
 
                 {/* --- RESUMEN TAB --- */}
@@ -368,7 +388,16 @@ export default function CommercialPage() {
                                 <TableBody>
                                     {filteredClients.map((client) => (
                                         <TableRow key={client.id}>
-                                            <TableCell className="font-medium">{client.nombre}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <ClientProfileDialog
+                                                    cliente={client}
+                                                    trigger={
+                                                        <span className="cursor-pointer hover:underline text-primary">
+                                                            {client.nombre}
+                                                        </span>
+                                                    }
+                                                />
+                                            </TableCell>
                                             <TableCell>{client.documento}</TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
@@ -395,20 +424,23 @@ export default function CommercialPage() {
                     </Card>
                 </TabsContent>
 
-                {/* --- OFERTAS TAB --- */}
-                <TabsContent value="ofertas" className="space-y-4">
+                {/* --- TRABAJOS TAB --- */}
+                <TabsContent value="trabajos" className="space-y-4">
                     <Card>
                         <CardHeader>
                             <div className="flex justify-between items-center">
-                                <CardTitle>Control de Ofertas y Proyectos</CardTitle>
-                                <div className="relative w-64">
-                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Buscar oferta o cliente..."
-                                        className="pl-8"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
+                                <CardTitle>Control de Trabajos</CardTitle>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Buscar trabajo o cliente..."
+                                            className="pl-8"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <CreateProjectDialog clientes={clients} onProjectCreated={handleCreateProject} />
                                 </div>
                             </div>
                         </CardHeader>
@@ -416,55 +448,92 @@ export default function CommercialPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>ID Oferta</TableHead>
+                                        <TableHead>ID</TableHead>
                                         <TableHead>Cliente</TableHead>
-                                        <TableHead>Descripción / Tipo</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Fecha Creación</TableHead>
+                                        <TableHead>Última Actualización</TableHead>
                                         <TableHead>Progreso</TableHead>
-                                        <TableHead>Valor Total</TableHead>
+                                        <TableHead>Valor</TableHead>
                                         <TableHead>Estado</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
+                                        <TableHead className="text-center">Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredQuotes.map((quote) => (
                                         <TableRow key={quote.id}>
-                                            <TableCell className="font-mono">{quote.numero}</TableCell>
-                                            <TableCell className="font-medium">{quote.cliente.nombre}</TableCell>
+                                            <TableCell className="font-mono text-xs">{quote.numero}</TableCell>
                                             <TableCell>
-                                                <div className="flex flex-col max-w-[200px]">
-                                                    <span className="truncate" title={quote.descripcionTrabajo}>{quote.descripcionTrabajo}</span>
+                                                <TrabajoHistoryDialog
+                                                    trabajo={quote}
+                                                    onTrabajoUpdated={(updated) => setCotizaciones(prev => prev.map(q => q.id === updated.id ? updated : q))}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col max-w-[180px]">
+                                                    <span className="truncate text-sm" title={quote.descripcionTrabajo}>{quote.descripcionTrabajo}</span>
                                                     <Badge variant="outline" className="w-fit text-[10px] mt-1">{quote.tipo}</Badge>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="w-[150px]">
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {format(quote.fecha, "dd/MM/yyyy", { locale: es })}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {format(quote.fechaActualizacion || quote.fecha, "dd/MM/yyyy", { locale: es })}
+                                            </TableCell>
+                                            <TableCell className="w-[120px]">
                                                 <div className="flex flex-col gap-1">
                                                     <Progress value={getProgressValue(quote.estado)} className="h-2" />
                                                     <span className="text-[10px] text-muted-foreground text-right">{getProgressValue(quote.estado)}%</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{formatCurrency(quote.total)}</TableCell>
+                                            <TableCell className="font-mono text-sm">{formatCurrency(quote.total)}</TableCell>
                                             <TableCell>
                                                 <Badge className={getStatusColor(quote.estado)} variant="secondary">
                                                     {quote.estado.replace('_', ' ')}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                        <DropdownMenuItem onClick={() => toast({ title: "Detalles", description: `Viendo detalles de oferta ${quote.numero}` })}>Ver Detalles</DropdownMenuItem>
-                                                        <EditQuoteDialog
-                                                            cotizacion={quote}
-                                                            onQuoteUpdated={(updated) => setCotizaciones(prev => prev.map(q => q.id === updated.id ? updated : q))}
-                                                        />
-                                                        <DropdownMenuItem onClick={() => generateQuotePDF(quote)}>Generar PDF</DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                            <TableCell>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <TrabajoHistoryDialog
+                                                        trabajo={quote}
+                                                        onTrabajoUpdated={(updated) => setCotizaciones(prev => prev.map(q => q.id === updated.id ? updated : q))}
+                                                        defaultTab="items"
+                                                        trigger={
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                title="Editar"
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                        }
+                                                    />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        title="Eliminar"
+                                                        onClick={() => {
+                                                            if (confirm(`¿Eliminar trabajo ${quote.numero}?`)) {
+                                                                setCotizaciones(prev => prev.filter(q => q.id !== quote.id));
+                                                                toast({ title: "Eliminado", description: "Trabajo eliminado correctamente" });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                        title="Generar PDF"
+                                                        onClick={() => generateQuotePDF(quote)}
+                                                    >
+                                                        <FileText className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -480,14 +549,17 @@ export default function CommercialPage() {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Facturación y Gestión de Cobro</CardTitle>
-                                <div className="relative w-64">
-                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Buscar factura..."
-                                        className="pl-8"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
+                                <div className="flex items-center gap-2">
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Buscar factura..."
+                                            className="pl-8"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <CreateFacturaDialog onFacturaCreated={handleCreateInvoice} nextId={nextInvoiceId} />
                                 </div>
                             </div>
                         </CardHeader>
@@ -502,6 +574,7 @@ export default function CommercialPage() {
                                         <TableHead>Valor Facturado</TableHead>
                                         <TableHead>Saldo Pendiente</TableHead>
                                         <TableHead>Estado</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -518,10 +591,11 @@ export default function CommercialPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium">{inv.cotizacion.cliente.nombre}</span>
-                                                        <span className="text-xs text-muted-foreground">REF: {inv.cotizacion.numero}</span>
-                                                    </div>
+                                                    <FacturaHistoryDialog
+                                                        factura={inv}
+                                                        onFacturaUpdated={(updated) => setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f))}
+                                                    />
+                                                    <span className="text-xs text-muted-foreground block">REF: {inv.cotizacion.numero}</span>
                                                 </TableCell>
                                                 <TableCell>{formatCurrency(inv.valorFacturado)}</TableCell>
                                                 <TableCell className={inv.saldoPendiente > 0 ? "font-bold text-orange-600 dark:text-orange-400" : "text-muted-foreground"}>
@@ -532,11 +606,35 @@ export default function CommercialPage() {
                                                         {inv.estado}
                                                     </Badge>
                                                 </TableCell>
+                                                <TableCell>
+                                                    <FacturaHistoryDialog
+                                                        factura={inv}
+                                                        onFacturaUpdated={(updated) => setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f))}
+                                                        trigger={
+                                                            <Button variant="outline" size="sm" className="text-xs">
+                                                                Gestionar
+                                                            </Button>
+                                                        }
+                                                    />
+                                                </TableCell>
                                             </TableRow>
                                         )
                                     })}
                                 </TableBody>
                             </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* --- COTIZADOR TAB --- */}
+                <TabsContent value="cotizador" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Crear Nueva Cotización</CardTitle>
+                            <CardDescription>Use el formulario para generar una nueva oferta comercial.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Cotizador clientes={clientes} inventario={initialInventory} onClose={() => { }} />
                         </CardContent>
                     </Card>
                 </TabsContent>

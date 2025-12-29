@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -49,19 +49,59 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { formatCurrency } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
-import { initialInventory, initialMovimientosInventario } from "@/lib/mock-data";
+import { initialInventory, initialMovimientosInventario, initialRegistros, initialCodigosTrabajo } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { RegisterInventoryMovementDialog } from "@/components/erp/register-inventory-movement-dialog";
+import { RegistroTable } from "../registro/registro-table";
 
 import { EditInventoryDialog } from "@/components/erp/edit-inventory-dialog";
+import { CreateInventoryItemDialog } from "@/components/erp/create-inventory-item-dialog";
+import { CreateCodigoTrabajoDialog } from "@/components/erp/create-codigo-trabajo-dialog";
+import { MovementDetailDialog } from "@/components/erp/movement-detail-dialog";
+import { CodigoDetailDialog } from "@/components/erp/codigo-detail-dialog";
 
 export default function OperacionesPage() {
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState("");
+
+    // Core Data State
     const [movements, setMovements] = useState(initialMovimientosInventario);
     const [inventory, setInventory] = useState(initialInventory);
+    const [codigos, setCodigos] = useState(initialCodigosTrabajo);
+
+    // Filter/Chart State
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: startOfYear(new Date()),
+        to: endOfYear(new Date())
+    });
+    const [inventoryType, setInventoryType] = useState('pie');
+    const [movementType, setMovementType] = useState('bar');
+    const [categoryType, setCategoryType] = useState('bar');
+
+    // Detail Dialog States
+    const [selectedMovement, setSelectedMovement] = useState<any>(null);
+    const [movementDetailOpen, setMovementDetailOpen] = useState(false);
+    const [selectedCodigo, setSelectedCodigo] = useState<any>(null);
+    const [codigoDetailOpen, setCodigoDetailOpen] = useState(false);
+
+    // Alerts Effect
+    useEffect(() => {
+        const lowStockCount = inventory.filter(i => i.cantidad <= i.stockMinimo).length;
+        if (lowStockCount > 0) {
+            // Use a small timeout to avoid initial render clashes or double toasts
+            const timer = setTimeout(() => {
+                toast({
+                    title: "⚠️ Alerta de Stock",
+                    description: `Tienes ${lowStockCount} items con stock bajo. Revisa el resumen.`,
+                    variant: "destructive",
+                });
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [inventory, toast]);
 
     const handleCreateMovement = (newMov: any) => {
         setMovements([newMov, ...movements]);
@@ -71,102 +111,67 @@ export default function OperacionesPage() {
         setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
     };
 
-    // --- DASHBOARD STATE ---
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: startOfYear(new Date()),
-        to: endOfYear(new Date()),
-    });
+    // Calculations
+    const filteredMovements = useMemo(() => {
+        if (!dateRange?.from) return movements;
+        return movements.filter(m => isWithinInterval(m.fecha, { start: dateRange.from!, end: dateRange.to || dateRange.from! }));
+    }, [movements, dateRange]);
 
-    const [inventoryType, setInventoryType] = useState("pie");
-    const [movementType, setMovementType] = useState("bar");
-    const [categoryType, setCategoryType] = useState("bar");
+    const totalValue = inventory.reduce((acc, item) => acc + (item.cantidad * item.valorUnitario), 0);
+    const totalItems = inventory.length;
+    const lowStockItems = inventory.filter(i => i.cantidad <= i.stockMinimo).length;
+    const kpiMovementsIn = filteredMovements.filter(m => m.tipo === 'ENTRADA').length;
+    const kpiMovementsOut = filteredMovements.filter(m => m.tipo === 'SALIDA').length;
 
-    const filterData = (date: Date | string) => {
-        const d = new Date(date);
-        if (dateRange?.from) {
-            if (dateRange.to) return isWithinInterval(d, { start: dateRange.from, end: dateRange.to });
-            return d >= dateRange.from;
-        }
-        return true;
-    };
-
-    const dashboardFilteredMovements = useMemo(() => {
-        return initialMovimientosInventario.filter(m => filterData(m.fecha));
-    }, [dateRange]);
-
-    // Derived Data
-    // 1. Value by Category
+    // Chart Data Preparation
     const valueByCategory = useMemo(() => {
-        const agg: Record<string, number> = {};
-        initialInventory.forEach(i => {
-            agg[i.categoria] = (agg[i.categoria] || 0) + (i.cantidad * i.valorUnitario);
-        });
-        return Object.keys(agg).map(k => ({ name: k, value: agg[k] })).sort((a, b) => b.value - a.value);
-    }, []);
+        const ag = inventory.reduce((acc, item) => {
+            acc[item.categoria] = (acc[item.categoria] || 0) + (item.cantidad * item.valorUnitario);
+            return acc;
+        }, {} as Record<string, number>);
+        return Object.entries(ag).map(([name, value]) => ({ name, value }));
+    }, [inventory]);
 
-    // 2. Movements Trend
     const movementTrend = useMemo(() => {
-        const agg: Record<string, number> = {};
-        dashboardFilteredMovements.forEach(m => {
-            const dateStr = new Date(m.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
-            agg[dateStr] = (agg[dateStr] || 0) + 1;
-        });
-        return Object.keys(agg).map(k => ({ name: k, count: agg[k] })).sort((a, b) => a.name.localeCompare(b.name));
-    }, [dashboardFilteredMovements]);
+        // Group by day for the last 30 days or range
+        const ag = filteredMovements.reduce((acc, m) => {
+            const day = format(m.fecha, "dd MMM", { locale: es });
+            acc[day] = (acc[day] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+        // Sort by date would require clearer objects, here we rely on mock order or randomness
+        // Ideally fill blanks.
+        return Object.entries(ag).map(([name, count]) => ({ name, count })).slice(0, 7); // Show last 7 active days for demo
+    }, [filteredMovements]);
 
-    // 3. Low Stock Distribution
     const lowStockDist = useMemo(() => {
-        const agg: Record<string, number> = {};
-        initialInventory.filter(i => i.cantidad <= i.stockMinimo).forEach(i => {
-            agg[i.categoria] = (agg[i.categoria] || 0) + 1;
-        });
-        return Object.keys(agg).map(k => ({ name: k, count: agg[k] })).sort((a, b) => b.count - a.count);
-    }, []);
+        const ag = inventory.filter(i => i.cantidad <= i.stockMinimo).reduce((acc, item) => {
+            acc[item.categoria] = (acc[item.categoria] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+        return Object.entries(ag).map(([name, count]) => ({ name, count }));
+    }, [inventory]);
 
-    const kpiTotalMovements = dashboardFilteredMovements.length;
-    const kpiMovementsIn = dashboardFilteredMovements.filter(m => m.tipo === 'ENTRADA').length;
-    const kpiMovementsOut = dashboardFilteredMovements.filter(m => m.tipo === 'SALIDA').length;
-
-
-    // --- KPIs ---
-    const totalItems = initialInventory.length;
-    const lowStockItems = initialInventory.filter(i => i.cantidad <= i.stockMinimo).length;
-    const totalValue = initialInventory.reduce((acc, i) => acc + (i.cantidad * i.valorUnitario), 0);
-
-    const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
-
-    // Filtered Data
-    const filteredInventory = useMemo(() => {
-        return initialInventory.filter(i =>
-            i.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            i.sku.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [searchTerm]);
 
     return (
-        <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Operaciones e Inventario</h1>
-                <p className="text-muted-foreground">Gestión de catálogo, stock y movimientos de almacén.</p>
+        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+            <div className="flex items-center justify-between space-y-2">
+                <h2 className="text-3xl font-bold tracking-tight">Operaciones y Logística</h2>
             </div>
-
-            {/* KPIs Moved to Resumen Tab */}
-
-            {/* Main Tabs */}
             <Tabs defaultValue="resumen" className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="resumen" className="gap-2"><LayoutDashboardIcon className="h-4 w-4" /> Resumen</TabsTrigger>
-                    <TabsTrigger value="catalogo" className="gap-2"><Package className="h-4 w-4" /> Catálogo de Artículos</TabsTrigger>
-                    <TabsTrigger value="movimientos" className="gap-2"><ArrowUpFromLine className="h-4 w-4" /> Movimientos</TabsTrigger>
+                    <TabsTrigger value="resumen">Resumen General</TabsTrigger>
+                    <TabsTrigger value="catalogo" id="tab-catalogo">Catálogo</TabsTrigger>
+                    <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
+                    <TabsTrigger value="registro">Registro Obras</TabsTrigger>
+                    <TabsTrigger value="codigos">Códigos Trabajo</TabsTrigger>
                 </TabsList>
 
                 {/* --- RESUMEN TAB --- */}
-                <TabsContent value="resumen" className="space-y-6">
-                    {/* Filters */}
-                    <div className="flex flex-wrap items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase">Rango de Fechas (Movimientos)</span>
+                <TabsContent value="resumen" className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-medium">Filtro de Análisis</h3>
                             <DatePickerWithRange value={dateRange} onChange={setDateRange} />
                         </div>
                         <div className="flex-1 text-right pt-4">
@@ -218,6 +223,22 @@ export default function OperacionesPage() {
                         </Card>
                     </div>
 
+                    {/* Quick Filters - Low Stock Alert Box */}
+                    {inventory.some(i => i.cantidad <= i.stockMinimo) && (
+                        <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 p-4 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                <div>
+                                    <h4 className="font-semibold text-orange-800 dark:text-orange-300">Items con Stock Bajo Detectados</h4>
+                                    <p className="text-sm text-orange-700 dark:text-orange-400">Hay items que requieren reabastecimiento urgente.</p>
+                                </div>
+                            </div>
+                            <Button variant="outline" className="border-orange-200 hover:bg-orange-100 hover:text-orange-800 dark:border-orange-800 dark:hover:bg-orange-900" onClick={() => document.getElementById("tab-catalogo")?.click()}>
+                                Ver Inventario
+                            </Button>
+                        </div>
+                    )}
+
                     {/* Charts */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <DashboardPanel title="Valor por Categoría" sub="Distribución monetaria del stock" typeState={[inventoryType, setInventoryType]}>
@@ -238,14 +259,17 @@ export default function OperacionesPage() {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Inventario Actual</CardTitle>
-                                <div className="relative w-64">
-                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Buscar por nombre o SKU..."
-                                        className="pl-8"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
+                                <div className="flex items-center gap-2">
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Buscar por nombre o SKU..."
+                                            className="pl-8"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <CreateInventoryItemDialog onItemCreated={(newItem) => setInventory([...inventory, newItem])} />
                                 </div>
                             </div>
                         </CardHeader>
@@ -317,8 +341,15 @@ export default function OperacionesPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {initialMovimientosInventario.map((mov) => (
-                                        <TableRow key={mov.id}>
+                                    {movements.map((mov) => (
+                                        <TableRow
+                                            key={mov.id}
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => {
+                                                setSelectedMovement(mov);
+                                                setMovementDetailOpen(true);
+                                            }}
+                                        >
                                             <TableCell>{format(mov.fecha, "dd/MM/yyyy HH:mm")}</TableCell>
                                             <TableCell>
                                                 <Badge variant={mov.tipo === 'ENTRADA' ? 'default' : 'secondary'} className={mov.tipo === 'SALIDA' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'}>
@@ -342,7 +373,77 @@ export default function OperacionesPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                {/* --- REGISTRO OBRAS TAB --- */}
+                <TabsContent value="registro" className="space-y-4">
+                    <RegistroTable data={initialRegistros} />
+                </TabsContent>
+
+                {/* --- CODIGOS TRABAJO TAB --- */}
+                <TabsContent value="codigos" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2">
+                                    <Activity className="h-5 w-5" /> Códigos de Trabajo Estándar
+                                </CardTitle>
+                                <CreateCodigoTrabajoDialog onCodigoCreated={(newCod) => setCodigos([...codigos, newCod])} />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[100px]">Código</TableHead>
+                                        <TableHead>Nombre / Descripción</TableHead>
+                                        <TableHead className="text-center">Materiales</TableHead>
+                                        <TableHead className="text-right">Mano Obra</TableHead>
+                                        <TableHead className="text-right">Total</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {codigos.map((codigo) => (
+                                        <TableRow
+                                            key={codigo.id}
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => {
+                                                setSelectedCodigo(codigo);
+                                                setCodigoDetailOpen(true);
+                                            }}
+                                        >
+                                            <TableCell className="font-mono font-medium">{codigo.codigo}</TableCell>
+                                            <TableCell>
+                                                <div className="font-medium">{codigo.nombre}</div>
+                                                <div className="text-xs text-muted-foreground truncate max-w-[300px]">{codigo.descripcion}</div>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="secondary">{codigo.materiales.length} items</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">{formatCurrency(codigo.manoDeObra)}</TableCell>
+                                            <TableCell className="text-right font-mono font-bold text-primary">{formatCurrency(codigo.costoTotal)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
             </Tabs>
+
+            {/* Dialogs outside Tabs to prevent nesting issues */}
+            <MovementDetailDialog
+                open={movementDetailOpen}
+                onOpenChange={setMovementDetailOpen}
+                movement={selectedMovement}
+            />
+
+            <CodigoDetailDialog
+                open={codigoDetailOpen}
+                onOpenChange={setCodigoDetailOpen}
+                codigo={selectedCodigo}
+                onUpdate={(updated) => setCodigos(codigos.map(c => c.id === updated.id ? updated : c))}
+            />
         </div>
     );
 }

@@ -25,6 +25,7 @@ export interface Cliente {
 
 export interface Material {
     id: string;
+    inventarioId: string; // Link to source item
     descripcion: string;
     unidad: string;
     cantidad: number;
@@ -67,7 +68,7 @@ export interface CotizacionItem {
     valorTotal: number;
 }
 
-export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'APROBADA' | 'RECHAZADA' | 'PENDIENTE' | 'NO_APROBADA' | 'EN_EJECUCION' | 'FINALIZADA';
+export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'APROBADA' | 'RECHAZADA' | 'PENDIENTE' | 'NO_APROBADA' | 'EN_EJECUCION' | 'FINALIZADA';
 export type TipoOferta = 'NORMAL' | 'SIMPLIFICADA';
 
 export interface Cotizacion {
@@ -86,6 +87,7 @@ export interface Cotizacion {
     iva: number;
     total: number;
     estado: EstadoCotizacion;
+    fechaActualizacion?: Date; // Track last update
 }
 
 // --- NEW ERP MODULES TYPES ---
@@ -117,6 +119,7 @@ export interface CuentaBancaria {
     tipo: TipoCuenta;
     saldoActual: number;
     numeroCuenta?: string;
+    banco?: string;
 }
 
 export type TipoMovimiento = 'INGRESO' | 'EGRESO';
@@ -144,6 +147,16 @@ export interface ObligacionFinanciera {
     saldoCapital: number;
     valorCuota: number;
     fechaInicio: Date;
+    pagos?: PagoObligacion[];
+}
+
+export interface PagoObligacion {
+    id: string;
+    fecha: Date;
+    valor: number;
+    interes?: number;
+    capital?: number;
+    saldoRestante: number;
 }
 
 // 3. OPERACIONES (Inventario Movements extended)
@@ -230,7 +243,9 @@ export interface NovedadNomina {
     fecha: Date;
     tipo: TipoNovedad;
     cantidad: number; // Horas o Valor
+    valorUnitario: number; // Valor por hora/día
     valorCalculado: number;
+    efecto: 'SUMA' | 'RESTA';
 }
 
 export interface LiquidacionNomina {
@@ -241,6 +256,7 @@ export interface LiquidacionNomina {
     totalDevengado: number;
     totalDeducido: number;
     netoPagar: number;
+    estado: 'PENDIENTE' | 'PAGADO';
     detalle: string; // JSON stringify data
 }
 
@@ -266,11 +282,27 @@ export interface RegistroObra {
 }
 
 // 7. DOTACIÓN
+export interface DotacionVariant {
+    id: string;
+    talla: string;
+    color: string;
+    cantidadDisponible: number;
+}
+
 export interface DotacionItem {
     id: string;
     descripcion: string;
-    talla: string;
-    cantidadDisponible: number;
+    categoria: 'UNIFORME' | 'EPP' | 'HERRAMIENTA';
+    genero: 'HOMBRE' | 'MUJER' | 'UNISEX';
+    variantes: DotacionVariant[];
+}
+
+export interface EntregaDotacionItem {
+    dotacionId: string;
+    varianteId: string;
+    descripcion: string;
+    detalle: string; // "Talla M - Color Azul"
+    cantidad: number;
 }
 
 export interface EntregaDotacion {
@@ -278,11 +310,9 @@ export interface EntregaDotacion {
     fecha: Date;
     empleadoId: string;
     empleado: Empleado;
-    items: {
-        dotacionId: string;
-        descripcion: string;
-        cantidad: number;
-    }[];
+    items: EntregaDotacionItem[];
+    estado: 'ASIGNADO' | 'ENTREGADO' | 'RECHAZADO';
+    fechaAceptacion?: Date;
     observacion: string;
 }
 
@@ -330,3 +360,23 @@ export interface Role {
     isSystemRole: boolean; // Cannot be deleted if true
 }
 
+// 11. CÓDIGOS DE TRABAJO
+export interface MaterialAsociado {
+    id: string;
+    inventarioId?: string; // Reference to InventarioItem
+    nombre: string;
+    cantidad: number;
+    valorUnitario: number;
+}
+
+export interface CodigoTrabajo {
+    id: string;
+    codigo: string; // COD-001
+    nombre: string;
+    descripcion: string;
+    manoDeObra: number;
+    materiales: MaterialAsociado[];
+    costoTotalMateriales: number;
+    costoTotal: number; // manoDeObra + costoTotalMateriales
+    fechaCreacion: Date;
+}

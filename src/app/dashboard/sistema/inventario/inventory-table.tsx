@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { InventarioItem, Material } from "@/types/sistema";
 import {
     Table,
@@ -22,14 +22,19 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
+
 import { formatDateES } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { InventoryFormDialog } from "@/components/erp/inventory-form-dialog";
+import { RegisterInventoryMovementDialog } from "@/components/erp/register-inventory-movement-dialog";
+import { Cotizacion } from "@/types/sistema";
 
 interface InventoryTableProps {
     data: InventarioItem[];
+    cotizaciones?: Cotizacion[];
 }
 
-export function InventoryTable({ data: initialData }: InventoryTableProps) {
+export function InventoryTable({ data: initialData, cotizaciones = [] }: InventoryTableProps) {
     const [data, setData] = useState<InventarioItem[]>(initialData);
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -76,6 +81,23 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
         setIsDialogOpen(true);
     };
 
+    const handleRegisterMovement = (mov: any) => {
+        // Logic to update inventory based on movement
+        const itemIndex = data.findIndex(i => i.id === mov.articuloId);
+        if (itemIndex > -1) {
+            const updatedItems = [...data];
+            const item = { ...updatedItems[itemIndex] };
+
+            if (mov.tipo === 'ENTRADA') {
+                item.cantidad += mov.cantidad;
+            } else {
+                item.cantidad -= mov.cantidad;
+            }
+            updatedItems[itemIndex] = item;
+            setData(updatedItems);
+        }
+    };
+
     const handleEdit = (item: InventarioItem) => {
         setCurrentItem({ ...item });
         setIsDialogOpen(true);
@@ -87,17 +109,16 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
         }
     };
 
-    const handleSave = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (currentItem.id) {
+    const handleSave = (item: InventarioItem) => {
+        if (item.id && data.some(i => i.id === item.id)) {
             // Update
-            setData(data.map(item => item.id === currentItem.id ? currentItem as InventarioItem : item));
+            setData(data.map(i => i.id === item.id ? item : i));
         } else {
             // Create
             const newItem = {
-                ...currentItem,
-                id: `INV-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-                valorTotal: (currentItem.valorUnitario || 0) * (currentItem.cantidad || 0)
+                ...item,
+                id: item.id || `INV-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+                fechaCreacion: new Date()
             } as InventarioItem;
             setData([newItem, ...data]);
         }
@@ -116,9 +137,12 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                         className="pl-9 bg-background/50"
                     />
                 </div>
-                <Button onClick={handleAddNew} className="electric-button font-bold w-full sm:w-auto">
-                    <Plus className="mr-2 h-4 w-4" /> Nuevo Item
-                </Button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <RegisterInventoryMovementDialog articulos={data} onMovementCreated={handleRegisterMovement} />
+                    <Button onClick={handleAddNew} className="electric-button font-bold flex-1 sm:flex-none">
+                        <Plus className="mr-2 h-4 w-4" /> Nuevo Item
+                    </Button>
+                </div>
             </div>
 
             <div className="rounded-md border bg-card text-card-foreground shadow-sm">
@@ -146,7 +170,7 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                             </TableRow>
                         ) : (
                             paginatedData.map((item) => (
-                                <>
+                                <React.Fragment key={item.id}>
                                     <TableRow key={item.id} className={expandedRows.has(item.id) ? "bg-muted/50" : ""}>
                                         <TableCell className="pl-4">
                                             {item.tipo === 'COMPUESTO' && (
@@ -165,7 +189,31 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                                         <TableCell className="font-medium">{item.item}</TableCell>
                                         <TableCell className="max-w-[300px] truncate" title={item.descripcion}>{item.descripcion}</TableCell>
                                         <TableCell>{item.unidad}</TableCell>
-                                        <TableCell>{item.cantidad}</TableCell>
+                                        <TableCell className="text-center">
+                                            {(() => {
+                                                // Calculate Reserved Stock from Quotes
+                                                const reserved = cotizaciones
+                                                    .filter(c => c.estado !== 'NO_APROBADA' && c.estado !== 'RECHAZADA' && c.estado !== 'BORRADOR') // Descontar si está en proceso
+                                                    .flatMap(c => c.items)
+                                                    .filter(quoteItem => quoteItem.inventarioId === item.id)
+                                                    .reduce((sum, quoteItem) => sum + quoteItem.cantidad, 0);
+
+                                                const available = item.cantidad - reserved;
+
+                                                return (
+                                                    <div className="flex flex-col items-center">
+                                                        <span className={available < 0 ? "text-red-600 font-bold" : "font-medium"}>
+                                                            {available} {item.unidad}
+                                                        </span>
+                                                        {reserved > 0 && (
+                                                            <span className="text-[10px] text-muted-foreground" title="Reservado en cotizaciones">
+                                                                (Físico: {item.cantidad})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant={item.tipo === 'SIMPLE' ? 'secondary' : 'default'} className="text-[10px]">
                                                 {item.tipo}
@@ -228,7 +276,7 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                </>
+                                </React.Fragment>
                             ))
                         )}
                     </TableBody>
@@ -259,73 +307,20 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
             </div>
 
 
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle>{currentItem.id ? "Editar Item" : "Nuevo Item"}</DialogTitle>
-                        <DialogDescription>
-                            Detalles del producto o servicio.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleSave}>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="item" className="text-right">Código</Label>
-                                <Input
-                                    id="item"
-                                    value={currentItem.item || ""}
-                                    onChange={(e) => setCurrentItem({ ...currentItem, item: e.target.value })}
-                                    className="col-span-3"
-                                    placeholder="Ej. MAT-001"
-                                    required
-                                />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="desc" className="text-right">Descripción</Label>
-                                <Input
-                                    id="desc"
-                                    value={currentItem.descripcion || ""}
-                                    onChange={(e) => setCurrentItem({ ...currentItem, descripcion: e.target.value })}
-                                    className="col-span-3"
-                                    required
-                                />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="unidad" className="text-right">Unidad</Label>
-                                <Input
-                                    id="unidad"
-                                    value={currentItem.unidad || ""}
-                                    onChange={(e) => setCurrentItem({ ...currentItem, unidad: e.target.value })}
-                                    className="col-span-3"
-                                />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="cantidad" className="text-right">Cantidad</Label>
-                                <Input
-                                    id="cantidad"
-                                    type="number"
-                                    value={currentItem.cantidad || 0}
-                                    onChange={(e) => setCurrentItem({ ...currentItem, cantidad: parseFloat(e.target.value) })}
-                                    className="col-span-3"
-                                />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="precio" className="text-right">Valor Unitario</Label>
-                                <Input
-                                    id="precio"
-                                    type="number"
-                                    value={currentItem.valorUnitario || 0}
-                                    onChange={(e) => setCurrentItem({ ...currentItem, valorUnitario: parseFloat(e.target.value) })}
-                                    className="col-span-3"
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit">Guardar</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-        </div >
+
+            <div className="flex items-center justify-end space-x-2 py-4">
+                <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={currentPage === 1}>Anterior</Button>
+                <div className="text-sm text-muted-foreground">Página {currentPage} de {totalPages || 1}</div>
+                <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0}>Siguiente</Button>
+            </div>
+
+            <InventoryFormDialog
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                initialData={currentItem}
+                onSave={handleSave}
+                availableItems={data}
+            />
+        </div>
     );
 }
