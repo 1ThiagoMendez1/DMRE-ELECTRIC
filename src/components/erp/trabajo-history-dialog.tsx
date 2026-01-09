@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -62,7 +62,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem } from "@/types/sistema";
 import { generateQuotePDF } from "@/utils/pdf-generator";
-import { initialInventory } from "@/lib/mock-data";
+import { initialInventory, initialCodigosTrabajo } from "@/lib/mock-data";
+import { ProductSelectorDialog } from "./product-selector-dialog";
 
 interface HistorialEntry {
     id: string;
@@ -112,10 +113,39 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
 
     // Add item dialog
     const [showAddItem, setShowAddItem] = useState(false);
-    const [searchItem, setSearchItem] = useState("");
+
+    // Global Settings (Initialize from Trabajo or Defaults)
+    const [globalDiscountPct, setGlobalDiscountPct] = useState(trabajo.descuentoGlobalPorcentaje || 0);
+    const [globalIvaPct, setGlobalIvaPct] = useState(trabajo.impuestoGlobalPorcentaje || 19);
+
+    // AIU Global Defaults
+    const [aiuAdminPct, setAiuAdminPct] = useState(trabajo.aiuAdminGlobalPorcentaje || 0);
+    const [aiuImprevPct, setAiuImprevPct] = useState(trabajo.aiuImprevistoGlobalPorcentaje || 0);
+    const [aiuUtilPct, setAiuUtilPct] = useState(trabajo.aiuUtilidadGlobalPorcentaje || 0);
+    const [ivaUtilPct, setIvaUtilPct] = useState(trabajo.ivaUtilidadGlobalPorcentaje || 19);
+
+    const visibleItems = useMemo(() => items.filter(i => i.visibleEnPdf), [items]);
+
+    // Update all items when global AIU changes (User Requirement: "si se pone un 5%... automatico para todos")
+    const updateGlobalAiu = (type: 'ADMIN' | 'IMPREV' | 'UTIL' | 'IVAUTIL', value: number) => {
+        if (type === 'ADMIN') setAiuAdminPct(value);
+        if (type === 'IMPREV') setAiuImprevPct(value);
+        if (type === 'UTIL') setAiuUtilPct(value);
+        if (type === 'IVAUTIL') setIvaUtilPct(value);
+
+        setItems(prev => prev.map(item => ({
+            ...item,
+            aiuAdminPorcentaje: type === 'ADMIN' ? value : item.aiuAdminPorcentaje,
+            aiuImprevistoPorcentaje: type === 'IMPREV' ? value : item.aiuImprevistoPorcentaje,
+            aiuUtilidadPorcentaje: type === 'UTIL' ? value : item.aiuUtilidadPorcentaje,
+            ivaUtilidadPorcentaje: type === 'IVAUTIL' ? value : item.ivaUtilidadPorcentaje,
+        })));
+    };
+
 
     // Anexo materiales toggle
     const [showAnexoMateriales, setShowAnexoMateriales] = useState(true);
+    const [showMaterialsInline, setShowMaterialsInline] = useState(false); // New: Inline materials in PDF preview
 
     // Simulate history - in production this would come from backend
     const [historial, setHistorial] = useState<HistorialEntry[]>([
@@ -137,19 +167,70 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
         }] : [])
     ]);
 
-    // Filtered inventory for adding items
-    const filteredInventory = useMemo(() => {
-        return initialInventory.filter(i =>
-            i.descripcion.toLowerCase().includes(searchItem.toLowerCase()) ||
-            i.sku.toLowerCase().includes(searchItem.toLowerCase())
-        ).slice(0, 10);
-    }, [searchItem]);
 
-    // Calculate totals from visible items
-    const visibleItems = items.filter(i => i.visibleEnPdf);
-    const subtotal = useMemo(() => items.reduce((acc, item) => acc + item.valorTotal, 0), [items]);
-    const iva = subtotal * 0.19;
-    const total = subtotal + iva;
+
+
+
+    // Calculate totals with AIU logic
+    const { subtotal, descuento, iva, total, totalAiuAdmin, totalAiuImprev, totalAiuUtil } = useMemo(() => {
+        let sub = 0;
+        let tAdmin = 0;
+        let tImprev = 0;
+        let tUtil = 0;
+
+        // Sum up derived values from items
+        const itemResults = items.map(item => {
+            const cost = item.costoUnitario || (item.valorUnitario * 0.7); // Fallback if no cost (approx margin)
+
+            // Item AIU Values
+            const admin = cost * ((item.aiuAdminPorcentaje || 0) / 100);
+            const imprev = cost * ((item.aiuImprevistoPorcentaje || 0) / 100);
+            const util = cost * ((item.aiuUtilidadPorcentaje || 0) / 100);
+
+            // Price Sale Base (Cost + AIU)
+            const priceSale = cost + admin + imprev + util;
+
+            // IVA on Utility (if applicable)
+            const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
+
+            // Item Final Total (Unitary)
+            const itemTotalUnit = priceSale + ivaUtilVal;
+
+            // Total Line
+            const lineTotal = itemTotalUnit * item.cantidad;
+
+            return {
+                lineTotal,
+                admin: admin * item.cantidad,
+                imprev: imprev * item.cantidad,
+                util: util * item.cantidad
+            };
+        });
+
+        sub = itemResults.reduce((acc, r) => acc + r.lineTotal, 0);
+        tAdmin = itemResults.reduce((acc, r) => acc + r.admin, 0);
+        tImprev = itemResults.reduce((acc, r) => acc + r.imprev, 0);
+        tUtil = itemResults.reduce((acc, r) => acc + r.util, 0);
+
+        // Apply Global Discount to the Subtotal
+        const discountVal = sub * (globalDiscountPct / 100);
+        const subAfterDiscount = sub - discountVal;
+
+        // Apply Global IVA (Standard Tax on the whole amount, if configured)
+        // Note: If IVA on Utility is used, usually Global IVA is 0 or specific logic. 
+        // We faithfully apply what the user asked: "Recuerda el IVA anterior" + AIU logic.
+        const totalIva = subAfterDiscount * (globalIvaPct / 100);
+
+        return {
+            subtotal: sub,
+            descuento: discountVal,
+            iva: totalIva,
+            total: subAfterDiscount + totalIva,
+            totalAiuAdmin: tAdmin,
+            totalAiuImprev: tImprev,
+            totalAiuUtil: tUtil
+        };
+    }, [items, globalDiscountPct, globalIvaPct]);
 
     const handleAddNote = () => {
         if (!newNote.trim()) return;
@@ -212,29 +293,33 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
         }));
     };
 
-    const handleAddItem = (inventarioItem: InventarioItem) => {
-        const newItem: ItemConVisibilidad = {
-            id: `NEW-${Date.now()}`,
-            inventarioId: inventarioItem.id,
-            descripcion: inventarioItem.descripcion,
-            cantidad: 1,
-            valorUnitario: inventarioItem.valorUnitario,
-            valorTotal: inventarioItem.valorUnitario,
-            visibleEnPdf: true,
+    const handleAddItem = (newItem: CotizacionItem) => {
+        const itemWithVis: ItemConVisibilidad = {
+            ...newItem,
+            visibleEnPdf: true
         };
 
-        setItems(prev => [...prev, newItem]);
+        const updatedItems = [...items, itemWithVis];
+        setItems(updatedItems);
 
-        const entry: HistorialEntry = {
-            id: Date.now().toString(),
+        // Update parent
+        const updatedTrabajo = {
+            ...trabajo,
+            items: updatedItems,
+        };
+        onTrabajoUpdated(updatedTrabajo);
+
+        // Add history entry
+        const historyEntry: HistorialEntry = {
+            id: crypto.randomUUID(),
             fecha: new Date(),
             tipo: 'ITEM_AGREGADO',
-            descripcion: `Item agregado: ${inventarioItem.descripcion}`,
-            usuario: 'Usuario Actual',
+            descripcion: `Se agregó el item: ${newItem.descripcion}`,
+            usuario: 'Usuario Actual'
         };
-        setHistorial(h => [entry, ...h]);
+        setHistorial(h => [historyEntry, ...h]);
         setShowAddItem(false);
-        setSearchItem("");
+
     };
 
     const handleRemoveItem = (itemId: string) => {
@@ -433,98 +518,165 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                 Agregar Item
                             </Button>
                         </div>
+                        <div className="bg-muted p-2 rounded mb-4 grid grid-cols-4 gap-4">
+                            <div>
+                                <Label className="text-xs">AIU Admin %</Label>
+                                <Input
+                                    type="number"
+                                    value={aiuAdminPct}
+                                    onChange={e => updateGlobalAiu('ADMIN', Number(e.target.value))}
+                                    className="h-7 text-xs"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs">AIU Imprev %</Label>
+                                <Input
+                                    type="number"
+                                    value={aiuImprevPct}
+                                    onChange={e => updateGlobalAiu('IMPREV', Number(e.target.value))}
+                                    className="h-7 text-xs"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs">AIU Util %</Label>
+                                <Input
+                                    type="number"
+                                    value={aiuUtilPct}
+                                    onChange={e => updateGlobalAiu('UTIL', Number(e.target.value))}
+                                    className="h-7 text-xs"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs">IVA s/Util %</Label>
+                                <Input
+                                    type="number"
+                                    value={ivaUtilPct}
+                                    disabled={aiuUtilPct === 0} // "si agrega un % en utilidad automaticamente este tambien debe habilitarlo"
+                                    onChange={e => updateGlobalAiu('IVAUTIL', Number(e.target.value))}
+                                    className="h-7 text-xs"
+                                />
+                            </div>
+                        </div>
 
                         <Card>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[50px]">PDF</TableHead>
                                             <TableHead>Descripción</TableHead>
-                                            <TableHead className="w-[100px]">Cantidad</TableHead>
-                                            <TableHead className="text-right">V. Unitario</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
-                                            <TableHead className="w-[80px]"></TableHead>
+                                            <TableHead className="w-[60px]">Cant.</TableHead>
+                                            <TableHead className="text-right w-[100px]">P. Prov.</TableHead>
+                                            <TableHead className="text-right w-[100px]">P. Venta</TableHead>
+                                            <TableHead className="text-center w-[60px]">Adm %</TableHead>
+                                            <TableHead className="text-center w-[60px]">Imp %</TableHead>
+                                            <TableHead className="text-center w-[60px]">Util %</TableHead>
+                                            <TableHead className="text-center w-[60px]">IVA U%</TableHead>
+                                            <TableHead className="text-right w-[110px]">Total</TableHead>
+                                            <TableHead className="w-[40px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {items.map((item) => (
-                                            <TableRow key={item.id} className={!item.visibleEnPdf ? 'opacity-50 bg-muted/30' : ''}>
-                                                <TableCell>
-                                                    <Checkbox
-                                                        checked={item.visibleEnPdf}
-                                                        onCheckedChange={() => handleToggleItemVisibility(item.id)}
-                                                        title={item.visibleEnPdf ? "Visible en PDF" : "Oculto del PDF"}
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        {!item.visibleEnPdf && <EyeOff className="h-3 w-3 text-muted-foreground" />}
-                                                        <span className={!item.visibleEnPdf ? 'line-through' : ''}>{item.descripcion}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input
-                                                        type="number"
-                                                        value={item.cantidad}
-                                                        onChange={(e) => handleUpdateItemQuantity(item.id, parseInt(e.target.value) || 1)}
-                                                        className="w-20 h-8"
-                                                        min={1}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono">{formatCurrency(item.valorUnitario)}</TableCell>
-                                                <TableCell className="text-right font-mono font-bold">{formatCurrency(item.valorTotal)}</TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-red-500"
-                                                        onClick={() => handleRemoveItem(item.id)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {items.map((item, index) => {
+                                            // Calculations per item
+                                            const cost = item.costoUnitario || (item.valorUnitario * 0.7); // Simulation if missing
+                                            const admin = cost * ((item.aiuAdminPorcentaje || 0) / 100);
+                                            const imprev = cost * ((item.aiuImprevistoPorcentaje || 0) / 100);
+                                            const util = cost * ((item.aiuUtilidadPorcentaje || 0) / 100);
+                                            const priceSale = cost + admin + imprev + util;
+                                            const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
+                                            const finalUnitTotal = priceSale + ivaUtilVal;
+                                            const rowTotal = finalUnitTotal * item.cantidad;
+
+                                            return (
+                                                <>
+                                                    <TableRow key={item.id} className={!item.visibleEnPdf ? 'opacity-50 bg-muted/30' : ''}>
+                                                        <TableCell className="min-w-[200px]">
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    {item.tipo === 'SERVICIO' ? <Wrench className="h-3 w-3 text-blue-500" /> : <Package className="h-3 w-3 text-green-500" />}
+                                                                    <span className="font-medium text-xs">{item.descripcion}</span>
+                                                                </div>
+                                                                {/* Sub-item count badge */}
+                                                                {item.subItems && item.subItems.length > 0 && (
+                                                                    <Badge variant="secondary" className="w-fit text-[10px] h-5 px-1 py-0">
+                                                                        {item.subItems.length} materiales
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Input
+                                                                type="number"
+                                                                value={item.cantidad}
+                                                                onChange={(e) => handleUpdateItemQuantity(item.id, parseInt(e.target.value) || 1)}
+                                                                className="h-7 w-12 text-xs p-1"
+                                                                min={1}
+                                                            />
+                                                        </TableCell>
+                                                        {/* P. Proveedor (Cost) */}
+                                                        <TableCell className="text-right p-1">
+                                                            <Input
+                                                                type="number"
+                                                                value={item.costoUnitario || ''}
+                                                                placeholder={formatCurrency(cost)}
+                                                                onChange={e => {
+                                                                    const val = parseFloat(e.target.value);
+                                                                    setItems(prev => prev.with(index, { ...item, costoUnitario: val }));
+                                                                }}
+                                                                className="h-7 w-20 text-xs text-right p-1"
+                                                            />
+                                                        </TableCell>
+                                                        {/* P. Venta (Calc) */}
+                                                        <TableCell className="text-right text-xs font-mono">
+                                                            {formatCurrency(priceSale)}
+                                                        </TableCell>
+                                                        {/* AIU Inputs per Item */}
+                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" value={item.aiuAdminPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, aiuAdminPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
+                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" value={item.aiuImprevistoPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, aiuImprevistoPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
+                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" value={item.aiuUtilidadPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, aiuUtilidadPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
+                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" disabled={!item.aiuUtilidadPorcentaje} value={item.ivaUtilidadPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, ivaUtilidadPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
+
+                                                        <TableCell className="text-right font-bold text-xs font-mono">
+                                                            {formatCurrency(rowTotal)}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(item.id)}>
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    {/* Subitems Materials View */}
+                                                    {item.subItems && item.subItems.length > 0 && item.subItems.map((sub, sIdx) => (
+                                                        <TableRow key={`${item.id}-sub-${sIdx}`} className="bg-muted/10 border-0 hover:bg-transparent">
+                                                            <TableCell colSpan={2} className="pl-6 py-1">
+                                                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                                                    <span>↳</span>
+                                                                    <span>{sub.nombre}</span>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="text-right py-1 text-[10px] font-mono text-muted-foreground">
+                                                                {formatCurrency(sub.valorUnitario)}
+                                                            </TableCell>
+                                                            <TableCell className="text-center py-1 text-[10px] text-muted-foreground">
+                                                                x {sub.cantidad * item.cantidad}
+                                                            </TableCell>
+                                                            <TableCell colSpan={6}></TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </CardContent>
                         </Card>
 
-                        {/* Add Item Modal */}
-                        {showAddItem && (
-                            <Card className="border-primary">
-                                <CardHeader className="pb-2">
-                                    <div className="flex justify-between items-center">
-                                        <CardTitle className="text-sm">Agregar Item del Inventario</CardTitle>
-                                        <Button variant="ghost" size="sm" onClick={() => setShowAddItem(false)}>✕</Button>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <Input
-                                        placeholder="Buscar producto..."
-                                        value={searchItem}
-                                        onChange={(e) => setSearchItem(e.target.value)}
-                                        className="mb-2"
-                                    />
-                                    <ScrollArea className="h-[200px]">
-                                        {filteredInventory.map(item => (
-                                            <div
-                                                key={item.id}
-                                                onClick={() => handleAddItem(item)}
-                                                className="p-2 hover:bg-muted rounded cursor-pointer flex justify-between items-center"
-                                            >
-                                                <div>
-                                                    <p className="font-medium text-sm">{item.descripcion}</p>
-                                                    <p className="text-xs text-muted-foreground">{item.sku}</p>
-                                                </div>
-                                                <span className="font-mono text-sm">{formatCurrency(item.valorUnitario)}</span>
-                                            </div>
-                                        ))}
-                                    </ScrollArea>
-                                </CardContent>
-                            </Card>
-                        )}
+                        {/* Product/Service Selector Dialog */}
+                        <ProductSelectorDialog
+                            open={showAddItem}
+                            onOpenChange={setShowAddItem}
+                            onItemSelected={handleAddItem}
+                        />
 
                         {/* Totals */}
                         <Card className="bg-muted/30">
@@ -533,11 +685,47 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                     <span>Subtotal ({items.length} items):</span>
                                     <span className="font-mono">{formatCurrency(subtotal)}</span>
                                 </div>
-                                <div className="flex justify-between text-sm">
-                                    <span>IVA (19%):</span>
-                                    <span className="font-mono">{formatCurrency(iva)}</span>
+                                <div className="flex justify-between items-center text-sm mt-2">
+                                    <span className="text-muted-foreground">Descuento Global</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center">
+                                            <Input
+                                                type="number"
+                                                className="h-6 w-12 text-right text-xs p-1"
+                                                value={globalDiscountPct}
+                                                onChange={e => setGlobalDiscountPct(Number(e.target.value))}
+                                                placeholder="0"
+                                            />
+                                            <span className="text-xs ml-1">%</span>
+                                        </div>
+                                        <span className="font-mono text-red-500">-{formatCurrency(descuento)}</span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="text-muted-foreground">IVA</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center">
+                                            <Input
+                                                type="number"
+                                                className="h-6 w-12 text-right text-xs p-1"
+                                                value={globalIvaPct}
+                                                onChange={e => setGlobalIvaPct(Number(e.target.value))}
+                                                placeholder="19"
+                                            />
+                                            <span className="text-xs ml-1">%</span>
+                                        </div>
+                                        <span className="font-mono">{formatCurrency(iva)}</span>
+                                    </div>
                                 </div>
                                 <Separator className="my-2" />
+                                {/* AIU Breakdown Display (Informational) */}
+                                {(totalAiuAdmin > 0 || totalAiuImprev > 0 || totalAiuUtil > 0) && (
+                                    <div className="text-xs text-muted-foreground mb-2 space-y-1">
+                                        <div className="flex justify-between"><span>Admin:</span><span>{formatCurrency(totalAiuAdmin)}</span></div>
+                                        <div className="flex justify-between"><span>Imprev:</span><span>{formatCurrency(totalAiuImprev)}</span></div>
+                                        <div className="flex justify-between"><span>Util:</span><span>{formatCurrency(totalAiuUtil)}</span></div>
+                                    </div>
+                                )}
                                 <div className="flex justify-between font-bold text-lg">
                                     <span>Total:</span>
                                     <span className="font-mono text-primary">{formatCurrency(total)}</span>
@@ -590,33 +778,74 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {visibleItems.map((item) => (
-                                            <TableRow key={item.id}>
-                                                <TableCell>{item.descripcion}</TableCell>
-                                                <TableCell className="text-center">{item.cantidad}</TableCell>
-                                                <TableCell className="text-right font-mono">{formatCurrency(item.valorUnitario)}</TableCell>
-                                                <TableCell className="text-right font-mono">{formatCurrency(item.valorTotal)}</TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {visibleItems.map((item) => {
+                                            const itemSub = item.valorTotal; // Already includes AIU + IvaU per item
+                                            // Logic: Show item ONLY if it is a 'SERVICIO' (Work Code) OR if visibility toggle is ON.
+                                            // This ensures Products (Materials) or untyped items are hidden by default when toggle is off.
+                                            const isService = item.tipo === 'SERVICIO';
+                                            const shouldRender = isService || showMaterialsInline;
+
+                                            if (!shouldRender) return null;
+
+                                            return (
+                                                <Fragment key={item.id}>
+                                                    <TableRow>
+                                                        <TableCell className="font-medium">{item.descripcion}</TableCell>
+                                                        <TableCell className="text-center">{item.cantidad}</TableCell>
+                                                        <TableCell className="text-right font-mono">{formatCurrency(item.valorUnitario)}</TableCell>
+                                                        <TableCell className="text-right font-mono">{formatCurrency(item.valorTotal)}</TableCell>
+                                                    </TableRow>
+                                                    {showMaterialsInline && item.subItems && item.subItems.map((sub, sIdx) => (
+                                                        <TableRow key={`${item.id}-sub-${sIdx}`} className="bg-muted/5 border-0">
+                                                            <TableCell className="pl-8 text-xs text-muted-foreground flex items-center gap-2">
+                                                                <span>•</span> {sub.nombre}
+                                                            </TableCell>
+                                                            <TableCell className="text-center text-xs text-muted-foreground">{sub.cantidad * item.cantidad}</TableCell>
+                                                            <TableCell className="text-right text-xs font-mono text-muted-foreground">{formatCurrency(sub.valorUnitario)}</TableCell>
+                                                            <TableCell></TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </Fragment>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
 
                                 {/* Totals */}
                                 <div className="flex justify-end">
                                     <div className="w-64 space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span>Subtotal:</span>
-                                            <span className="font-mono">{formatCurrency(visibleItems.reduce((a, i) => a + i.valorTotal, 0))}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span>IVA (19%):</span>
-                                            <span className="font-mono">{formatCurrency(visibleItems.reduce((a, i) => a + i.valorTotal, 0) * 0.19)}</span>
-                                        </div>
-                                        <Separator />
-                                        <div className="flex justify-between font-bold text-lg">
-                                            <span>TOTAL:</span>
-                                            <span className="font-mono">{formatCurrency(visibleItems.reduce((a, i) => a + i.valorTotal, 0) * 1.19)}</span>
-                                        </div>
+                                        {(() => {
+                                            // Recalculate totals for Visible Items
+                                            const subVisible = visibleItems.reduce((a, i) => a + i.valorTotal, 0);
+                                            const descVisible = subVisible * (globalDiscountPct / 100);
+                                            const baseVisible = subVisible - descVisible;
+                                            const ivaVisible = baseVisible * (globalIvaPct / 100);
+                                            const totalVisible = baseVisible + ivaVisible;
+
+                                            return (
+                                                <>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span>Subtotal ({visibleItems.length} items):</span>
+                                                        <span className="font-mono">{formatCurrency(subVisible)}</span>
+                                                    </div>
+                                                    {descVisible > 0 && (
+                                                        <div className="flex justify-between text-sm text-red-500">
+                                                            <span>Desc. Global ({globalDiscountPct}%):</span>
+                                                            <span className="font-mono">-{formatCurrency(descVisible)}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between text-sm">
+                                                        <span>IVA ({globalIvaPct}%):</span>
+                                                        <span className="font-mono">{formatCurrency(ivaVisible)}</span>
+                                                    </div>
+                                                    <Separator />
+                                                    <div className="flex justify-between font-bold text-lg">
+                                                        <span>TOTAL:</span>
+                                                        <span className="font-mono">{formatCurrency(totalVisible)}</span>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
 
@@ -668,6 +897,18 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                     Incluir Anexo de Materiales en PDF
                                 </label>
                             </div>
+
+                            <div className="flex items-center gap-2 ml-4">
+                                <Checkbox
+                                    id="show-inline-materials"
+                                    checked={showMaterialsInline}
+                                    onCheckedChange={(checked) => setShowMaterialsInline(checked === true)}
+                                />
+                                <label htmlFor="show-inline-materials" className="text-sm cursor-pointer">
+                                    Mostrar Materiales en Lista Principal
+                                </label>
+                            </div>
+
                             <Button onClick={() => {
                                 // Create cotizacion with only visible items
                                 const cotizacionFiltrada = {
@@ -715,6 +956,6 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                     </TabsContent>
                 </Tabs>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

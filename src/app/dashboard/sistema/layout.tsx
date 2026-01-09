@@ -1,4 +1,4 @@
-"use client";
+import { ErpProvider } from "@/components/providers/erp-provider";
 
 export default function SistemaLayout({
     children,
@@ -6,8 +6,8 @@ export default function SistemaLayout({
     children: React.ReactNode;
 }) {
     return (
-        <>
+        <ErpProvider>
             {children}
-        </>
+        </ErpProvider>
     );
 }
