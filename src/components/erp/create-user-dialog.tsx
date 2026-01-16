@@ -22,15 +22,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/sistema";
+import { systemNavItems } from "@/lib/data";
 
 const formSchema = z.object({
     name: z.string().min(3, "El nombre es requerido"),
     email: z.string().email("Correo inválido"),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
     role: z.enum(["ADMIN", "ENGINEER", "CLIENT", "VIEWER"] as [string, ...string[]]),
+    sidebarAccess: z.array(z.string()).refine((value) => value.some((item) => item), {
+        message: "Debe seleccionar al menos un permiso.",
+    }),
 });
 
 interface CreateUserDialogProps {
@@ -46,7 +52,9 @@ export function CreateUserDialog({ onUserCreated }: CreateUserDialogProps) {
         defaultValues: {
             name: "",
             email: "",
+            password: "",
             role: "VIEWER",
+            sidebarAccess: ["dashboard"], // Default access to dashboard
         },
     });
 
@@ -77,7 +85,7 @@ export function CreateUserDialog({ onUserCreated }: CreateUserDialogProps) {
                 <DialogHeader>
                     <DialogTitle>Registrar Nuevo Usuario</DialogTitle>
                     <DialogDescription>
-                        Crea un nuevo acceso al sistema ERP.
+                        Crea un nuevo acceso al sistema ERP y asigna sus permisos.
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -110,6 +118,19 @@ export function CreateUserDialog({ onUserCreated }: CreateUserDialogProps) {
                         />
                         <FormField
                             control={form.control}
+                            name="password"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Contraseña</FormLabel>
+                                    <FormControl>
+                                        <Input type="password" placeholder="******" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
                             name="role"
                             render={({ field }) => (
                                 <FormItem>
@@ -131,6 +152,58 @@ export function CreateUserDialog({ onUserCreated }: CreateUserDialogProps) {
                                 </FormItem>
                             )}
                         />
+
+                        <FormField
+                            control={form.control}
+                            name="sidebarAccess"
+                            render={() => (
+                                <FormItem>
+                                    <div className="mb-4">
+                                        <FormLabel className="text-base">Permisos de Acceso</FormLabel>
+                                        <p className="text-[0.8rem] text-muted-foreground">
+                                            Selecciona los módulos visibles para este usuario.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-2 border p-3 rounded-md max-h-[200px] overflow-y-auto">
+                                        {systemNavItems.map((item) => (
+                                            <FormField
+                                                key={item.id}
+                                                control={form.control}
+                                                name="sidebarAccess"
+                                                render={({ field }) => {
+                                                    return (
+                                                        <FormItem
+                                                            key={item.id}
+                                                            className="flex flex-row items-center space-x-3 space-y-0"
+                                                        >
+                                                            <FormControl>
+                                                                <Checkbox
+                                                                    checked={field.value?.includes(item.id)}
+                                                                    onCheckedChange={(checked) => {
+                                                                        return checked
+                                                                            ? field.onChange([...field.value, item.id])
+                                                                            : field.onChange(
+                                                                                field.value?.filter(
+                                                                                    (value) => value !== item.id
+                                                                                )
+                                                                            )
+                                                                    }}
+                                                                />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal cursor-pointer flex items-center gap-2">
+                                                                {item.label}
+                                                            </FormLabel>
+                                                        </FormItem>
+                                                    )
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
                         <div className="flex justify-end pt-4">
                             <Button type="submit">Crear Usuario</Button>
                         </div>

@@ -1,13 +1,15 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { Factura, Cotizacion, Cliente } from "@/types/sistema";
-import { initialFacturas, initialQuotes, initialClients } from "@/lib/mock-data";
+import { Factura, Cotizacion, Cliente, User } from "@/types/sistema";
+import { initialFacturas, initialQuotes, initialClients, initialUsers } from "@/lib/mock-data";
 
 interface ErpContextType {
     facturas: Factura[];
     cotizaciones: Cotizacion[];
     clientes: Cliente[];
+    users: User[];
+    currentUser: User | undefined;
     addFactura: (factura: Factura) => void;
     updateFactura: (updated: Factura) => void;
     addCotizacion: (cotizacion: Cotizacion) => void;
@@ -15,6 +17,8 @@ interface ErpContextType {
     addCliente: (cliente: Cliente) => void;
     updateCliente: (updated: Cliente) => void;
     deleteCotizacion: (id: string) => void;
+    updateUserPermissions: (userId: string, access: string[]) => void;
+    setCurrentUser: (user: User) => void;
 }
 
 const ErpContext = createContext<ErpContextType | undefined>(undefined);
@@ -23,6 +27,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const [facturas, setFacturas] = useState<Factura[]>(initialFacturas);
     const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(initialQuotes);
     const [clientes, setClientes] = useState<Cliente[]>(initialClients);
+    const [users, setUsers] = useState<User[]>(initialUsers);
+    const [currentUser, setCurrentUser] = useState<User | undefined>(initialUsers[0]); // Default to Admin
 
     const addFactura = (factura: Factura) => {
         setFacturas(prev => [factura, ...prev]);
@@ -52,12 +58,24 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         setCotizaciones(prev => prev.filter(c => c.id !== id));
     };
 
+    const updateUserPermissions = (userId: string, access: string[]) => {
+        setUsers(prev => prev.map(u =>
+            u.id === userId ? { ...u, sidebarAccess: access } : u
+        ));
+
+        // Update current user if it's the same
+        if (currentUser?.id === userId) {
+            setCurrentUser(prev => prev ? { ...prev, sidebarAccess: access } : undefined);
+        }
+    };
+
     return (
         <ErpContext.Provider value={{
-            facturas, cotizaciones, clientes,
+            facturas, cotizaciones, clientes, users, currentUser,
             addFactura, updateFactura,
             addCotizacion, updateCotizacion, deleteCotizacion,
-            addCliente, updateCliente
+            addCliente, updateCliente,
+            updateUserPermissions, setCurrentUser
         }}>
             {children}
         </ErpContext.Provider>
