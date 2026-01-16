@@ -5,8 +5,10 @@
 @layer base {
   :root {
     /* Light Mode (Corporate Clean) */
-    --background: 0 0% 100%; /* #FFFFFF */
-    --foreground: 0 0% 10%; /* #1A1A1A */
+    --background: 0 0% 100%;
+    /* #FFFFFF */
+    --foreground: 0 0% 10%;
+    /* #1A1A1A */
 
     --card: 0 0% 100%;
     --card-foreground: 0 0% 10%;
@@ -14,39 +16,57 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
-    --primary: 0 0% 0%; /* Black Buttons */
-    --primary-foreground: 0 0% 100%; /* White Text */
+    --primary: 0 0% 0%;
+    /* Black Buttons */
+    --primary-foreground: 0 0% 100%;
+    /* White Text */
 
-    --secondary: 210 20% 96%; /* #F3F4F6 */
+    --secondary: 210 20% 96%;
+    /* #F3F4F6 */
     --secondary-foreground: 0 0% 9%;
 
     --muted: 210 20% 96%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 182 100% 35%; /* Darker cyan for light mode accents if needed, or keeping corporate blue/green? User said Black buttons. Let's keep accent distinct or subtle. */
+    --accent: 182 100% 35%;
+    /* Darker cyan for light mode accents if needed, or keeping corporate blue/green? User said Black buttons. Let's keep accent distinct or subtle. */
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 13% 91%; /* Light Gray lines */
+    --border: 220 13% 91%;
+    /* Light Gray lines */
     --input: 220 13% 91%;
     --ring: 0 0% 0%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%; /* Slightly off-white for sidebar in light mode */
+    --sidebar-background: 0 0% 98%;
+    /* Slightly off-white for sidebar in light mode */
     --sidebar-foreground: 0 0% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-accent: 210 20% 90%;
     --sidebar-accent-foreground: 0 0% 10%;
     --sidebar-ring: 0 0% 0%;
+
+    /* Login Component Variables */
+    --color-bg: #f3f4f6;
+    --color-surface: #ffffff;
+    --color-muted-surface: #f9fafb;
+    --color-border: #e5e7eb;
+    --color-text-secondary: #6b7280;
+    --color-text-primary: #111827;
+    --color-heading: #1f2937;
+    --color-bg-2: #e5e7eb;
   }
 
   .dark {
     /* Dark Mode (Preserved from original :root) */
-    --background: 0 0% 13.3%; /* #222222 */
-    --foreground: 0 0% 98%; /* #fafafa */
+    --background: 0 0% 13.3%;
+    /* #222222 */
+    --foreground: 0 0% 98%;
+    /* #fafafa */
 
     --card: 0 0% 16%;
     --card-foreground: 0 0% 98%;
@@ -54,7 +74,8 @@
     --popover: 0 0% 13.3%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 182 100% 74.3%; /* #7DF9FF */
+    --primary: 182 100% 74.3%;
+    /* #7DF9FF */
     --primary-foreground: 0 0% 9%;
 
     --secondary: 0 0% 20%;
@@ -63,7 +84,8 @@
     --muted: 0 0% 20%;
     --muted-foreground: 0 0% 63.9%;
 
-    --accent: 111 100% 53.9%; /* #39FF14 */
+    --accent: 111 100% 53.9%;
+    /* #39FF14 */
     --accent-foreground: 0 0% 9%;
 
     --destructive: 0 84.2% 60.2%;
@@ -79,6 +101,16 @@
     --sidebar-accent: 182 100% 74.3%;
     --sidebar-accent-foreground: 0 0% 9%;
     --sidebar-ring: 182 100% 74.3%;
+
+    /* Login Component Variables (Dark) */
+    --color-bg: #101214;
+    --color-surface: #161A1D;
+    --color-muted-surface: #1D2125;
+    --color-border: #2C333A;
+    --color-text-secondary: #596773;
+    --color-text-primary: #C7D1DB;
+    --color-heading: #DEE4EA;
+    --color-bg-2: #C7D1DB;
   }
 }
 
@@ -86,6 +118,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     min-height: 100vh;
@@ -101,10 +134,12 @@
     border-color: hsl(var(--primary));
     color: hsl(var(--primary));
   }
+
   .electric-button:hover {
     color: hsl(var(--primary-foreground));
     box-shadow: 0 0 20px hsl(var(--primary) / 0.5);
   }
+
   .electric-button::before {
     content: '';
     position: absolute;
@@ -115,6 +150,7 @@
     background: linear-gradient(120deg, transparent, hsl(var(--primary) / 0.7), transparent);
     transition: left 0.6s ease;
   }
+
   .electric-button:hover::before {
     left: 100%;
   }
@@ -122,6 +158,7 @@
   .text-glow-primary {
     text-shadow: 0 0 8px hsl(var(--primary) / 0.7);
   }
+
   .text-glow-accent {
     text-shadow: 0 0 8px hsl(var(--accent) / 0.7);
   }
@@ -136,14 +173,24 @@
     50% {
       stroke-dashoffset: 0;
     }
+
     100% {
       stroke-dashoffset: -200;
     }
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 0.3; transform: scale(0.95); }
-    50% { opacity: 1; transform: scale(1.05); }
+
+    0%,
+    100% {
+      opacity: 0.3;
+      transform: scale(0.95);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
   }
 
   .neuron-pulse {
@@ -156,16 +203,20 @@
     size: auto;
     margin: 0;
   }
+
   body {
     background-color: white;
     color: black;
   }
+
   .print\:hidden {
     display: none;
   }
+
   .print\:shadow-none {
     box-shadow: none;
   }
+
   .print\:border-none {
     border: none;
   }

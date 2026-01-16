@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { initialUsers, initialRoles, initialAgenda } from "@/lib/mock-data";
 import { CreateUserDialog } from "@/components/erp/create-user-dialog";
+import { CreateTaskDialog } from "@/components/erp/create-task-dialog";
 
 export default function ControlPage() {
     const { toast } = useToast();
@@ -40,6 +41,14 @@ export default function ControlPage() {
     const totalRoles = roles.length;
     const pendingTasks = agenda.filter(t => t.estado === 'PENDIENTE').length;
     const completedTasks = agenda.filter(t => t.estado === 'COMPLETADA').length;
+
+    const handleTaskCreated = (newTask: any) => {
+        setAgenda([newTask, ...agenda]);
+        toast({
+            title: "Tarea creada",
+            description: `La tarea "${newTask.titulo}" ha sido agendada.`,
+        });
+    };
 
     const getPriorityColor = (priority: string) => {
         switch (priority) {
@@ -70,7 +79,7 @@ export default function ControlPage() {
                 <TabsList>
                     <TabsTrigger value="resumen" className="gap-2"><LayoutDashboard className="h-4 w-4" /> Resumen</TabsTrigger>
                     <TabsTrigger value="usuarios" className="gap-2"><Users className="h-4 w-4" /> Usuarios</TabsTrigger>
-                    <TabsTrigger value="roles" className="gap-2"><Shield className="h-4 w-4" /> Roles</TabsTrigger>
+
                     <TabsTrigger value="agenda" className="gap-2"><Calendar className="h-4 w-4" /> Agenda</TabsTrigger>
                 </TabsList>
 
@@ -87,16 +96,7 @@ export default function ControlPage() {
                                 <p className="text-xs text-muted-foreground">Registrados en el sistema</p>
                             </CardContent>
                         </Card>
-                        <Card className="border-l-4 border-l-purple-500">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium">Roles Definidos</CardTitle>
-                                <Shield className="h-4 w-4 text-purple-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{totalRoles}</div>
-                                <p className="text-xs text-muted-foreground">Perfiles de acceso</p>
-                            </CardContent>
-                        </Card>
+
                         <Card className="border-l-4 border-l-amber-500">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
                                 <CardTitle className="text-sm font-medium">Tareas Pendientes</CardTitle>
@@ -119,10 +119,7 @@ export default function ControlPage() {
                                     <Users className="h-5 w-5 text-primary" />
                                     <span>Gestionar Usuarios</span>
                                 </button>
-                                <button onClick={() => setActiveTab("roles")} className="w-full text-left p-3 rounded-lg hover:bg-muted flex items-center gap-3">
-                                    <Shield className="h-5 w-5 text-purple-500" />
-                                    <span>Configurar Roles</span>
-                                </button>
+
                                 <button onClick={() => setActiveTab("agenda")} className="w-full text-left p-3 rounded-lg hover:bg-muted flex items-center gap-3">
                                     <Calendar className="h-5 w-5 text-amber-500" />
                                     <span>Ver Agenda</span>
@@ -199,55 +196,7 @@ export default function ControlPage() {
                     </Card>
                 </TabsContent>
 
-                {/* ROLES TAB - EMBEDDED CONTENT */}
-                <TabsContent value="roles" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle>Roles y Permisos</CardTitle>
-                                <Button onClick={() => toast({ title: "Nuevo Rol", description: "Formulario de creación en desarrollo" })}>
-                                    <Plus className="mr-2 h-4 w-4" /> Nuevo Rol
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Rol</TableHead>
-                                        <TableHead>Descripción</TableHead>
-                                        <TableHead>Permisos</TableHead>
-                                        <TableHead>Sistema</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {roles.map((role) => (
-                                        <TableRow key={role.id}>
-                                            <TableCell className="font-medium">{role.nombre}</TableCell>
-                                            <TableCell className="max-w-[200px] truncate">{role.descripcion}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">{role.permisos?.length || 0} permisos</Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {role.isSystemRole ? (
-                                                    <Badge className="bg-blue-100 text-blue-800">Sistema</Badge>
-                                                ) : (
-                                                    <Badge variant="secondary">Personalizado</Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button size="sm" variant="ghost" disabled={role.isSystemRole} onClick={() => toast({ title: "Editar Rol", description: `Editando ${role.nombre}` })}>
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+
 
                 {/* AGENDA TAB - EMBEDDED CONTENT */}
                 <TabsContent value="agenda" className="space-y-4">
@@ -255,9 +204,7 @@ export default function ControlPage() {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Agenda de Tareas</CardTitle>
-                                <Button onClick={() => toast({ title: "Nueva Tarea", description: "Formulario de tarea en desarrollo" })}>
-                                    <Plus className="mr-2 h-4 w-4" /> Nueva Tarea
-                                </Button>
+                                <CreateTaskDialog onTaskCreated={handleTaskCreated} />
                             </div>
                         </CardHeader>
                         <CardContent>

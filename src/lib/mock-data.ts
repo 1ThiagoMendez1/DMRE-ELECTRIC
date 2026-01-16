@@ -42,21 +42,24 @@ export const initialUsers: User[] = [
         name: "Admin Sistema",
         email: "admin@dmre.com",
         role: "ADMIN",
-        avatar: "https://github.com/shadcn.png"
+        avatar: "https://github.com/shadcn.png",
+        sidebarAccess: ['dashboard', 'comercial', 'financiera', 'logistica', 'operaciones', 'talento-humano', 'control']
     },
     {
         id: "USR-002",
         name: "Ingeniero Jefe",
         email: "ingenieria@dmre.com",
         role: "ENGINEER",
-        avatar: ""
+        avatar: "",
+        sidebarAccess: ['dashboard', 'operaciones', 'logistica']
     },
     {
         id: "USR-003",
         name: "Cliente Demo",
         email: "cliente@empresa.com",
         role: "CLIENT",
-        avatar: ""
+        avatar: "",
+        sidebarAccess: ['dashboard']
     }
 ];
 
