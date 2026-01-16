@@ -76,8 +76,16 @@ const randomItem = <T>(arr: T[]): T => {
 };
 
 const randomDate = (startYear: number, endYear: number) => {
-    const start = new Date(startYear, 0, 1).getTime();
-    const end = new Date(endYear, 11, 31).getTime();
+    // Override: Always return Dec 2025 or Jan 2026 to satisfy "todos los datos con fecha para diciembre 2025 y enero 2026"
+    // Actually, let's make it cleaner:
+    const start = new Date(2025, 11, 1).getTime(); // Dec 1, 2025
+    const end = new Date(2026, 0, 31).getTime(); // Jan 31, 2026
+    return new Date(start + seededRandom() * (end - start));
+};
+
+const randomRecentDate = () => {
+    const start = new Date(2025, 11, 1).getTime();
+    const end = new Date(2026, 0, 31).getTime();
     return new Date(start + seededRandom() * (end - start));
 };
 
@@ -156,7 +164,8 @@ const generateCotizaciones = (count: number, clientes: Cliente[], inventario: In
                 descripcion: itemInv.descripcion,
                 cantidad: cantidad,
                 valorUnitario: itemInv.valorUnitario,
-                valorTotal: itemInv.valorUnitario * cantidad
+                valorTotal: itemInv.valorUnitario * cantidad,
+                tipo: 'PRODUCTO' as const // Fixed type error
             };
         });
 
@@ -203,8 +212,8 @@ const generateFacturas = (cotizaciones: Cotizacion[]): Factura[] => {
                 id: `FAC-${(i + 1).toString().padStart(4, '0')}`,
                 cotizacionId: c.id,
                 cotizacion: c,
-                fechaEmision: addDays(c.fecha, randomInt(5, 15)),
-                fechaVencimiento: addDays(c.fecha, randomInt(35, 45)),
+                fechaEmision: new Date(2025, 11, randomInt(1, 31)), // Dec 2025
+                fechaVencimiento: new Date(2026, 0, randomInt(10, 31)), // Jan 2026 Only
                 valorFacturado,
                 anticipoRecibido: anticipo,
                 retencionRenta: rRenta,
@@ -610,5 +619,30 @@ export const initialCodigosTrabajo: CodigoTrabajo[] = [
         costoTotalMateriales: 330000,
         costoTotal: 580000,
         fechaCreacion: new Date(2024, 2, 5)
+    }
+];
+
+export const initialTrabajos: Cotizacion[] = [
+    {
+        id: "COT-001",
+        numero: "COT-001",
+        tipo: "NORMAL",
+        fecha: new Date(),
+        clienteId: "CLI-001",
+        cliente: {
+            id: "CLI-001",
+            nombre: "Empresa Demo S.A.S",
+            documento: "900.123.456-7",
+            direccion: "Calle 123 # 45-67",
+            telefono: "300 123 4567",
+            correo: "contacto@demo.com",
+            contactoPrincipal: "Gerente General",
+            fechaCreacion: new Date()
+        },
+        descripcionTrabajo: "Mantenimiento General",
+        items: [],
+        subtotal: 5000000,
+        aiuAdmin: 0, aiuImprevistos: 0, aiuUtilidad: 0, iva: 950000, total: 5950000,
+        estado: "APROBADA"
     }
 ];

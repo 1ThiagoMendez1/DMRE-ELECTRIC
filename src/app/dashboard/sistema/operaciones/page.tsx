@@ -161,10 +161,8 @@ export default function OperacionesPage() {
             <Tabs defaultValue="resumen" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="resumen">Resumen General</TabsTrigger>
-                    <TabsTrigger value="catalogo" id="tab-catalogo">Catálogo</TabsTrigger>
                     <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
                     <TabsTrigger value="registro">Registro Obras</TabsTrigger>
-                    <TabsTrigger value="codigos">Códigos Trabajo</TabsTrigger>
                 </TabsList>
 
                 {/* --- RESUMEN TAB --- */}
@@ -253,73 +251,6 @@ export default function OperacionesPage() {
                     </div>
                 </TabsContent>
 
-                {/* --- CATALOGO TAB --- */}
-                <TabsContent value="catalogo" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle>Inventario Actual</CardTitle>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative w-64">
-                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            placeholder="Buscar por nombre o SKU..."
-                                            className="pl-8"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                    </div>
-                                    <CreateInventoryItemDialog onItemCreated={(newItem) => setInventory([...inventory, newItem])} />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>SKU</TableHead>
-                                        <TableHead>Descripción</TableHead>
-                                        <TableHead>Categoría</TableHead>
-                                        <TableHead>Ubicación</TableHead>
-                                        <TableHead>Stock</TableHead>
-                                        <TableHead>Estado</TableHead>
-                                        <TableHead className="text-right">Valor Unit.</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {inventory.map((item) => {
-                                        const stockStatus = item.cantidad <= item.stockMinimo ? 'BAJO' : 'OK';
-                                        return (
-                                            <TableRow key={item.id}>
-                                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                                                <TableCell className="font-medium">{item.descripcion}</TableCell>
-                                                <TableCell><Badge variant="outline">{item.categoria}</Badge></TableCell>
-                                                <TableCell>{item.ubicacion}</TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <span>{item.cantidad} {item.unidad}</span>
-                                                        {stockStatus === 'BAJO' && <AlertTriangle className="h-3 w-3 text-orange-500" />}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="w-[100px]">
-                                                        <Progress value={(item.cantidad / (item.stockMinimo * 3)) * 100} className={cn("h-2", stockStatus === 'BAJO' ? "bg-orange-200" : "")} />
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">{formatCurrency(item.valorUnitario)}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <EditInventoryDialog articulo={item} onItemUpdated={handleItemUpdate} />
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
                 {/* --- MOVIMIENTOS TAB --- */}
                 <TabsContent value="movimientos" className="space-y-4">
                     <Card>
@@ -379,55 +310,6 @@ export default function OperacionesPage() {
                     <RegistroTable data={initialRegistros} />
                 </TabsContent>
 
-                {/* --- CODIGOS TRABAJO TAB --- */}
-                <TabsContent value="codigos" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2">
-                                    <Activity className="h-5 w-5" /> Códigos de Trabajo Estándar
-                                </CardTitle>
-                                <CreateCodigoTrabajoDialog onCodigoCreated={(newCod) => setCodigos([...codigos, newCod])} />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[100px]">Código</TableHead>
-                                        <TableHead>Nombre / Descripción</TableHead>
-                                        <TableHead className="text-center">Materiales</TableHead>
-                                        <TableHead className="text-right">Mano Obra</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {codigos.map((codigo) => (
-                                        <TableRow
-                                            key={codigo.id}
-                                            className="cursor-pointer hover:bg-muted/50"
-                                            onClick={() => {
-                                                setSelectedCodigo(codigo);
-                                                setCodigoDetailOpen(true);
-                                            }}
-                                        >
-                                            <TableCell className="font-mono font-medium">{codigo.codigo}</TableCell>
-                                            <TableCell>
-                                                <div className="font-medium">{codigo.nombre}</div>
-                                                <div className="text-xs text-muted-foreground truncate max-w-[300px]">{codigo.descripcion}</div>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge variant="secondary">{codigo.materiales.length} items</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(codigo.manoDeObra)}</TableCell>
-                                            <TableCell className="text-right font-mono font-bold text-primary">{formatCurrency(codigo.costoTotal)}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
 
             </Tabs>
 

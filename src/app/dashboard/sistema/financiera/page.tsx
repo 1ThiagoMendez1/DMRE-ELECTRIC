@@ -21,7 +21,8 @@ import {
     History,
     FileText,
     MoreHorizontal,
-    Pencil
+    Pencil,
+    AlertTriangle
 } from "lucide-react";
 import {
     Card,
@@ -67,33 +68,57 @@ import { CreateObligacionDialog } from "@/components/erp/create-obligacion-dialo
 import { ObligacionDetailDialog } from "@/components/erp/obligacion-detail-dialog";
 
 import { useToast } from "@/hooks/use-toast";
-import { initialCuentas, initialMovimientos, initialFacturas, initialObligaciones } from "@/lib/mock-data";
+import { initialCuentas, initialMovimientos, initialObligaciones } from "@/lib/mock-data";
+// import { useErp } from "@/components/providers/erp-provider"; // Not needed directly if only BillingModule uses it
 import { formatCurrency, cn } from "@/lib/utils";
-import { CuentaBancaria, MovimientoFinanciero, Factura, ObligacionFinanciera } from "@/types/sistema";
+import { CuentaBancaria, MovimientoFinanciero, ObligacionFinanciera } from "@/types/sistema";
+import { BillingModule } from "@/components/erp/billing-module";
 
 export default function FinancieraPage() {
     const { toast } = useToast();
+    // const { facturas, addFactura, updateFactura, cotizaciones } = useErp(); // Moved to BillingModule
+
+    // Local state for financial specific modules
     const [cuentas, setCuentas] = useState<CuentaBancaria[]>(initialCuentas);
     const [movimientos, setMovimientos] = useState<MovimientoFinanciero[]>(initialMovimientos);
-    const [facturas, setFacturas] = useState<Factura[]>(initialFacturas);
     const [obligaciones, setObligaciones] = useState<ObligacionFinanciera[]>(initialObligaciones);
-    const [invoiceSearch, setInvoiceSearch] = useState("");
+    // const [invoiceSearch, setInvoiceSearch] = useState(""); // Moved
+
+    // --- LOGIC MOVED TO BILLING MODULE ---
+    // nextInvoiceId, filteredFacturas, handlers, useEffect
 
     // Calculate next Invoice ID
-    const nextInvoiceId = useMemo(() => {
-        if (facturas.length === 0) return "Fac-0001";
-        const ids = facturas.map(f => {
-            const num = parseInt(f.id.replace(/[^0-9]/g, ''));
-            return isNaN(num) ? 0 : num;
-        });
-        const maxId = Math.max(0, ...ids);
-        return `Fac-${String(maxId + 1).padStart(4, '0')}`;
-    }, [facturas]);
+    // const nextInvoiceId = useMemo(() => {
+    //     if (facturas.length === 0) return "Fac-0001";
+    //     const ids = facturas.map(f => {
+    //         const num = parseInt(f.id.replace(/[^0-9]/g, ''));
+    //         return isNaN(num) ? 0 : num;
+    //     });
+    //     const maxId = Math.max(0, ...ids);
+    //     return `Fac-${String(maxId + 1).padStart(4, '0')}`;
+    // }, [facturas]);
 
-    const filteredFacturas = facturas.filter(f =>
-        f.id.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-        f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase())
-    );
+    // Check for Overdue Invoices
+    // useEffect(() => {
+    //     const today = new Date();
+    //     const overdueCount = facturas.filter(f => {
+    //         if (f.estado === 'CANCELADA') return false;
+    //         return new Date(f.fechaVencimiento) < today;
+    //     }).length;
+
+    //     if (overdueCount > 0) {
+    //         toast({
+    //             title: "Atención: Facturas Vencidas",
+    //             description: `Tienes ${overdueCount} facturas vencidas que requieren gestión.`,
+    //             variant: "destructive",
+    //         });
+    //     }
+    // }, [facturas, toast]);
+
+    // const filteredFacturas = facturas.filter(f =>
+    //     f.id.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+    //     f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase())
+    // );
 
     // Calculate totals
     const totalSaldo = cuentas.reduce((acc, curr) => acc + curr.saldoActual, 0);
@@ -137,16 +162,6 @@ export default function FinancieraPage() {
         // Note: Logic to revert old balance and apply new one is complex, skipping for MVP UI demo
         toast({ title: "Movimiento actualizado", description: "Los detalles han sido guardados." });
     }
-
-    const handleInvoiceUpdate = (updatedInvoice: Factura) => {
-        setFacturas(facturas.map(f => f.id === updatedInvoice.id ? updatedInvoice : f));
-        // toast handles in component usually, but good to have here
-    };
-
-    const handleCreateInvoice = (newInvoice: Factura) => {
-        setFacturas([newInvoice, ...facturas]);
-        toast({ title: "Factura Creada", description: "Nueva factura registrada en el sistema." });
-    };
 
     const handleCreateObligacion = (newObligacion: ObligacionFinanciera) => {
         setObligaciones([...obligaciones, newObligacion]);
@@ -423,69 +438,7 @@ export default function FinancieraPage() {
 
                 {/* --- FACTURACION TAB --- */}
                 <TabsContent value="facturacion" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex justify-between items-center flex-wrap gap-4">
-                                <CardTitle>Gestión de Facturación y Cartera</CardTitle>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative w-64">
-                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            placeholder="Buscar factura o cliente..."
-                                            className="pl-8"
-                                            value={invoiceSearch}
-                                            onChange={(e) => setInvoiceSearch(e.target.value)}
-                                        />
-                                    </div>
-                                    <CreateFacturaDialog onFacturaCreated={handleCreateInvoice} nextId={nextInvoiceId} />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>N° Factura</TableHead>
-                                        <TableHead>Cliente</TableHead>
-                                        <TableHead>Emisión</TableHead>
-                                        <TableHead>Vencimiento</TableHead>
-                                        <TableHead>Valor Total</TableHead>
-                                        <TableHead>Saldo Pendiente</TableHead>
-                                        <TableHead>Estado</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredFacturas.map((fac) => (
-                                        <TableRow key={fac.id}>
-                                            <TableCell className="font-mono font-bold">{fac.id}</TableCell>
-                                            <TableCell>{fac.cotizacion?.cliente?.nombre || "Cliente General"}</TableCell>
-                                            <TableCell>{format(new Date(fac.fechaEmision), "dd MMM yyyy", { locale: es })}</TableCell>
-                                            <TableCell>{format(new Date(fac.fechaVencimiento), "dd MMM yyyy", { locale: es })}</TableCell>
-                                            <TableCell>{formatCurrency(fac.valorFacturado)}</TableCell>
-                                            <TableCell className="font-bold text-red-500">{formatCurrency(fac.saldoPendiente)}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={fac.estado === 'CANCELADA' ? 'default' : fac.estado === 'PARCIAL' ? 'secondary' : 'destructive'}>
-                                                    {fac.estado}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <FacturaHistoryDialog
-                                                    factura={fac}
-                                                    onFacturaUpdated={handleInvoiceUpdate}
-                                                    trigger={
-                                                        <Button variant="outline" size="sm" className="text-xs">
-                                                            Gestionar
-                                                        </Button>
-                                                    }
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
+                    <BillingModule />
                 </TabsContent>
             </Tabs>
         </div>

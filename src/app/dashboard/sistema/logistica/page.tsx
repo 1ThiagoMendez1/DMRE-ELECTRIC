@@ -14,8 +14,12 @@ import {
     Mail,
     Receipt,
     Wrench,
-    Fuel
+    Fuel,
+    Search,
+    ListOrdered
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,8 +36,10 @@ import {
     initialGastosVehiculos,
     initialCuentasPorPagar,
     initialQuotes,
-    initialEmpleados
+    initialEmpleados,
+    initialCodigosTrabajo
 } from "@/lib/mock-data";
+import { CodigoTrabajo } from "@/types/sistema";
 
 // Import submodule components
 import { InventoryTable } from "../inventario/inventory-table";
@@ -46,6 +52,10 @@ import { ActivosDashboard } from "@/components/erp/activos-dashboard";
 import { DotacionItem } from "@/types/sistema";
 import { CreateVehicleDialog } from "@/components/erp/create-vehicle-dialog";
 import { RegisterExpenseDialog } from "@/components/erp/register-expense-dialog";
+import { CreateInventoryItemDialog } from "@/components/erp/create-inventory-item-dialog";
+import { EditInventoryDialog } from "@/components/erp/edit-inventory-dialog";
+import { InventoryItemDetailDialog } from "@/components/erp/inventory-item-detail-dialog";
+import { cn } from "@/lib/utils";
 
 export default function LogisticaPage() {
     const { toast } = useToast();
@@ -69,6 +79,17 @@ export default function LogisticaPage() {
     // Activos state
     const [vehiculos, setVehiculos] = useState(initialVehiculos);
     const [gastos, setGastos] = useState(initialGastosVehiculos);
+
+    // Catalogo state
+    const [catalogoItems, setCatalogoItems] = useState(initialInventory);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedItem, setSelectedItem] = useState<any | null>(null);
+    const [itemDetailOpen, setItemDetailOpen] = useState(false);
+
+    const handleItemClick = (item: any) => {
+        setSelectedItem(item);
+        setItemDetailOpen(true);
+    };
 
     const handleCreateSupplier = (newProv: any) => {
         setProveedores([newProv, ...proveedores]);
@@ -110,7 +131,8 @@ export default function LogisticaPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="resumen" className="gap-2"><LayoutDashboard className="h-4 w-4" /> Resumen</TabsTrigger>
-                    <TabsTrigger value="inventario" className="gap-2"><Package className="h-4 w-4" /> Inventario</TabsTrigger>
+                    <TabsTrigger value="catalogo" className="gap-2"><ListOrdered className="h-4 w-4" /> Catálogo de Inventario</TabsTrigger>
+                    <TabsTrigger value="inventario" className="gap-2"><Package className="h-4 w-4" /> Códigos de Trabajo</TabsTrigger>
                     <TabsTrigger value="suministro" className="gap-2"><Truck className="h-4 w-4" /> Suministro</TabsTrigger>
                     <TabsTrigger value="dotacion" className="gap-2"><HardHat className="h-4 w-4" /> Dotación</TabsTrigger>
                     <TabsTrigger value="activos" className="gap-2"><Car className="h-4 w-4" /> Activos</TabsTrigger>
@@ -201,9 +223,168 @@ export default function LogisticaPage() {
                     </div>
                 </TabsContent>
 
-                {/* INVENTARIO TAB */}
-                <TabsContent value="inventario">
-                    <InventoryTable data={initialInventory} cotizaciones={initialQuotes} />
+                {/* CATALOGO DE INVENTARIO TAB */}
+                <TabsContent value="catalogo" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-center">
+                                <CardTitle>Catálogo de Inventario</CardTitle>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Buscar por nombre o SKU..."
+                                            className="pl-8"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <CreateInventoryItemDialog onItemCreated={(newItem) => setCatalogoItems([...catalogoItems, newItem])} />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>SKU</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Categoría</TableHead>
+                                        <TableHead>Ubicación</TableHead>
+                                        <TableHead>Stock</TableHead>
+                                        <TableHead>Estado</TableHead>
+                                        <TableHead className="text-right">Precio Proveedor</TableHead>
+                                        <TableHead className="text-right">Precio de Venta</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {catalogoItems
+                                        .filter(item =>
+                                            item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+                                        )
+                                        .map((item) => {
+                                            const stockStatus = item.cantidad <= item.stockMinimo ? 'BAJO' : 'OK';
+                                            const precioProveedor = item.costoMateriales || Math.round(item.valorUnitario * 0.7);
+                                            return (
+                                                <TableRow
+                                                    key={item.id}
+                                                    className="cursor-pointer hover:bg-muted/50"
+                                                    onClick={() => handleItemClick(item)}
+                                                >
+                                                    <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                                    <TableCell className="font-medium">{item.descripcion}</TableCell>
+                                                    <TableCell><Badge variant="outline">{item.categoria}</Badge></TableCell>
+                                                    <TableCell>{item.ubicacion}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{item.cantidad} {item.unidad}</span>
+                                                            {stockStatus === 'BAJO' && <AlertTriangle className="h-3 w-3 text-orange-500" />}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="w-[100px]">
+                                                            <Progress value={(item.cantidad / (item.stockMinimo * 3)) * 100} className={cn("h-2", stockStatus === 'BAJO' ? "bg-orange-200" : "")} />
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-muted-foreground">{formatCurrency(precioProveedor)}</TableCell>
+                                                    <TableCell className="text-right font-medium">{formatCurrency(item.valorUnitario)}</TableCell>
+                                                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                                        <EditInventoryDialog articulo={item} onItemUpdated={(updated) => setCatalogoItems(catalogoItems.map(i => i.id === updated.id ? updated : i))} />
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* CÓDIGOS DE TRABAJO TAB */}
+                <TabsContent value="inventario" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Package className="h-5 w-5" /> Códigos de Trabajo
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-6">
+                                {initialCodigosTrabajo.map((codigo) => {
+                                    const totalMateriales = codigo.materiales.reduce(
+                                        (acc, mat) => acc + (mat.cantidad * mat.valorUnitario),
+                                        0
+                                    );
+                                    return (
+                                        <div key={codigo.id} className="border rounded-lg p-4 space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant="outline" className="font-mono">{codigo.codigo}</Badge>
+                                                        <h3 className="font-semibold text-lg">{codigo.nombre}</h3>
+                                                    </div>
+                                                    <p className="text-sm text-muted-foreground mt-1">{codigo.descripcion}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-2xl font-bold text-primary">{formatCurrency(codigo.costoTotal)}</p>
+                                                    <p className="text-xs text-muted-foreground">Valor Total al Cliente</p>
+                                                </div>
+                                            </div>
+
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow className="bg-muted/30">
+                                                        <TableHead>Material</TableHead>
+                                                        <TableHead className="text-center">Cantidad</TableHead>
+                                                        <TableHead className="text-right">Precio Venta</TableHead>
+                                                        <TableHead className="text-right">Subtotal</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {codigo.materiales.map((mat) => (
+                                                        <TableRow key={mat.id}>
+                                                            <TableCell className="font-medium">{mat.nombre}</TableCell>
+                                                            <TableCell className="text-center">{mat.cantidad}</TableCell>
+                                                            <TableCell className="text-right">{formatCurrency(mat.valorUnitario)}</TableCell>
+                                                            <TableCell className="text-right font-semibold">
+                                                                {formatCurrency(mat.cantidad * mat.valorUnitario)}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    <TableRow className="bg-muted/10 border-t-2">
+                                                        <TableCell colSpan={3} className="text-right font-medium">
+                                                            Subtotal Materiales:
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-bold">
+                                                            {formatCurrency(totalMateriales)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    <TableRow>
+                                                        <TableCell colSpan={3} className="text-right font-medium">
+                                                            Mano de Obra:
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-bold">
+                                                            {formatCurrency(codigo.manoDeObra)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    <TableRow className="bg-primary/5 border-t-2">
+                                                        <TableCell colSpan={3} className="text-right font-bold text-primary">
+                                                            TOTAL AL CLIENTE:
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-bold text-primary text-lg">
+                                                            {formatCurrency(totalMateriales + codigo.manoDeObra)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 {/* SUMINISTRO TAB - WITH SUB-TABS */}
@@ -546,6 +727,12 @@ export default function LogisticaPage() {
                     </Tabs>
                 </TabsContent>
             </Tabs>
+
+            <InventoryItemDetailDialog
+                open={itemDetailOpen}
+                onOpenChange={setItemDetailOpen}
+                item={selectedItem}
+            />
         </div>
     );
 }

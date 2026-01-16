@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   SidebarProvider,
   Sidebar,
@@ -202,6 +204,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <span className="hidden md:inline-block text-sm text-muted-foreground mr-2 capitalize font-medium">
+              {format(new Date(), "EEEE, dd 'de' MMM yyyy", { locale: es })}
+            </span>
             <NotificationCenter />
             <ThemeToggle />
           </div>

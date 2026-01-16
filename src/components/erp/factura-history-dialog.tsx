@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -15,8 +15,11 @@ import {
     CreditCard,
     Receipt,
     History,
-    Banknote
+    Banknote,
+    Calendar
 } from "lucide-react";
+
+import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +56,7 @@ import { Factura, EstadoFactura } from "@/types/sistema";
 interface MovimientoFactura {
     id: string;
     fecha: Date;
-    tipo: 'ABONO' | 'ADELANTO' | 'DESCUENTO' | 'RETENCION' | 'ESTADO_CAMBIO' | 'NOTA';
+    tipo: 'ABONO' | 'ADELANTO' | 'DESCUENTO' | 'RETENCION' | 'ESTADO_CAMBIO' | 'NOTA' | 'FECHA_CAMBIO';
     descripcion: string;
     valor?: number;
     usuario: string;
@@ -77,6 +80,7 @@ const getEstadoBadge = (estado: EstadoFactura) => {
 };
 
 export function FacturaHistoryDialog({ factura, onFacturaUpdated, trigger }: FacturaHistoryDialogProps) {
+    const { toast } = useToast();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState("detalles");
 
@@ -85,11 +89,24 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, trigger }: Fac
     const [abonoConcepto, setAbonoConcepto] = useState("");
     const [adelantoMonto, setAdelantoMonto] = useState<string>("");
     const [nuevoEstado, setNuevoEstado] = useState<EstadoFactura>(factura.estado);
+    const [fechaVencimiento, setFechaVencimiento] = useState<string>(
+        format(new Date(factura.fechaVencimiento), "yyyy-MM-dd")
+    );
     const [nota, setNota] = useState("");
 
     // Track local saldo
     const [saldoPendiente, setSaldoPendiente] = useState(factura.saldoPendiente);
     const [anticipoTotal, setAnticipoTotal] = useState(factura.anticipoRecibido);
+
+    useEffect(() => {
+        setSaldoPendiente(factura.saldoPendiente);
+        setAnticipoTotal(factura.anticipoRecibido);
+        setNuevoEstado(factura.estado);
+        setFechaVencimiento(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
+        // Reset inputs on prop change (optional but good UI)
+        setAbonoMonto("");
+        setAdelantoMonto("");
+    }, [factura]);
 
     // Movimientos history
     const [movimientos, setMovimientos] = useState<MovimientoFactura[]>([
@@ -119,6 +136,15 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, trigger }: Fac
     const handleRegistrarAbono = () => {
         const monto = parseFloat(abonoMonto);
         if (isNaN(monto) || monto <= 0) return;
+
+        if (monto > saldoPendiente) {
+            toast({
+                variant: "destructive",
+                title: "Error en Abono",
+                description: `El monto ingresado ($${formatCurrency(monto)}) supera el saldo pendiente ($${formatCurrency(saldoPendiente)}). No se puede procesar el pago.`
+            });
+            return;
+        }
 
         const nuevoSaldo = Math.max(0, saldoPendiente - monto);
         setSaldoPendiente(nuevoSaldo);
@@ -164,6 +190,15 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, trigger }: Fac
     const handleRegistrarAdelanto = () => {
         const monto = parseFloat(adelantoMonto);
         if (isNaN(monto) || monto <= 0) return;
+
+        if (monto > saldoPendiente) {
+            toast({
+                variant: "destructive",
+                title: "Error en Adelanto",
+                description: `El adelanto ingresado ($${formatCurrency(monto)}) supera el saldo pendiente ($${formatCurrency(saldoPendiente)}).`
+            });
+            return;
+        }
 
         const nuevoAnticipo = anticipoTotal + monto;
         const nuevoSaldo = Math.max(0, saldoPendiente - monto);
@@ -211,6 +246,29 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, trigger }: Fac
         });
     };
 
+    const handleActualizarFecha = () => {
+        const currentDateStr = format(new Date(factura.fechaVencimiento), "yyyy-MM-dd");
+        if (fechaVencimiento === currentDateStr) return;
+
+        const nuevaFecha = new Date(fechaVencimiento + 'T12:00:00'); // Ensure mid-day to avoid TZ shifts
+
+        const entry: MovimientoFactura = {
+            id: Date.now().toString(),
+            fecha: new Date(),
+            tipo: 'FECHA_CAMBIO',
+            descripcion: `Fecha vencimiento cambiada a ${format(nuevaFecha, "dd/MM/yyyy")}`,
+            usuario: 'Usuario Actual',
+        };
+
+        setMovimientos([entry, ...movimientos]);
+        toast({ title: "Fecha Actualizada", description: "La fecha de vencimiento ha sido modificada." });
+
+        onFacturaUpdated({
+            ...factura,
+            fechaVencimiento: nuevaFecha
+        });
+    };
+
     const handleAgregarNota = () => {
         if (!nota.trim()) return;
 
@@ -233,6 +291,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, trigger }: Fac
             case 'DESCUENTO': return <TrendingDown className="h-4 w-4 text-orange-500" />;
             case 'RETENCION': return <CreditCard className="h-4 w-4 text-red-500" />;
             case 'ESTADO_CAMBIO': return <CheckCircle2 className="h-4 w-4 text-purple-500" />;
+            case 'FECHA_CAMBIO': return <Calendar className="h-4 w-4 text-blue-600" />;
             case 'NOTA': return <FileText className="h-4 w-4 text-gray-500" />;
         }
     };
@@ -468,6 +527,30 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, trigger }: Fac
                                     </div>
                                     <Button onClick={handleCambiarEstado} disabled={nuevoEstado === factura.estado}>
                                         Actualizar Estado
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Modificar Fecha Vencimiento */}
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Calendar className="h-4 w-4" /> Modificar Vencimiento
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex gap-4 items-end">
+                                    <div className="flex-1">
+                                        <label className="text-xs text-muted-foreground">Nueva Fecha</label>
+                                        <Input
+                                            type="date"
+                                            value={fechaVencimiento}
+                                            onChange={(e) => setFechaVencimiento(e.target.value)}
+                                        />
+                                    </div>
+                                    <Button onClick={handleActualizarFecha}>
+                                        Actualizar Fecha
                                     </Button>
                                 </div>
                             </CardContent>

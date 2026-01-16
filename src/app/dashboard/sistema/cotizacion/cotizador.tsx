@@ -13,12 +13,15 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Trash2, User, Search, Plus, Save, FileDown, X } from "lucide-react";
+import { Trash2, User, Search, Plus, Save, FileDown, X, Package, Wrench, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
+import { formatCurrency } from "@/lib/utils";
+import { ProductSelectorDialog } from "@/components/erp/product-selector-dialog";
+import { Checkbox as CheckboxUI } from "@/components/ui/checkbox";
 
 interface CotizadorProps {
     clientes: Cliente[];
@@ -36,12 +39,18 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
     const [showProductsInPdf, setShowProductsInPdf] = useState(true);
     const [fechaCotizacion, setFechaCotizacion] = useState<string>(new Date().toISOString().split('T')[0]);
 
+    // Global Settings State
+    const [globalDiscountPct, setGlobalDiscountPct] = useState(0);
+    const [globalIvaPct, setGlobalIvaPct] = useState(19);
+
     // Cargar datos iniciales si existen (Modo Edición/Visualización)
     useEffect(() => {
         if (initialData) {
             setSelectedCliente(initialData.cliente);
             setItems(initialData.items);
             setFechaCotizacion(new Date(initialData.fecha).toISOString().split('T')[0]);
+            // If we stored global discount/tax in data, we would load it here. 
+            // Assuming default for now or inferring from totals if possible, but simplest is reset or default.
         }
     }, [initialData]);
 
@@ -55,9 +64,24 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
     };
 
     // Totales
-    const subtotal = useMemo(() => items.reduce((acc, item) => acc + item.valorTotal, 0), [items]);
-    const iva = subtotal * 0.19;
-    const total = subtotal + iva;
+    const { subtotal, descuento, iva, total } = useMemo(() => {
+        // 1. Sum up item totals (qty * price)
+        const sub = items.reduce((acc, item) => acc + (item.cantidad * item.valorUnitario), 0);
+
+        // 2. Apply Global Discount
+        const discountVal = sub * (globalDiscountPct / 100);
+        const subAfterDiscount = sub - discountVal;
+
+        // 3. Apply Global IVA
+        const totalIva = subAfterDiscount * (globalIvaPct / 100);
+
+        return {
+            subtotal: sub,
+            descuento: discountVal,
+            iva: totalIva,
+            total: subAfterDiscount + totalIva
+        };
+    }, [items, globalDiscountPct, globalIvaPct]);
 
     // Handlers
     const handleSelectClient = (cliente: Cliente) => {
@@ -65,21 +89,8 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
         setIsClientModalOpen(false);
     };
 
-    const handleAddItem = (producto: InventarioItem) => {
-        const existingItem = items.find((i) => i.inventarioId === producto.id);
-        if (existingItem) {
-            handleUpdateQuantity(existingItem.id, existingItem.cantidad + 1);
-        } else {
-            const newItem: CotizacionItem = {
-                id: Math.random().toString(36).substr(2, 9),
-                inventarioId: producto.id,
-                descripcion: producto.descripcion,
-                cantidad: 1,
-                valorUnitario: producto.valorUnitario,
-                valorTotal: producto.valorUnitario,
-            };
-            setItems([...items, newItem]);
-        }
+    const handleAddItem = (newItem: CotizacionItem) => {
+        setItems([...items, newItem]);
         setIsInventoryModalOpen(false);
     };
 
@@ -165,39 +176,90 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                     <TableRow>
                                         <TableHead>Descripción</TableHead>
                                         <TableHead className="w-[80px]">Cant.</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
+                                        <TableHead className="text-right w-[120px]">Precio Unit.</TableHead>
+                                        <TableHead className="text-right w-[120px]">Total</TableHead>
                                         <TableHead className="w-[40px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {items.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                                                 Sin items.
                                             </TableCell>
                                         </TableRow>
-                                    ) : items.map((item) => (
-                                        <TableRow key={item.id}>
-                                            <TableCell className="text-xs">{item.descripcion}</TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number"
-                                                    value={item.cantidad}
-                                                    onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
-                                                    className="h-7 w-16 text-xs"
-                                                    min={1}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="text-right text-xs font-medium">
-                                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(item.valorTotal)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(item.id)}>
-                                                    <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    ) : items.map((item, index) => {
+                                        const finalTotal = item.cantidad * item.valorUnitario;
+
+                                        return (
+                                            <>
+                                                <TableRow key={item.id}>
+                                                    <TableCell className="text-xs">
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2">
+                                                                {item.tipo === 'SERVICIO' ? <Wrench className="h-3 w-3 text-blue-500" /> : <Package className="h-3 w-3 text-green-500" />}
+                                                                <span className="font-medium">{item.descripcion}</span>
+                                                            </div>
+                                                            {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && (
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <CheckboxUI
+                                                                        id={`hide-details-${item.id}`}
+                                                                        checked={!!item.ocultarDetalles}
+                                                                        onCheckedChange={(checked) => {
+                                                                            const updated = [...items];
+                                                                            updated[index].ocultarDetalles = !!checked;
+                                                                            setItems(updated);
+                                                                        }}
+                                                                        className="h-3 w-3"
+                                                                    />
+                                                                    <Label htmlFor={`hide-details-${item.id}`} className="text-[10px] text-muted-foreground cursor-pointer flex items-center gap-1">
+                                                                        <EyeOff className="h-3 w-3" /> Ocultar detalles
+                                                                    </Label>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            type="number"
+                                                            value={item.cantidad}
+                                                            onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                                                            className="h-7 w-16 text-xs"
+                                                            min={1}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-xs font-medium">
+                                                        {formatCurrency(item.valorUnitario)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-xs font-bold">
+                                                        {formatCurrency(finalTotal)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(item.id)}>
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                                {/* Subitems Render */}
+                                                {item.tipo === 'SERVICIO' && item.subItems && !item.ocultarDetalles && (
+                                                    item.subItems.map((sub, subIdx) => (
+                                                        <TableRow key={`${item.id}-sub-${subIdx}`} className="bg-muted/10 border-0 hover:bg-transparent">
+                                                            <TableCell colSpan={2} className="pl-8 py-1">
+                                                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                                                    <span>↳</span>
+                                                                    <span>{sub.nombre}</span>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="text-center py-1 text-[10px] text-muted-foreground">
+                                                                {sub.cantidad * item.cantidad} un.
+                                                            </TableCell>
+                                                            <TableCell colSpan={2}></TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                )}
+                                            </>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </CardContent>
@@ -214,16 +276,40 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                             <div className="space-y-1">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Subtotal</span>
-                                    <span>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(subtotal)}</span>
+                                    <span>{formatCurrency(subtotal)}</span>
                                 </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">IVA (19%)</span>
-                                    <span>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(iva)}</span>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-muted-foreground">Descuento</span>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            className="h-6 w-12 text-right text-xs p-1"
+                                            value={globalDiscountPct}
+                                            onChange={e => setGlobalDiscountPct(Number(e.target.value))}
+                                            placeholder="0"
+                                        />
+                                        <span className="text-xs">%</span>
+                                        <span className="text-red-500 ml-2">-{formatCurrency(descuento)}</span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-muted-foreground">IVA</span>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            className="h-6 w-12 text-right text-xs p-1"
+                                            value={globalIvaPct}
+                                            onChange={e => setGlobalIvaPct(Number(e.target.value))}
+                                            placeholder="19"
+                                        />
+                                        <span className="text-xs">%</span>
+                                        <span className="ml-2">{formatCurrency(iva)}</span>
+                                    </div>
                                 </div>
                                 <Separator className="my-2" />
                                 <div className="flex justify-between font-bold text-base">
                                     <span>Total</span>
-                                    <span>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(total)}</span>
+                                    <span>{formatCurrency(total)}</span>
                                 </div>
                             </div>
 
@@ -290,50 +376,11 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isInventoryModalOpen} onOpenChange={setIsInventoryModalOpen}>
-                <DialogContent className="sm:max-w-[700px]">
-                    <DialogHeader>
-                        <DialogTitle>Inventario</DialogTitle>
-                    </DialogHeader>
-                    {/* ... Inventory Search Content ... */}
-                    <div className="space-y-4">
-                        <div className="flex items-center border rounded-md px-3">
-                            <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                className="border-0 focus-visible:ring-0"
-                                placeholder="Buscar producto..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <ScrollArea className="h-[400px]">
-                            {filteredInventory.map(item => (
-                                <div
-                                    key={item.id}
-                                    className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg cursor-pointer transition-colors border mb-2"
-                                    onClick={() => handleAddItem(item)}
-                                >
-                                    <div>
-                                        <div className="flex items-center space-x-2">
-                                            <Badge variant={item.tipo === 'COMPUESTO' ? 'default' : 'secondary'} className="text-[10px] h-5">
-                                                {item.tipo}
-                                            </Badge>
-                                            <p className="font-medium text-sm">{item.descripcion}</p>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground mt-1">Ref: {item.item} | Disp: {item.cantidad}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-sm">
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(item.valorUnitario)}
-                                        </p>
-                                        <Badge variant="outline" className="mt-1 cursor-pointer">Agregar</Badge>
-                                    </div>
-                                </div>
-                            ))}
-                        </ScrollArea>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <ProductSelectorDialog
+                open={isInventoryModalOpen}
+                onOpenChange={setIsInventoryModalOpen}
+                onItemSelected={handleAddItem}
+            />
         </div>
     );
 }

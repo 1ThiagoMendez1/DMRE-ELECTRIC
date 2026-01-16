@@ -62,10 +62,25 @@ export interface InventarioItem {
 export interface CotizacionItem {
     id: string;
     inventarioId: string;
+    tipo: 'PRODUCTO' | 'SERVICIO'; // New: Distinguish between simple products and work codes
     descripcion: string; // Snapshot of description
     cantidad: number;
     valorUnitario: number; // Snapshot of price
     valorTotal: number;
+
+    // New fields for extended functionality
+    descuentoValor?: number;
+    descuentoPorcentaje?: number; // 0-100
+    impuesto?: number; // % IVA, e.g., 19
+    ocultarDetalles?: boolean; // If true, only show total for this item
+    subItems?: MaterialAsociado[]; // Expanded materials for Work Codes
+
+    // AIU & Costing Fields
+    costoUnitario?: number; // Precio Proveedor
+    aiuAdminPorcentaje?: number;
+    aiuImprevistoPorcentaje?: number;
+    aiuUtilidadPorcentaje?: number;
+    ivaUtilidadPorcentaje?: number; // IVA specific to Utility portion
 }
 
 export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'APROBADA' | 'RECHAZADA' | 'PENDIENTE' | 'NO_APROBADA' | 'EN_EJECUCION' | 'FINALIZADA';
@@ -81,9 +96,19 @@ export interface Cotizacion {
     descripcionTrabajo: string; // New
     items: CotizacionItem[];
     subtotal: number;
-    aiuAdmin: number;  // New
-    aiuImprevistos: number; // New
-    aiuUtilidad: number; // New
+    descuentoGlobal?: number; // New: Global Discount Amount
+    descuentoGlobalPorcentaje?: number; // New: Global Discount %
+    impuestoGlobalPorcentaje?: number; // New: Global Tax % (e.g. 19)
+
+    // Global AIU Defaults
+    aiuAdminGlobalPorcentaje?: number;
+    aiuImprevistoGlobalPorcentaje?: number;
+    aiuUtilidadGlobalPorcentaje?: number;
+    ivaUtilidadGlobalPorcentaje?: number;
+
+    aiuAdmin: number;  // Calculated Amount
+    aiuImprevistos: number; // Calculated Amount
+    aiuUtilidad: number; // Calculated Amount
     iva: number;
     total: number;
     estado: EstadoCotizacion;

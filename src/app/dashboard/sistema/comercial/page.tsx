@@ -74,35 +74,47 @@ import { CreateClientDialog } from "@/components/erp/create-client-dialog";
 import { CreateProjectDialog } from "@/components/erp/create-project-dialog";
 import { EditClientDialog } from "@/components/erp/edit-client-dialog";
 import { ClientProfileDialog } from "@/components/erp/client-profile-dialog";
-import { EditQuoteDialog } from "@/components/erp/edit-quote-dialog";
+// import { EditQuoteDialog } from "@/components/erp/edit-quote-dialog"; // Unused and missing
 import { generateQuotePDF } from "@/utils/pdf-generator";
 import { Cotizador } from "../cotizacion/cotizador";
 import { TrabajoHistoryDialog } from "@/components/erp/trabajo-history-dialog";
-import { FacturaHistoryDialog } from "@/components/erp/factura-history-dialog";
-import { CreateFacturaDialog } from "@/components/erp/create-factura-dialog";
+import { BillingModule } from "@/components/erp/billing-module";
 import { Factura } from "@/types/sistema";
+import { useErp } from "@/components/providers/erp-provider";
 
 export default function CommercialPage() {
     const { toast } = useToast();
+    const {
+        facturas, addFactura, updateFactura,
+        cotizaciones, addCotizacion, updateCotizacion, deleteCotizacion,
+        clientes, addCliente, updateCliente
+    } = useErp();
+
     const [searchTerm, setSearchTerm] = useState("");
-    const [clientes, setClientes] = useState(initialClients);
-    const [cotizaciones, setCotizaciones] = useState(initialQuotes);
-    const [facturas, setFacturas] = useState(initialFacturas);
+    // Removed local states for facturas, cotizaciones, clientes
 
-    // Calculate next Invoice ID (Synced with Financiera Logic)
-    const nextInvoiceId = useMemo(() => {
-        if (facturas.length === 0) return "Fac-0001";
-        const ids = facturas.map(f => {
-            const num = parseInt(f.id.replace(/[^0-9]/g, ''));
-            return isNaN(num) ? 0 : num;
-        });
-        const maxId = Math.max(0, ...ids);
-        return `Fac-${String(maxId + 1).padStart(4, '0')}`;
-    }, [facturas]);
+    // nextInvoiceId moved to BillingModule
 
-    const handleCreateInvoice = (newInvoice: Factura) => {
-        setFacturas([newInvoice, ...facturas]);
-        toast({ title: "Factura Creada", description: `Factura ${newInvoice.id} registrada exitosamente.` });
+    // handleCreateInvoice moved to BillingModule
+
+    const handleClientUpdated = (updatedClient: any) => {
+        updateCliente(updatedClient);
+        toast({ title: "Cliente Actualizado", description: "La información ha sido guardada." });
+    };
+
+    const handleCreateQuote = (newQuote: any) => {
+        addCotizacion(newQuote);
+        toast({ title: "Cotización Creada", description: `Oferta ${newQuote.numero} generada exitosamente.` });
+    };
+
+    const handleQuoteUpdated = (updatedQuote: any) => {
+        updateCotizacion(updatedQuote);
+        toast({ title: "Cotización Actualizada", description: "Cambios guardados correctamente." });
+    };
+
+    const handleCreateClient = (newClient: any) => {
+        addCliente(newClient);
+        toast({ title: "Cliente Creado", description: "Nuevo cliente registrado en el sistema." });
     };
 
     // --- DASHBOARD STATE ---
@@ -131,8 +143,8 @@ export default function CommercialPage() {
     };
 
     const dashboardFilteredQuotes = useMemo(() => {
-        return initialQuotes.filter(q => filterData(q.fecha, q.cliente.id));
-    }, [dateRange, selectedClientFilter]);
+        return cotizaciones.filter(q => filterData(q.fecha, q.cliente.id));
+    }, [dateRange, selectedClientFilter, cotizaciones]);
 
     // 1. Revenue Over Time (Approved Quotes)
     const revenueData = useMemo(() => {
@@ -205,40 +217,24 @@ export default function CommercialPage() {
     };
 
     // --- STATE MANAGEMENT ---
-    // In a real app, this would be global state (Redux/Zustand) or Server State (React Query)
-    const [clients, setClients] = useState(initialClients);
-
-    const handleCreateClient = (newClient: any) => {
-        setClients([newClient, ...clients]);
-    };
+    // Using global state from useErp()
 
     // --- MEMOIZED DATA ---
     const filteredClients = useMemo(() => {
-        return clients.filter(c =>
+        return clientes.filter(c =>
             c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
             c.documento.includes(searchTerm)
         );
-    }, [searchTerm, clients]);
-
-    const [projects, setProjects] = useState(initialQuotes);
-
-    const handleCreateProject = (newProject: any) => {
-        setProjects([newProject, ...projects]);
-    };
+    }, [searchTerm, clientes]);
 
     const filteredQuotes = useMemo(() => {
-        return projects.filter(q =>
+        return cotizaciones.filter(q =>
             q.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
             q.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [searchTerm, projects]);
+    }, [searchTerm, cotizaciones]);
 
-    const filteredInvoices = useMemo(() => {
-        return facturas.filter(f =>
-            f.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            f.cotizacion.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [searchTerm, facturas]);
+    // filteredInvoices moved to BillingModule
 
     return (
         <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
@@ -277,7 +273,7 @@ export default function CommercialPage() {
                                 <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Todos los Clientes</SelectItem>
-                                    {initialClients.map(c => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
+                                    {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -329,7 +325,7 @@ export default function CommercialPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
-                                    {formatCurrency(initialFacturas.filter(f => isBefore(f.fechaVencimiento, new Date()) && f.saldoPendiente > 0).reduce((acc, curr) => acc + curr.saldoPendiente, 0))}
+                                    {formatCurrency(facturas.filter(f => isBefore(f.fechaVencimiento, new Date()) && f.saldoPendiente > 0).reduce((acc, curr) => acc + curr.saldoPendiente, 0))}
                                 </div>
                                 <p className="text-xs text-muted-foreground">Global (No filtra por fecha dashboard)</p>
                             </CardContent>
@@ -412,7 +408,7 @@ export default function CommercialPage() {
                                                     <ClientProfileDialog cliente={client} />
                                                     <EditClientDialog
                                                         cliente={client}
-                                                        onClientUpdated={(updated) => setClientes(prev => prev.map(c => c.id === updated.id ? updated : c))}
+                                                        onClientUpdated={(updated) => updateCliente(updated)}
                                                     />
                                                 </div>
                                             </TableCell>
@@ -440,7 +436,7 @@ export default function CommercialPage() {
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
                                     </div>
-                                    <CreateProjectDialog clientes={clients} onProjectCreated={handleCreateProject} />
+                                    <CreateProjectDialog clientes={clientes} onProjectCreated={handleCreateQuote} />
                                 </div>
                             </div>
                         </CardHeader>
@@ -466,7 +462,7 @@ export default function CommercialPage() {
                                             <TableCell>
                                                 <TrabajoHistoryDialog
                                                     trabajo={quote}
-                                                    onTrabajoUpdated={(updated) => setCotizaciones(prev => prev.map(q => q.id === updated.id ? updated : q))}
+                                                    onTrabajoUpdated={(updated) => updateCotizacion(updated)}
                                                 />
                                             </TableCell>
                                             <TableCell>
@@ -497,7 +493,7 @@ export default function CommercialPage() {
                                                 <div className="flex items-center justify-center gap-1">
                                                     <TrabajoHistoryDialog
                                                         trabajo={quote}
-                                                        onTrabajoUpdated={(updated) => setCotizaciones(prev => prev.map(q => q.id === updated.id ? updated : q))}
+                                                        onTrabajoUpdated={(updated) => updateCotizacion(updated)}
                                                         defaultTab="items"
                                                         trigger={
                                                             <Button
@@ -517,7 +513,7 @@ export default function CommercialPage() {
                                                         title="Eliminar"
                                                         onClick={() => {
                                                             if (confirm(`¿Eliminar trabajo ${quote.numero}?`)) {
-                                                                setCotizaciones(prev => prev.filter(q => q.id !== quote.id));
+                                                                deleteCotizacion(quote.id);
                                                                 toast({ title: "Eliminado", description: "Trabajo eliminado correctamente" });
                                                             }
                                                         }}
@@ -545,85 +541,7 @@ export default function CommercialPage() {
 
                 {/* --- FACTURACION TAB --- */}
                 <TabsContent value="facturacion" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle>Facturación y Gestión de Cobro</CardTitle>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative w-64">
-                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            placeholder="Buscar factura..."
-                                            className="pl-8"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                    </div>
-                                    <CreateFacturaDialog onFacturaCreated={handleCreateInvoice} nextId={nextInvoiceId} />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>N° Factura</TableHead>
-                                        <TableHead>Emisión</TableHead>
-                                        <TableHead>Vencimiento</TableHead>
-                                        <TableHead>Cliente / Proyecto</TableHead>
-                                        <TableHead>Valor Facturado</TableHead>
-                                        <TableHead>Saldo Pendiente</TableHead>
-                                        <TableHead>Estado</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredInvoices.map((inv) => {
-                                        const isOverdue = isBefore(inv.fechaVencimiento, new Date()) && inv.saldoPendiente > 0;
-                                        return (
-                                            <TableRow key={inv.id}>
-                                                <TableCell className="font-mono">{inv.id}</TableCell>
-                                                <TableCell>{formatDate(inv.fechaEmision)}</TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        {formatDate(inv.fechaVencimiento)}
-                                                        {isOverdue && <div title="Vencida"><AlertCircle className="h-3 w-3 text-red-500" /></div>}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <FacturaHistoryDialog
-                                                        factura={inv}
-                                                        onFacturaUpdated={(updated) => setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f))}
-                                                    />
-                                                    <span className="text-xs text-muted-foreground block">REF: {inv.cotizacion.numero}</span>
-                                                </TableCell>
-                                                <TableCell>{formatCurrency(inv.valorFacturado)}</TableCell>
-                                                <TableCell className={inv.saldoPendiente > 0 ? "font-bold text-orange-600 dark:text-orange-400" : "text-muted-foreground"}>
-                                                    {formatCurrency(inv.saldoPendiente)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={inv.estado === 'CANCELADA' ? 'default' : 'outline'} className={inv.estado === 'PENDIENTE' && isOverdue ? 'border-red-500 text-red-500' : ''}>
-                                                        {inv.estado}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <FacturaHistoryDialog
-                                                        factura={inv}
-                                                        onFacturaUpdated={(updated) => setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f))}
-                                                        trigger={
-                                                            <Button variant="outline" size="sm" className="text-xs">
-                                                                Gestionar
-                                                            </Button>
-                                                        }
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
+                    <BillingModule />
                 </TabsContent>
 
                 {/* --- COTIZADOR TAB --- */}
