@@ -77,21 +77,66 @@ export function DotacionDetailDialog({
                                     <TableRow>
                                         <TableHead>Talla</TableHead>
                                         <TableHead>Color</TableHead>
-                                        <TableHead className="text-right">Stock Disponible</TableHead>
-                                        <TableHead className="w-[100px]"></TableHead>
+                                        <TableHead className="text-center">Stock Disponible</TableHead>
+                                        <TableHead className="text-right">Ajuste Rápido</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {item.variantes.map(v => (
-                                        <TableRow key={v.id}>
-                                            <TableCell>{v.talla}</TableCell>
-                                            <TableCell>{v.color}</TableCell>
-                                            <TableCell className="text-right font-bold">{v.cantidadDisponible}</TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="sm"><Edit className="h-4 w-4" /></Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {item.variantes.map(v => {
+                                        const stockMin = item.stockMinimo || 10;
+                                        const isLow = v.cantidadDisponible <= stockMin;
+                                        return (
+                                            <TableRow key={v.id}>
+                                                <TableCell>{v.talla}</TableCell>
+                                                <TableCell>{v.color}</TableCell>
+                                                <TableCell className={`text-center font-bold ${isLow ? 'text-amber-500' : 'text-primary'}`}>
+                                                    {v.cantidadDisponible}
+                                                    {isLow && <span className="ml-1 text-[10px]">⚠️</span>}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 w-7 p-0"
+                                                            onClick={() => {
+                                                                if (v.cantidadDisponible > 0) {
+                                                                    onUpdateItem({
+                                                                        ...item,
+                                                                        variantes: item.variantes.map(vr =>
+                                                                            vr.id === v.id
+                                                                                ? { ...vr, cantidadDisponible: vr.cantidadDisponible - 1 }
+                                                                                : vr
+                                                                        )
+                                                                    });
+                                                                }
+                                                            }}
+                                                        >
+                                                            -
+                                                        </Button>
+                                                        <span className="w-8 text-center text-sm">{v.cantidadDisponible}</span>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 w-7 p-0"
+                                                            onClick={() => {
+                                                                onUpdateItem({
+                                                                    ...item,
+                                                                    variantes: item.variantes.map(vr =>
+                                                                        vr.id === v.id
+                                                                            ? { ...vr, cantidadDisponible: vr.cantidadDisponible + 1 }
+                                                                            : vr
+                                                                    )
+                                                                });
+                                                            }}
+                                                        >
+                                                            +
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </div>

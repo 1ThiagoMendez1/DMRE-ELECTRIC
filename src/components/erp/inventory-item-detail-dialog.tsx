@@ -6,13 +6,16 @@ import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import { Package, MapPin, Layers, DollarSign, AlertTriangle, CheckCircle } from "lucide-react";
 
+import { EditInventoryDialog } from "./edit-inventory-dialog";
+
 interface InventoryItemDetailDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     item: any | null;
+    onItemUpdated: (updated: any) => void;
 }
 
-export function InventoryItemDetailDialog({ open, onOpenChange, item }: InventoryItemDetailDialogProps) {
+export function InventoryItemDetailDialog({ open, onOpenChange, item, onItemUpdated }: InventoryItemDetailDialogProps) {
     if (!item) return null;
 
     const stockStatus = item.cantidad <= item.stockMinimo ? 'BAJO' : 'OK';
@@ -24,13 +27,18 @@ export function InventoryItemDetailDialog({ open, onOpenChange, item }: Inventor
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        {item.descripcion}
-                    </DialogTitle>
-                    <DialogDescription>
-                        SKU: {item.sku}
-                    </DialogDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Package className="h-5 w-5" />
+                                {item.descripcion}
+                            </DialogTitle>
+                            <DialogDescription>
+                                SKU: {item.sku}
+                            </DialogDescription>
+                        </div>
+                        <EditInventoryDialog articulo={item} onItemUpdated={onItemUpdated} />
+                    </div>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">

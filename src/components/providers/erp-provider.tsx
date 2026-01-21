@@ -1,8 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { Factura, Cotizacion, Cliente, User } from "@/types/sistema";
-import { initialFacturas, initialQuotes, initialClients, initialUsers } from "@/lib/mock-data";
+import { Factura, Cotizacion, Cliente, User, InventarioItem, Proveedor, Vehiculo, DotacionItem, EntregaDotacion, CuentaPorPagar, GastoVehiculo, CodigoTrabajo, OrdenCompra } from "@/types/sistema";
+import {
+    initialFacturas, initialQuotes, initialClients, initialUsers,
+    initialInventory, initialProveedores, initialVehiculos, initialDotacionItems, initialEntregasDotacion, initialCuentasPorPagar, initialGastosVehiculos, initialCodigosTrabajo, initialOrdenesCompra
+} from "@/lib/mock-data";
 
 interface ErpContextType {
     facturas: Factura[];
@@ -19,6 +22,31 @@ interface ErpContextType {
     deleteCotizacion: (id: string) => void;
     updateUserPermissions: (userId: string, access: string[]) => void;
     setCurrentUser: (user: User) => void;
+    // Logistics State
+    inventario: InventarioItem[];
+    proveedores: Proveedor[];
+    vehiculos: Vehiculo[];
+    dotacionItems: DotacionItem[];
+    entregasDotacion: EntregaDotacion[];
+    cuentasPorPagar: CuentaPorPagar[];
+    gastosVehiculos: GastoVehiculo[];
+    codigosTrabajo: CodigoTrabajo[];
+
+    // Logistics Actions
+    updateInventarioItem: (updated: InventarioItem) => void;
+    addInventarioItem: (item: InventarioItem) => void;
+    updateProveedor: (updated: Proveedor) => void;
+    addProveedor: (prov: Proveedor) => void;
+    updateVehiculo: (veh: Vehiculo) => void;
+    addVehiculo: (veh: Vehiculo) => void;
+    updateDotacionItem: (item: DotacionItem) => void;
+    addEntregaDotacion: (entrega: EntregaDotacion) => void;
+    addGastoVehiculo: (gasto: GastoVehiculo) => void;
+    updateCuentaPorPagar: (updated: CuentaPorPagar) => void;
+    addCodigoTrabajo: (codigo: CodigoTrabajo) => void;
+    updateCodigoTrabajo: (updated: CodigoTrabajo) => void;
+    deleteCodigoTrabajo: (id: string) => void;
+    ordenesCompra: OrdenCompra[];
 }
 
 const ErpContext = createContext<ErpContextType | undefined>(undefined);
@@ -29,6 +57,17 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const [clientes, setClientes] = useState<Cliente[]>(initialClients);
     const [users, setUsers] = useState<User[]>(initialUsers);
     const [currentUser, setCurrentUser] = useState<User | undefined>(initialUsers[0]); // Default to Admin
+
+    // Logistics State
+    const [inventario, setInventario] = useState<InventarioItem[]>(initialInventory);
+    const [proveedores, setProveedores] = useState<Proveedor[]>(initialProveedores);
+    const [vehiculos, setVehiculos] = useState<Vehiculo[]>(initialVehiculos);
+    const [dotacionItems, setDotacionItems] = useState<DotacionItem[]>(initialDotacionItems);
+    const [entregasDotacion, setEntregasDotacion] = useState<EntregaDotacion[]>(initialEntregasDotacion);
+    const [cuentasPorPagar, setCuentasPorPagar] = useState<CuentaPorPagar[]>(initialCuentasPorPagar);
+    const [gastosVehiculos, setGastosVehiculos] = useState<GastoVehiculo[]>(initialGastosVehiculos);
+    const [codigosTrabajo, setCodigosTrabajo] = useState<CodigoTrabajo[]>(initialCodigosTrabajo);
+    const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>(initialOrdenesCompra);
 
     const addFactura = (factura: Factura) => {
         setFacturas(prev => [factura, ...prev]);
@@ -75,7 +114,31 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addFactura, updateFactura,
             addCotizacion, updateCotizacion, deleteCotizacion,
             addCliente, updateCliente,
-            updateUserPermissions, setCurrentUser
+            updateUserPermissions, setCurrentUser,
+
+            // Logistics Exports
+            inventario, proveedores, vehiculos, dotacionItems, entregasDotacion, cuentasPorPagar, gastosVehiculos,
+
+            updateInventarioItem: (updated) => setInventario(prev => prev.map(i => i.id === updated.id ? updated : i)),
+            addInventarioItem: (item) => setInventario(prev => [item, ...prev]),
+
+            updateProveedor: (updated) => setProveedores(prev => prev.map(p => p.id === updated.id ? updated : p)),
+            addProveedor: (prov) => setProveedores(prev => [prov, ...prev]),
+
+            updateVehiculo: (updated) => setVehiculos(prev => prev.map(v => v.id === updated.id ? updated : v)),
+            addVehiculo: (veh) => setVehiculos(prev => [veh, ...prev]),
+
+            updateDotacionItem: (updated) => setDotacionItems(prev => prev.map(d => d.id === updated.id ? updated : d)),
+            addEntregaDotacion: (entrega) => setEntregasDotacion(prev => [entrega, ...prev]),
+
+            addGastoVehiculo: (gasto) => setGastosVehiculos(prev => [gasto, ...prev]),
+            updateCuentaPorPagar: (updated) => setCuentasPorPagar(prev => prev.map(c => c.id === updated.id ? updated : c)),
+
+            codigosTrabajo,
+            addCodigoTrabajo: (codigo) => setCodigosTrabajo(prev => [codigo, ...prev]),
+            updateCodigoTrabajo: (updated) => setCodigosTrabajo(prev => prev.map(c => c.id === updated.id ? updated : c)),
+            deleteCodigoTrabajo: (id) => setCodigosTrabajo(prev => prev.filter(c => c.id !== id)),
+            ordenesCompra
         }}>
             {children}
         </ErpContext.Provider>

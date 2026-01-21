@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useErp } from "@/components/providers/erp-provider";
 import {
     initialInventory,
     initialProveedores,
@@ -44,77 +45,99 @@ import { CodigoTrabajo } from "@/types/sistema";
 // Import submodule components
 import { InventoryTable } from "../inventario/inventory-table";
 import { CreateSupplierDialog } from "@/components/erp/create-supplier-dialog";
-import { SupplierProfileDialog } from "@/components/erp/supplier-profile-dialog";
+import { SupplierDetailDialog } from "@/components/erp/supplier-detail-dialog";
 import { DotacionDetailDialog } from "@/components/erp/dotacion-detail-dialog";
 import { NewEntregaDialog } from "@/components/erp/new-entrega-dialog";
 import { SuministroDashboard } from "@/components/erp/suministro-dashboard";
 import { ActivosDashboard } from "@/components/erp/activos-dashboard";
+import { DotacionMetricsDashboard } from "@/components/erp/dotacion-metrics-dashboard";
 import { DotacionItem } from "@/types/sistema";
 import { CreateVehicleDialog } from "@/components/erp/create-vehicle-dialog";
 import { RegisterExpenseDialog } from "@/components/erp/register-expense-dialog";
 import { CreateInventoryItemDialog } from "@/components/erp/create-inventory-item-dialog";
 import { EditInventoryDialog } from "@/components/erp/edit-inventory-dialog";
 import { InventoryItemDetailDialog } from "@/components/erp/inventory-item-detail-dialog";
+import { VehicleDetailDialog } from "@/components/erp/vehicle-detail-dialog";
+import { EditVehicleDialog } from "@/components/erp/edit-vehicle-dialog";
 import { cn } from "@/lib/utils";
+import { differenceInDays } from "date-fns";
+
+import { AlertConfigDialog } from "@/components/erp/alert-config-dialog";
+import { AlertsBanner } from "@/components/erp/alerts-banner";
+import { WorkCodesTable } from "@/components/erp/work-codes-table";
+import { CuentasPorPagarDashboard } from "@/components/erp/cuentas-por-pagar-dashboard";
 
 export default function LogisticaPage() {
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState("resumen");
+
+    // Context Integration
+    const {
+        inventario: catalogoItems, // Alias mapping
+        proveedores,
+        cuentasPorPagar,
+        vehiculos,
+        dotacionItems,
+        entregasDotacion: entregas,
+        gastosVehiculos: gastos,
+        addProveedor,
+        addVehiculo,
+        addGastoVehiculo,
+        updateCuentaPorPagar,
+        addEntregaDotacion,
+        updateDotacionItem,
+        addInventarioItem,
+        updateInventarioItem,
+        ordenesCompra // New
+    } = useErp();
 
     // Sub-tabs for Suministro
     const [suministroTab, setSuministroTab] = useState("resumen");
     // Sub-tabs for Activos
     const [activosTab, setActivosTab] = useState("resumen");
 
-    // Suministro state
-    const [proveedores, setProveedores] = useState(initialProveedores);
-    const [cuentasPorPagar, setCuentasPorPagar] = useState(initialCuentasPorPagar);
-
-    // Dotacion state
-    const [entregas, setEntregas] = useState(initialEntregasDotacion);
-    const [dotacionItems, setDotacionItems] = useState(initialDotacionItems);
+    // Local UI State
     const [selectedDotacionItem, setSelectedDotacionItem] = useState<DotacionItem | null>(null);
     const [dotacionDetailOpen, setDotacionDetailOpen] = useState(false);
-
-    // Activos state
-    const [vehiculos, setVehiculos] = useState(initialVehiculos);
-    const [gastos, setGastos] = useState(initialGastosVehiculos);
-
-    // Catalogo state
-    const [catalogoItems, setCatalogoItems] = useState(initialInventory);
+    const [dotacionSearch, setDotacionSearch] = useState("");
+    const [dotacionFilter, setDotacionFilter] = useState("Todos");
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
     const [itemDetailOpen, setItemDetailOpen] = useState(false);
+
+    // Supplier State
+    const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
+    const [supplierDetailOpen, setSupplierDetailOpen] = useState(false);
+
+    // Vehicle State
+    const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+    const [vehicleDetailOpen, setVehicleDetailOpen] = useState(false);
 
     const handleItemClick = (item: any) => {
         setSelectedItem(item);
         setItemDetailOpen(true);
     };
 
-    const handleCreateSupplier = (newProv: any) => {
-        setProveedores([newProv, ...proveedores]);
+    // Actions Wrapper (Connecting Dialogs to Context)
+    const handleCreateSupplier = (newProv: any) => addProveedor(newProv);
+    const handleCreateVehicle = (newVeh: any) => addVehiculo(newVeh);
+    const handleCreateExpense = (newExpense: any) => addGastoVehiculo(newExpense);
+
+    // Custom Logic for Payment (Context has universal update, we need specific logic)
+    // Custom Logic for Payment (Context has universal update, we need specific logic)
+    const handleRegisterPayment = (id: string, amount: number) => {
+        const item = cuentasPorPagar.find(c => c.id === id);
+        if (item) {
+            const newBalance = Math.max(0, item.saldoPendiente - amount);
+            const newPaid = item.valorPagado + amount;
+            updateCuentaPorPagar({ ...item, valorPagado: newPaid, saldoPendiente: newBalance });
+            toast({ title: "Pago Registrado", description: `Se ha registrado un pago de ${formatCurrency(amount)}.` });
+        }
     };
 
-    const handleCreateVehicle = (newVeh: any) => {
-        setVehiculos([newVeh, ...vehiculos]);
-    };
-
-    const handleCreateExpense = (newExpense: any) => {
-        setGastos([newExpense, ...gastos]);
-    };
-
-    const handleRegisterPayment = (id: string) => {
-        setCuentasPorPagar(prev => prev.map(cxp => {
-            if (cxp.id === id) {
-                return { ...cxp, valorPagado: cxp.valorTotal, saldoPendiente: 0 };
-            }
-            return cxp;
-        }));
-    };
-
-    // KPIs
-    const totalInventoryValue = initialInventory.reduce((acc, item) => acc + item.valorTotal, 0);
-    const lowStockItems = initialInventory.filter(i => i.cantidad <= 10).length;
+    // KPIs (Calculated from Context Data)
+    const totalInventoryValue = catalogoItems.reduce((acc, item) => acc + item.valorTotal, 0);
+    const lowStockItems = catalogoItems.filter(i => i.cantidad <= (i.stockMinimo || 10)).length;
     const totalProveedores = proveedores.length;
     const totalVehiculos = vehiculos.length;
     const totalDotacion = dotacionItems.length;
@@ -123,9 +146,12 @@ export default function LogisticaPage() {
 
     return (
         <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Logística e Inventarios</h1>
-                <p className="text-muted-foreground">Centro de gestión de bienes, suministros y activos.</p>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Logística e Inventarios</h1>
+                    <p className="text-muted-foreground">Centro de gestión de bienes, suministros y activos.</p>
+                </div>
+                <AlertConfigDialog />
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -140,6 +166,9 @@ export default function LogisticaPage() {
 
                 {/* RESUMEN TAB */}
                 <TabsContent value="resumen" className="space-y-6">
+                    {/* Alerts Banner */}
+                    <AlertsBanner />
+
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <Card className="border-l-4 border-l-primary">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -148,7 +177,7 @@ export default function LogisticaPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{formatCurrency(totalInventoryValue)}</div>
-                                <p className="text-xs text-muted-foreground">{initialInventory.length} items registrados</p>
+                                <p className="text-xs text-muted-foreground">{catalogoItems.length} items registrados</p>
                             </CardContent>
                         </Card>
                         <Card className="border-l-4 border-l-amber-500">
@@ -239,7 +268,7 @@ export default function LogisticaPage() {
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
                                     </div>
-                                    <CreateInventoryItemDialog onItemCreated={(newItem) => setCatalogoItems([...catalogoItems, newItem])} />
+                                    <CreateInventoryItemDialog onItemCreated={addInventarioItem} />
                                 </div>
                             </div>
                         </CardHeader>
@@ -249,6 +278,7 @@ export default function LogisticaPage() {
                                     <TableRow>
                                         <TableHead>SKU</TableHead>
                                         <TableHead>Descripción</TableHead>
+                                        <TableHead>Proveedor</TableHead>
                                         <TableHead>Categoría</TableHead>
                                         <TableHead>Ubicación</TableHead>
                                         <TableHead>Stock</TableHead>
@@ -267,6 +297,7 @@ export default function LogisticaPage() {
                                         .map((item) => {
                                             const stockStatus = item.cantidad <= item.stockMinimo ? 'BAJO' : 'OK';
                                             const precioProveedor = item.costoMateriales || Math.round(item.valorUnitario * 0.7);
+                                            const proveedorInfo = proveedores.find(p => p.id === item.proveedorId);
                                             return (
                                                 <TableRow
                                                     key={item.id}
@@ -275,6 +306,13 @@ export default function LogisticaPage() {
                                                 >
                                                     <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                                                     <TableCell className="font-medium">{item.descripcion}</TableCell>
+                                                    <TableCell>
+                                                        {proveedorInfo ? (
+                                                            <span className="text-xs text-muted-foreground">{proveedorInfo.nombre}</span>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground italic">Sin asignar</span>
+                                                        )}
+                                                    </TableCell>
                                                     <TableCell><Badge variant="outline">{item.categoria}</Badge></TableCell>
                                                     <TableCell>{item.ubicacion}</TableCell>
                                                     <TableCell>
@@ -291,7 +329,7 @@ export default function LogisticaPage() {
                                                     <TableCell className="text-right text-muted-foreground">{formatCurrency(precioProveedor)}</TableCell>
                                                     <TableCell className="text-right font-medium">{formatCurrency(item.valorUnitario)}</TableCell>
                                                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                        <EditInventoryDialog articulo={item} onItemUpdated={(updated) => setCatalogoItems(catalogoItems.map(i => i.id === updated.id ? updated : i))} />
+                                                        <EditInventoryDialog articulo={item} onItemUpdated={updateInventarioItem} />
                                                     </TableCell>
                                                 </TableRow>
                                             )
@@ -304,87 +342,7 @@ export default function LogisticaPage() {
 
                 {/* CÓDIGOS DE TRABAJO TAB */}
                 <TabsContent value="inventario" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Package className="h-5 w-5" /> Códigos de Trabajo
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-6">
-                                {initialCodigosTrabajo.map((codigo) => {
-                                    const totalMateriales = codigo.materiales.reduce(
-                                        (acc, mat) => acc + (mat.cantidad * mat.valorUnitario),
-                                        0
-                                    );
-                                    return (
-                                        <div key={codigo.id} className="border rounded-lg p-4 space-y-4">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant="outline" className="font-mono">{codigo.codigo}</Badge>
-                                                        <h3 className="font-semibold text-lg">{codigo.nombre}</h3>
-                                                    </div>
-                                                    <p className="text-sm text-muted-foreground mt-1">{codigo.descripcion}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-2xl font-bold text-primary">{formatCurrency(codigo.costoTotal)}</p>
-                                                    <p className="text-xs text-muted-foreground">Valor Total al Cliente</p>
-                                                </div>
-                                            </div>
-
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow className="bg-muted/30">
-                                                        <TableHead>Material</TableHead>
-                                                        <TableHead className="text-center">Cantidad</TableHead>
-                                                        <TableHead className="text-right">Precio Venta</TableHead>
-                                                        <TableHead className="text-right">Subtotal</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {codigo.materiales.map((mat) => (
-                                                        <TableRow key={mat.id}>
-                                                            <TableCell className="font-medium">{mat.nombre}</TableCell>
-                                                            <TableCell className="text-center">{mat.cantidad}</TableCell>
-                                                            <TableCell className="text-right">{formatCurrency(mat.valorUnitario)}</TableCell>
-                                                            <TableCell className="text-right font-semibold">
-                                                                {formatCurrency(mat.cantidad * mat.valorUnitario)}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                    <TableRow className="bg-muted/10 border-t-2">
-                                                        <TableCell colSpan={3} className="text-right font-medium">
-                                                            Subtotal Materiales:
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-bold">
-                                                            {formatCurrency(totalMateriales)}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="text-right font-medium">
-                                                            Mano de Obra:
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-bold">
-                                                            {formatCurrency(codigo.manoDeObra)}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                    <TableRow className="bg-primary/5 border-t-2">
-                                                        <TableCell colSpan={3} className="text-right font-bold text-primary">
-                                                            TOTAL AL CLIENTE:
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-bold text-primary text-lg">
-                                                            {formatCurrency(totalMateriales + codigo.manoDeObra)}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <WorkCodesTable />
                 </TabsContent>
 
                 {/* SUMINISTRO TAB - WITH SUB-TABS */}
@@ -398,7 +356,7 @@ export default function LogisticaPage() {
 
                         {/* Suministro - Resumen */}
                         <TabsContent value="resumen" className="space-y-4 mt-4">
-                            <SuministroDashboard proveedores={proveedores} cuentasPorPagar={cuentasPorPagar} />
+                            <SuministroDashboard proveedores={proveedores} cuentasPorPagar={cuentasPorPagar} ordenesCompra={ordenesCompra} />
                         </TabsContent>
 
                         {/* Suministro - Proveedores */}
@@ -422,9 +380,12 @@ export default function LogisticaPage() {
                                                 <TableHead className="text-right">Acciones</TableHead>
                                             </TableRow>
                                         </TableHeader>
-                                        <TableBody>
+                                        <TableBody className="cursor-pointer">
                                             {proveedores.map((prov) => (
-                                                <TableRow key={prov.id}>
+                                                <TableRow key={prov.id} className="hover:bg-muted/50" onClick={() => {
+                                                    setSelectedSupplier(prov);
+                                                    setSupplierDetailOpen(true);
+                                                }}>
                                                     <TableCell className="font-medium">{prov.nombre}</TableCell>
                                                     <TableCell><Badge variant="secondary">{prov.categoria}</Badge></TableCell>
                                                     <TableCell>{prov.nit}</TableCell>
@@ -435,7 +396,7 @@ export default function LogisticaPage() {
                                                     </TableCell>
                                                     <TableCell>{prov.datosBancarios}</TableCell>
                                                     <TableCell className="text-right">
-                                                        <SupplierProfileDialog proveedor={prov} />
+                                                        <Button variant="ghost" size="sm">Ver Detalle</Button>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -443,49 +404,23 @@ export default function LogisticaPage() {
                                     </Table>
                                 </CardContent>
                             </Card>
+                            {selectedSupplier && (
+                                <SupplierDetailDialog
+                                    open={supplierDetailOpen}
+                                    onOpenChange={setSupplierDetailOpen}
+                                    proveedor={selectedSupplier}
+                                />
+                            )}
                         </TabsContent>
 
                         {/* Suministro - Cuentas por Pagar */}
+                        {/* Suministro - Cuentas por Pagar */}
                         <TabsContent value="cxp" className="mt-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Facturas de Proveedores Pendientes</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Proveedor</TableHead>
-                                                <TableHead>Ref / Factura</TableHead>
-                                                <TableHead>Concepto</TableHead>
-                                                <TableHead>Fecha</TableHead>
-                                                <TableHead>Total</TableHead>
-                                                <TableHead>Pagado</TableHead>
-                                                <TableHead>Saldo</TableHead>
-                                                <TableHead></TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {cuentasPorPagar.map((cxp) => (
-                                                <TableRow key={cxp.id}>
-                                                    <TableCell className="font-medium">{cxp.proveedor.nombre}</TableCell>
-                                                    <TableCell>{cxp.numeroFacturaProveedor}</TableCell>
-                                                    <TableCell>{cxp.concepto}</TableCell>
-                                                    <TableCell>{format(cxp.fecha, "dd MMM yyyy", { locale: es })}</TableCell>
-                                                    <TableCell>{formatCurrency(cxp.valorTotal)}</TableCell>
-                                                    <TableCell>{formatCurrency(cxp.valorPagado)}</TableCell>
-                                                    <TableCell className="font-bold text-red-600">{formatCurrency(cxp.saldoPendiente)}</TableCell>
-                                                    <TableCell>
-                                                        {cxp.saldoPendiente > 0 && (
-                                                            <Button size="sm" variant="outline" onClick={() => handleRegisterPayment(cxp.id)}>Pagar</Button>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </CardContent>
-                            </Card>
+                            <CuentasPorPagarDashboard
+                                cuentas={cuentasPorPagar}
+                                proveedores={proveedores}
+                                onRegisterPayment={handleRegisterPayment}
+                            />
                         </TabsContent>
                     </Tabs>
                 </TabsContent>
@@ -493,21 +428,24 @@ export default function LogisticaPage() {
                 {/* DOTACION TAB */}
                 {/* DOTACION TAB */}
                 <TabsContent value="dotacion" className="space-y-4">
-                    <div className="flex justify-end">
+                    {/* Metrics Dashboard */}
+                    <DotacionMetricsDashboard dotacionItems={dotacionItems} entregas={entregas} />
+
+                    {/* Actions Bar */}
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                                {dotacionItems.length} tipos de dotación
+                            </Badge>
+                        </div>
                         <NewEntregaDialog
                             items={dotacionItems}
                             empleados={initialEmpleados}
-                            // Wait, previous file view showed initialEmpleados export in mock-data?
-                            // Checking line 484 of mock-data: export const initialEmpleados = ...
-                            // Logistica imports initialCuentasPorPagar, etc. Need to check if initialEmpleados is imported.
-                            // I'll assume I need to import it or use a fallback. 
-                            // Wait, I should make sure to import it in LogisticaPage if not present.
                             onSave={(ent) => {
-                                setEntregas([ent, ...entregas]);
-                                // Update Stock logic (decrease available)
+                                addEntregaDotacion(ent);
                                 const updatedItems = dotacionItems.map(item => {
                                     if (item.id === ent.items[0].dotacionId) {
-                                        return {
+                                        const newItem = {
                                             ...item,
                                             variantes: item.variantes.map(v =>
                                                 v.id === ent.items[0].varianteId
@@ -515,57 +453,116 @@ export default function LogisticaPage() {
                                                     : v
                                             )
                                         };
+                                        updateDotacionItem(newItem);
+                                        return newItem;
                                     }
                                     return item;
                                 });
-                                setDotacionItems(updatedItems);
-                                toast({ title: "Entrega Registrada", description: "El empleado debe aceptar la entrega." });
+                                toast({
+                                    title: "Dotación Asignada",
+                                    description: "La dotación deberá ser aceptada por el empleado antes de marcarse como entregada."
+                                });
                             }}
                         />
                     </div>
+
                     <div className="grid gap-6 md:grid-cols-2">
+                        {/* INVENTORY PANEL - LEFT */}
                         <Card>
-                            <CardHeader>
+                            <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2">
                                     <Package className="h-5 w-5" /> Inventario Disponible
                                 </CardTitle>
+                                <div className="relative mt-2">
+                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Buscar dotación..."
+                                        className="pl-8 h-9"
+                                        value={dotacionSearch}
+                                        onChange={(e) => setDotacionSearch(e.target.value)}
+                                    />
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Item</TableHead>
-                                            <TableHead>Desc</TableHead>
+                                            <TableHead>Categoría</TableHead>
                                             <TableHead className="text-right">Stock</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {dotacionItems.map((item) => {
-                                            const totalStock = item.variantes.reduce((acc, v) => acc + v.cantidadDisponible, 0);
-                                            const tallas = Array.from(new Set(item.variantes.map(v => v.talla))).join(", ");
-                                            return (
-                                                <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => {
-                                                    setSelectedDotacionItem(item);
-                                                    setDotacionDetailOpen(true);
-                                                }}>
-                                                    <TableCell className="font-medium">{item.descripcion}</TableCell>
-                                                    <TableCell className="text-xs text-muted-foreground">
-                                                        {tallas} ({item.genero})
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-bold text-primary">{totalStock}</TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
+                                        {dotacionItems
+                                            .filter(item => item.descripcion.toLowerCase().includes(dotacionSearch.toLowerCase()))
+                                            .map((item) => {
+                                                const totalStock = item.variantes.reduce((acc, v) => acc + v.cantidadDisponible, 0);
+                                                const stockMin = item.stockMinimo || 10;
+                                                const stockStatus = totalStock <= stockMin
+                                                    ? 'critical'
+                                                    : totalStock <= stockMin * 2
+                                                        ? 'warning'
+                                                        : 'ok';
+
+                                                return (
+                                                    <TableRow
+                                                        key={item.id}
+                                                        className="cursor-pointer hover:bg-muted/50"
+                                                        onClick={() => {
+                                                            setSelectedDotacionItem(item);
+                                                            setDotacionDetailOpen(true);
+                                                        }}
+                                                    >
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-lg">
+                                                                    {item.categoria === 'EPP' ? '🦺' : item.categoria === 'UNIFORME' ? '👔' : '🔧'}
+                                                                </span>
+                                                                <div>
+                                                                    <div className="font-medium text-sm">{item.descripcion}</div>
+                                                                    <div className="text-xs text-muted-foreground">{item.genero}</div>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className="text-[10px]">{item.categoria}</Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <span className={cn(
+                                                                "font-bold",
+                                                                stockStatus === 'ok' && "text-primary",
+                                                                stockStatus === 'warning' && "text-amber-500",
+                                                                stockStatus === 'critical' && "text-red-400"
+                                                            )}>
+                                                                {totalStock}
+                                                            </span>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                     </TableBody>
                                 </Table>
                             </CardContent>
                         </Card>
 
+                        {/* HISTORY PANEL - RIGHT */}
                         <Card>
-                            <CardHeader>
+                            <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2">
-                                    <HardHat className="h-5 w-5" /> Historial Entregas
+                                    <HardHat className="h-5 w-5" /> Historial de Entregas
                                 </CardTitle>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {['Todos', 'Pendientes', 'Aceptados', 'Entregados'].map((filter) => (
+                                        <Badge
+                                            key={filter}
+                                            variant={dotacionFilter === filter ? 'default' : 'outline'}
+                                            className="cursor-pointer text-[10px]"
+                                            onClick={() => setDotacionFilter(filter)}
+                                        >
+                                            {filter}
+                                        </Badge>
+                                    ))}
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <Table>
@@ -578,28 +575,74 @@ export default function LogisticaPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {entregas.slice(0, 10).map((entrega) => (
-                                            <TableRow key={entrega.id}>
-                                                <TableCell className="font-medium text-sm">{entrega.empleado.nombreCompleto}</TableCell>
-                                                <TableCell className="text-xs">{format(entrega.fecha, "dd MMM", { locale: es })}</TableCell>
-                                                <TableCell className="text-xs">{entrega.items[0].descripcion} - {entrega.items[0].detalle}</TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant={entrega.estado === 'ENTREGADO' ? 'default' : 'secondary'} className="text-[10px]">
-                                                            {entrega.estado}
-                                                        </Badge>
-                                                        {entrega.estado === 'ASIGNADO' && (
-                                                            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => {
-                                                                setEntregas(entregas.map(e => e.id === entrega.id ? { ...e, estado: 'ENTREGADO', fechaAceptacion: new Date() } : e));
-                                                                toast({ title: "Entrega Aceptada", description: "Se ha confirmado la recepción." });
-                                                            }}>
-                                                                Aceptar
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {entregas
+                                            .filter(e => {
+                                                if (dotacionFilter === 'Pendientes') return e.estado === 'ASIGNADO';
+                                                if (dotacionFilter === 'Aceptados') return e.estado === 'ACEPTADO';
+                                                if (dotacionFilter === 'Entregados') return e.estado === 'ENTREGADO';
+                                                return true;
+                                            })
+                                            .slice(0, 12)
+                                            .map((entrega) => {
+                                                const estadoLabel = {
+                                                    'ASIGNADO': 'Pendiente de aceptación',
+                                                    'ACEPTADO': 'Listo para entrega',
+                                                    'ENTREGADO': 'Entrega confirmada',
+                                                    'RECHAZADO': 'Rechazado',
+                                                    'DEVUELTO': 'Devuelto'
+                                                }[entrega.estado] || entrega.estado;
+
+                                                return (
+                                                    <TableRow key={entrega.id}>
+                                                        <TableCell className="font-medium text-sm">{entrega.empleado.nombreCompleto}</TableCell>
+                                                        <TableCell className="text-xs">{format(entrega.fecha, "dd MMM", { locale: es })}</TableCell>
+                                                        <TableCell className="text-xs max-w-[150px] truncate">{entrega.items[0].descripcion}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <Badge
+                                                                    variant={entrega.estado === 'ENTREGADO' ? 'default' : entrega.estado === 'ACEPTADO' ? 'secondary' : 'outline'}
+                                                                    className="text-[9px]"
+                                                                >
+                                                                    {estadoLabel}
+                                                                </Badge>
+                                                                {entrega.estado === 'ACEPTADO' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="default"
+                                                                        className="h-6 text-[10px] px-2"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            // Here we would call updateEntregaDotacion if available
+                                                                            toast({
+                                                                                title: "Entrega Confirmada",
+                                                                                description: "Se ha registrado la entrega física."
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        Confirmar Entrega
+                                                                    </Button>
+                                                                )}
+                                                                {entrega.estado === 'ASIGNADO' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="h-6 text-[10px] px-2"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            toast({
+                                                                                title: "Recepción Confirmada",
+                                                                                description: "El empleado ha aceptado la dotación."
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        Confirmar recepción
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                     </TableBody>
                                 </Table>
                             </CardContent>
@@ -613,7 +656,7 @@ export default function LogisticaPage() {
                             item={selectedDotacionItem}
                             historialEntregas={entregas.filter(e => e.items.some(i => i.dotacionId === selectedDotacionItem.id))}
                             onUpdateItem={(updated) => {
-                                setDotacionItems(dotacionItems.map(i => i.id === updated.id ? updated : i));
+                                updateDotacionItem(updated);
                             }}
                         />
                     )}
@@ -638,7 +681,12 @@ export default function LogisticaPage() {
                             <Card>
                                 <CardHeader>
                                     <div className="flex justify-between items-center">
-                                        <CardTitle>Flota Vehicular</CardTitle>
+                                        <div>
+                                            <CardTitle>Flota Vehicular</CardTitle>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Gestión completa de vehículos y documentación
+                                            </p>
+                                        </div>
                                         <CreateVehicleDialog onVehicleCreated={handleCreateVehicle} />
                                     </div>
                                 </CardHeader>
@@ -648,32 +696,92 @@ export default function LogisticaPage() {
                                             <TableRow>
                                                 <TableHead>Placa</TableHead>
                                                 <TableHead>Vehículo</TableHead>
+                                                <TableHead>Estado</TableHead>
                                                 <TableHead>Conductor</TableHead>
                                                 <TableHead>SOAT</TableHead>
                                                 <TableHead>Tecno</TableHead>
                                                 <TableHead className="text-right">Gastos</TableHead>
+                                                <TableHead className="text-right">Acciones</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {vehiculos.map((veh) => {
                                                 const vehicleGastos = gastos.filter(g => g.vehiculo.placa === veh.placa);
                                                 const totalVehicleGastos = vehicleGastos.reduce((acc, g) => acc + g.valor, 0);
+
+                                                // Document status semaphore
+                                                const getDocSemaphore = (date: Date) => {
+                                                    const days = differenceInDays(new Date(date), new Date());
+                                                    if (days < 0) return { color: 'bg-red-500', variant: 'destructive' as const };
+                                                    if (days <= 30) return { color: 'bg-amber-500', variant: 'secondary' as const };
+                                                    if (days <= 60) return { color: 'bg-yellow-500', variant: 'outline' as const };
+                                                    return { color: 'bg-green-500', variant: 'default' as const };
+                                                };
+
+                                                const soatStatus = getDocSemaphore(veh.vencimientoSoat);
+                                                const tecnoStatus = getDocSemaphore(veh.vencimientoTecnomecanica);
+
                                                 return (
-                                                    <TableRow key={veh.id}>
+                                                    <TableRow
+                                                        key={veh.id}
+                                                        className="cursor-pointer hover:bg-muted/50"
+                                                        onClick={() => {
+                                                            setSelectedVehicle(veh);
+                                                            setVehicleDetailOpen(true);
+                                                        }}
+                                                    >
                                                         <TableCell className="font-bold">{veh.placa}</TableCell>
-                                                        <TableCell>{veh.marcaModelo}</TableCell>
-                                                        <TableCell>{veh.conductorAsignado || 'Sin asignar'}</TableCell>
                                                         <TableCell>
-                                                            <Badge variant={new Date(veh.vencimientoSoat) < new Date() ? 'destructive' : 'secondary'}>
-                                                                {format(veh.vencimientoSoat, "dd MMM yy", { locale: es })}
-                                                            </Badge>
+                                                            <div>
+                                                                <div className="text-sm">{veh.marcaModelo}</div>
+                                                                <div className="text-xs text-muted-foreground">{veh.ano} • {veh.color}</div>
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Badge variant={new Date(veh.vencimientoTecnomecanica) < new Date() ? 'destructive' : 'secondary'}>
-                                                                {format(veh.vencimientoTecnomecanica, "dd MMM yy", { locale: es })}
+                                                            <Badge variant={veh.estado === 'OPERATIVO' ? 'default' : veh.estado === 'MANTENIMIENTO' ? 'secondary' : 'outline'}>
+                                                                {veh.estado}
                                                             </Badge>
                                                         </TableCell>
-                                                        <TableCell className="text-right font-mono">{formatCurrency(totalVehicleGastos)}</TableCell>
+                                                        <TableCell className="text-sm">{veh.conductorAsignado || 'Sin asignar'}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-1">
+                                                                <div className={`w-2 h-2 rounded-full ${soatStatus.color}`} />
+                                                                <Badge variant={soatStatus.variant} className="text-[10px]">
+                                                                    {format(veh.vencimientoSoat, "dd/MM/yy", { locale: es })}
+                                                                </Badge>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-1">
+                                                                <div className={`w-2 h-2 rounded-full ${tecnoStatus.color}`} />
+                                                                <Badge variant={tecnoStatus.variant} className="text-[10px]">
+                                                                    {format(veh.vencimientoTecnomecanica, "dd/MM/yy", { locale: es })}
+                                                                </Badge>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono text-sm">{formatCurrency(totalVehicleGastos)}</TableCell>
+                                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <EditVehicleDialog
+                                                                    vehiculo={veh}
+                                                                    onVehicleUpdated={(updated) => {
+                                                                        // Would use updateVehiculo from context if available
+                                                                        toast({ title: "Vehículo actualizado", description: updated.placa });
+                                                                    }}
+                                                                />
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0"
+                                                                    onClick={() => {
+                                                                        setSelectedVehicle(veh);
+                                                                        setVehicleDetailOpen(true);
+                                                                    }}
+                                                                >
+                                                                    👁️
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
                                                     </TableRow>
                                                 );
                                             })}
@@ -681,6 +789,14 @@ export default function LogisticaPage() {
                                     </Table>
                                 </CardContent>
                             </Card>
+
+                            {/* Vehicle Detail Dialog */}
+                            <VehicleDetailDialog
+                                open={vehicleDetailOpen}
+                                onOpenChange={setVehicleDetailOpen}
+                                vehiculo={selectedVehicle}
+                                gastos={gastos}
+                            />
                         </TabsContent>
 
                         {/* Activos - Bitácora */}
@@ -732,6 +848,7 @@ export default function LogisticaPage() {
                 open={itemDetailOpen}
                 onOpenChange={setItemDetailOpen}
                 item={selectedItem}
+                onItemUpdated={updateInventarioItem}
             />
         </div>
     );

@@ -32,7 +32,10 @@ import {
     Role,
     Permission,
     CodigoTrabajo,
-    MaterialAsociado
+    MaterialAsociado,
+    OrdenCompra,
+    DetalleCompra,
+    EstadoOrdenCompra
 } from "@/types/sistema";
 import { addDays, subDays } from "date-fns";
 
@@ -117,10 +120,11 @@ const generateClientes = (count: number): Cliente[] => {
     }));
 };
 
-const generateInventario = (count: number): InventarioItem[] => {
+const generateInventario = (count: number, proveedores: Proveedor[]): InventarioItem[] => {
     return Array.from({ length: count }, (_, i) => {
         const precioBase = randomInt(5000, 500000);
         const isCompuesto = seededRandom() > 0.8;
+        const proveedor = randomItem(proveedores);
 
         return {
             id: `INV-${(i + 1).toString().padStart(3, '0')}`,
@@ -134,6 +138,7 @@ const generateInventario = (count: number): InventarioItem[] => {
             stockMinimo: randomInt(10, 50),
             fechaCreacion: randomDate(2023, 2024),
             tipo: isCompuesto ? 'COMPUESTO' : 'SIMPLE',
+            proveedorId: proveedor.id,
             materiales: isCompuesto ? Array.from({ length: randomInt(2, 4) }, (_, j) => ({
                 id: `MAT-${i}-${j}`,
                 inventarioId: `INV-MOCK-${j}`,
@@ -286,14 +291,22 @@ const generateEmpleados = (count: number): Empleado[] => {
 };
 
 const generateVehiculos = (count: number): Vehiculo[] => {
+    const colores = ['Blanco', 'Negro', 'Gris', 'Rojo', 'Azul'];
+    const estados: Array<'OPERATIVO' | 'MANTENIMIENTO' | 'INACTIVO'> = ['OPERATIVO', 'OPERATIVO', 'OPERATIVO', 'OPERATIVO', 'MANTENIMIENTO', 'INACTIVO'];
+
     return Array.from({ length: count }, (_, i) => ({
         id: `VEH-${i + 1}`,
         placa: `${String.fromCharCode(65 + randomInt(0, 25))}${String.fromCharCode(65 + randomInt(0, 25))}${String.fromCharCode(65 + randomInt(0, 25))}-${randomInt(100, 999)}`,
-        marcaModelo: randomItem(["Chevrolet N300", "Renault Kangoo", "Toyota Hilux", "Jac 1040"]),
+        marcaModelo: randomItem(["Chevrolet N300", "Renault Kangoo", "Toyota Hilux", "Jac 1040", "Ford Ranger", "Nissan NP300"]),
         conductorAsignado: `${randomItem(nombres)} ${randomItem(apellidos)}`,
         vencimientoSoat: addDays(new Date(), randomInt(-30, 300)),
         vencimientoTecnomecanica: addDays(new Date(), randomInt(-30, 300)),
-        vencimientoSeguro: addDays(new Date(), randomInt(-30, 300))
+        vencimientoSeguro: addDays(new Date(), randomInt(-30, 300)),
+        estado: randomItem(estados),
+        kilometrajeActual: randomInt(15000, 180000),
+        ano: randomInt(2018, 2024),
+        color: randomItem(colores),
+        fechaRegistro: randomDate(2020, 2023)
     }));
 };
 
@@ -355,7 +368,24 @@ const generateMovimientosInventario = (count: number, articulos: InventarioItem[
 const generateCuentasPorPagar = (count: number, proveedores: Proveedor[]): CuentaPorPagar[] => {
     return Array.from({ length: count }, (_, i) => {
         const total = randomInt(500000, 10000000);
-        const pagado = total * (randomInt(0, 80) / 100);
+        const valorPagado = total * (randomInt(0, 80) / 100);
+        const pagos: any[] = [];
+
+        if (valorPagado > 0) {
+            const numPagos = randomInt(1, 3);
+            let remaining = valorPagado;
+            for (let j = 0; j < numPagos; j++) {
+                const val = j === numPagos - 1 ? remaining : remaining / numPagos;
+                pagos.push({
+                    id: `PAY-${i}-${j}`,
+                    fecha: subDays(new Date(), randomInt(1, 60)),
+                    valor: val,
+                    nota: "Abono parcial"
+                });
+                remaining -= val;
+            }
+        }
+
         return {
             id: `R-CXP-${i + 1}`,
             proveedorId: randomItem(proveedores).id,
@@ -364,8 +394,9 @@ const generateCuentasPorPagar = (count: number, proveedores: Proveedor[]): Cuent
             fecha: randomDate(2024, 2025),
             concepto: 'Compra de Materiales',
             valorTotal: total,
-            valorPagado: pagado,
-            saldoPendiente: total - pagado
+            valorPagado: valorPagado,
+            saldoPendiente: total - valorPagado,
+            pagos: pagos
         };
     });
 };
@@ -393,7 +424,9 @@ const generateNovedadesNomina = (count: number, empleados: Empleado[]): NovedadN
         fecha: randomDate(2024, 2025),
         tipo: randomItem(['HORA_EXTRA_DIURNA', 'HORA_EXTRA_NOCTURNA', 'FESTIVA', 'AUSENCIA']) as TipoNovedad,
         cantidad: randomInt(1, 8),
-        valorCalculado: randomInt(20000, 100000)
+        valorUnitario: randomInt(5000, 20000),
+        valorCalculado: randomInt(20000, 100000),
+        efecto: 'SUMA'
     }));
 };
 
@@ -410,6 +443,7 @@ const generateLiquidaciones = (count: number, empleados: Empleado[]): Liquidacio
             totalDevengado: devengado,
             totalDeducido: deducido,
             netoPagar: devengado - deducido,
+            estado: 'PENDIENTE',
             detalle: '{}'
         };
     });
@@ -424,6 +458,7 @@ const generateDotacionItems = (): DotacionItem[] => [
         descripcion: 'Camisa Polo Institucional',
         categoria: 'UNIFORME',
         genero: 'UNISEX',
+        stockMinimo: 20,
         variantes: [
             { id: 'v1', talla: 'S', color: 'Azul', cantidadDisponible: 15 },
             { id: 'v2', talla: 'M', color: 'Azul', cantidadDisponible: 50 },
@@ -435,6 +470,8 @@ const generateDotacionItems = (): DotacionItem[] => [
         descripcion: 'Botas de Seguridad Dielectricas',
         categoria: 'EPP',
         genero: 'UNISEX',
+        stockMinimo: 15,
+        fechaVencimiento: addDays(new Date(), 25), // Vence en 25 días
         variantes: [
             { id: 'v4', talla: '38', color: 'Negro', cantidadDisponible: 10 },
             { id: 'v5', talla: '40', color: 'Negro', cantidadDisponible: 20 },
@@ -446,6 +483,8 @@ const generateDotacionItems = (): DotacionItem[] => [
         descripcion: 'Casco de Seguridad',
         categoria: 'EPP',
         genero: 'UNISEX',
+        stockMinimo: 10,
+        fechaVencimiento: addDays(new Date(), 180), // Vence en 6 meses
         variantes: [
             { id: 'v7', talla: 'Unica', color: 'Blanco', cantidadDisponible: 30 },
             { id: 'v8', talla: 'Unica', color: 'Amarillo', cantidadDisponible: 10 },
@@ -456,19 +495,56 @@ const generateDotacionItems = (): DotacionItem[] => [
         descripcion: 'Guantes de Carnaza',
         categoria: 'EPP',
         genero: 'UNISEX',
+        stockMinimo: 50,
+        fechaVencimiento: addDays(new Date(), 15), // Vence en 15 días - ALERTA
         variantes: [
             { id: 'v9', talla: 'Unica', color: 'Gris', cantidadDisponible: 100 },
+        ]
+    },
+    {
+        id: 'DOT-5',
+        descripcion: 'Pantalón Jean Institucional',
+        categoria: 'UNIFORME',
+        genero: 'UNISEX',
+        stockMinimo: 25,
+        variantes: [
+            { id: 'v10', talla: '30', color: 'Azul Oscuro', cantidadDisponible: 8 },
+            { id: 'v11', talla: '32', color: 'Azul Oscuro', cantidadDisponible: 12 },
+            { id: 'v12', talla: '34', color: 'Azul Oscuro', cantidadDisponible: 18 },
+        ]
+    },
+    {
+        id: 'DOT-6',
+        descripcion: 'Gafas de Seguridad',
+        categoria: 'EPP',
+        genero: 'UNISEX',
+        stockMinimo: 30,
+        variantes: [
+            { id: 'v13', talla: 'Unica', color: 'Transparente', cantidadDisponible: 45 },
         ]
     },
 ];
 
 const generateEntregasDotacion = (count: number, empleados: Empleado[], items: DotacionItem[]): EntregaDotacion[] => {
+    const estados: Array<'ASIGNADO' | 'ACEPTADO' | 'ENTREGADO' | 'RECHAZADO'> = ['ASIGNADO', 'ACEPTADO', 'ENTREGADO', 'ENTREGADO', 'ENTREGADO'];
+
     return Array.from({ length: count }, (_, i) => {
         const item = randomItem(items);
         const variant = randomItem(item.variantes);
+        const estado = randomItem(estados);
+        const fechaAsignacion = randomDate(2024, 2025);
+
+        // Generate traceability data based on estado
+        const fechaAceptacion = (estado === 'ACEPTADO' || estado === 'ENTREGADO')
+            ? addDays(fechaAsignacion, randomInt(1, 5))
+            : undefined;
+        const fechaEntrega = estado === 'ENTREGADO'
+            ? addDays(fechaAceptacion || fechaAsignacion, randomInt(1, 3))
+            : undefined;
+
         return {
             id: `ENT-DOT-${i + 1}`,
-            fecha: randomDate(2024, 2025),
+            fecha: fechaAsignacion,
             empleadoId: randomItem(empleados).id,
             empleado: randomItem(empleados),
             items: [{
@@ -478,7 +554,11 @@ const generateEntregasDotacion = (count: number, empleados: Empleado[], items: D
                 detalle: `${variant.talla} - ${variant.color}`,
                 cantidad: randomInt(1, 2)
             }],
-            estado: randomItem(['ASIGNADO', 'ENTREGADO']) as any,
+            estado: estado,
+            usuarioAsigna: 'Admin Sistema',
+            fechaAceptacion: fechaAceptacion,
+            usuarioConfirma: estado === 'ENTREGADO' ? 'Admin Sistema' : undefined,
+            fechaEntrega: fechaEntrega,
             observacion: "Entrega trimestral"
         };
     });
@@ -516,7 +596,9 @@ const generateAgenda = (count: number): TareaAgenda[] => {
 // --- EXPORTS ---
 
 export const initialClients = generateClientes(50);
-export const initialInventory = generateInventario(100);
+// Generate proveedores FIRST so inventario can reference them
+export const initialProveedores = generateProveedores(20);
+export const initialInventory = generateInventario(100, initialProveedores);
 export const initialQuotes = generateCotizaciones(40, initialClients, initialInventory);
 export const initialRegistros = initialQuotes.filter(q => q.estado === 'EN_EJECUCION' || q.estado === 'FINALIZADA').map(q => ({
     id: `REG-${q.id}`,
@@ -535,7 +617,6 @@ export const initialFacturas = generateFacturas(initialQuotes);
 export const initialCuentas = generateCuentasBancarias();
 export const initialMovimientos = generateMovimientos(100, initialCuentas);
 export const initialObligaciones = generateObligaciones(5);
-export const initialProveedores = generateProveedores(20);
 export const initialMovimientosInventario = generateMovimientosInventario(100, initialInventory);
 export const initialCuentasPorPagar = generateCuentasPorPagar(30, initialProveedores);
 export const initialEmpleados = generateEmpleados(15);
@@ -578,7 +659,57 @@ export const initialRoles: Role[] = [
     }
 ];
 
-// Códigos de Trabajo
+const generateOrdenesCompra = (count: number, proveedores: Proveedor[], inventario: InventarioItem[]): OrdenCompra[] => {
+    return Array.from({ length: count }, (_, i) => {
+        const proveedor = randomItem(proveedores);
+
+        // Filter inventory items that belong to this supplier
+        const proveedorItems = inventario.filter(inv => inv.proveedorId === proveedor.id);
+        // Fallback to all items if proveedor has no items (shouldn't happen in seeded data)
+        const itemPool = proveedorItems.length > 0 ? proveedorItems : inventario;
+
+        // Generate Items
+        const numItems = randomInt(1, Math.min(4, itemPool.length));
+        const items: DetalleCompra[] = Array.from({ length: numItems }, (_, j) => {
+            const itemInv = itemPool[j % itemPool.length]; // Cycle through available items
+            // Simulate Price Variation (History)
+            const variation = (randomInt(0, 30) - 15) / 100;
+            const histPrice = itemInv.valorUnitario * (1 + variation);
+            const qty = randomInt(10, 100);
+
+            return {
+                id: `OC-DET-${i}-${j}`,
+                inventarioId: itemInv.id,
+                descripcion: itemInv.descripcion,
+                cantidad: qty,
+                valorUnitario: histPrice,
+                subtotal: histPrice * qty,
+                recibido: qty
+            };
+        });
+
+        // Recalculate true totals based on items
+        const trueSubtotal = items.reduce((acc, curr) => acc + curr.subtotal, 0);
+        const trueImpuestos = trueSubtotal * 0.19;
+
+        return {
+            id: `OC-${i + 1}`,
+            numero: `OC-${(i + 1).toString().padStart(4, '0')}`,
+            proveedorId: proveedor.id,
+            proveedor: proveedor,
+            fechaEmision: randomDate(2024, 2025),
+            fechaEntregaEstimada: randomDate(2024, 2025),
+            items: items,
+            subtotal: trueSubtotal,
+            impuestos: trueImpuestos,
+            total: trueSubtotal + trueImpuestos,
+            estado: randomItem(['RECIBIDA', 'RECIBIDA', 'RECIBIDA', 'PARCIAL', 'PENDIENTE']) as EstadoOrdenCompra,
+            observaciones: "Pedido de reposición de inventario"
+        };
+    }).sort((a, b) => b.fechaEmision.getTime() - a.fechaEmision.getTime());
+};
+
+export const initialOrdenesCompra = generateOrdenesCompra(50, initialProveedores, initialInventory);
 export const initialCodigosTrabajo: CodigoTrabajo[] = [
     {
         id: "COD-001",
