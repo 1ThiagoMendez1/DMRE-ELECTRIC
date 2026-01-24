@@ -116,6 +116,7 @@ export interface Cotizacion {
     estado: EstadoCotizacion;
     fechaActualizacion?: Date; // Track last update
     evidencia?: EvidenciaTrabajo[]; // Nuevo campo para ejecución
+    comentarios?: ComentarioCotizacion[]; // New: Negotiation thread
 }
 
 export interface Ubicacion {
@@ -134,6 +135,14 @@ export interface EvidenciaTrabajo {
     url?: string; // URL simulada para fotos/videos
     descripcion?: string;
     ubicacion?: Ubicacion; // Georreferenciación de la evidencia
+}
+
+export interface ComentarioCotizacion {
+    id: string;
+    fecha: Date;
+    autor: string; // "Cliente" or "DMRE"
+    mensaje: string;
+    leido: boolean;
 }
 
 // --- NEW ERP MODULES TYPES ---
