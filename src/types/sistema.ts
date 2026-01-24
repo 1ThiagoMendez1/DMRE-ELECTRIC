@@ -115,6 +115,15 @@ export interface Cotizacion {
     total: number;
     estado: EstadoCotizacion;
     fechaActualizacion?: Date; // Track last update
+    comentarios?: ComentarioCotizacion[]; // New: Negotiation thread
+}
+
+export interface ComentarioCotizacion {
+    id: string;
+    fecha: Date;
+    autor: string; // "Cliente" or "DMRE"
+    mensaje: string;
+    leido: boolean;
 }
 
 // --- NEW ERP MODULES TYPES ---

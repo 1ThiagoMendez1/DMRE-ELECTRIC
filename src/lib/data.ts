@@ -1,4 +1,4 @@
-import { Cpu, Network, Wrench, Cable, Bot, LampDesk, User, Package, FileText, ClipboardList, DollarSign } from 'lucide-react';
+import { Cpu, Network, Wrench, Cable, Bot, LampDesk, User, Package, FileText, ClipboardList, DollarSign, Briefcase } from 'lucide-react';
 
 export const services = [
     {
