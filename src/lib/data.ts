@@ -1,4 +1,4 @@
-import { Cpu, Network, Wrench, Cable, Bot, LampDesk, User, Package, FileText, ClipboardList } from 'lucide-react';
+import { Cpu, Network, Wrench, Cable, Bot, LampDesk, User, Package, FileText, ClipboardList, DollarSign, Briefcase } from 'lucide-react';
 
 export const services = [
     {
@@ -78,25 +78,55 @@ export const projects = [
     },
 ];
 
-export const dashboardNavItems = [
+export const dashboardNavItems = []
+
+export const systemNavItems = [
     {
-        label: 'Cotizaciones',
-        href: '/dashboard',
-        icon: FileText,
+        id: 'dashboard',
+        label: 'Dashboard',
+        href: '/dashboard/sistema',
+        icon: FileText, // LayoutDashboardIcon imported elsewhere, using existing for now or fix imports
     },
     {
-        label: 'Clientes',
-        href: '/dashboard/clients',
+        id: 'landing',
+        label: 'Landing Page',
+        href: '/dashboard/sistema/landing',
+        icon: Network, // Using Network icon for website management
+    },
+    {
+        id: 'comercial',
+        label: 'Comercial',
+        href: '/dashboard/sistema/comercial',
         icon: User,
     },
     {
-        label: 'Inventario',
-        href: '/dashboard/inventory',
+        id: 'financiera',
+        label: 'Financiera',
+        href: '/dashboard/sistema/financiera',
+        icon: DollarSign, // Ensure import
+    },
+    {
+        id: 'logistica',
+        label: 'Logística',
+        href: '/dashboard/sistema/logistica',
         icon: Package,
     },
     {
-        label: 'Códigos de Trabajo',
-        href: '/dashboard/codes',
+        id: 'operaciones',
+        label: 'Operaciones',
+        href: '/dashboard/sistema/operaciones',
+        icon: ClipboardList,
+    },
+    {
+        id: 'talento-humano',
+        label: 'Talento Humano',
+        href: '/dashboard/sistema/talento-humano',
+        icon: User, // Briefcase
+    },
+    {
+        id: 'control',
+        label: 'Control',
+        href: '/dashboard/sistema/control',
         icon: ClipboardList,
     },
 ]

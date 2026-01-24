@@ -38,16 +38,23 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { initialUsers } from "@/lib/mock-data";
+import { PermissionDialog } from "@/components/erp/permission-dialog";
 import { CreateUserDialog } from "@/components/erp/create-user-dialog";
+import { useErp } from "@/components/providers/erp-provider";
+import { systemNavItems } from "@/lib/data";
 
 export default function UsuariosPage() {
     const { toast } = useToast();
+    const { users, updateUserPermissions, setCurrentUser, currentUser } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
-    const [usuarios, setUsuarios] = useState(initialUsers);
+
+    // No longer needing local state for users as it comes from context
+    // const [usuarios, setUsuarios] = useState(initialUsers); 
 
     const handleCreateUser = (newUser: any) => {
-        setUsuarios([newUser, ...usuarios]);
+        // Implement add user in provider if needed, for now just a toast demo or we should add 'addUser' to context
+        // For this task, we focus on permissions of existing users.
+        toast({ title: "Información", description: "Creación de usuarios simulada (falta implementar en provider addUser)" });
     };
 
     const getRoleBadge = (role: string) => {
@@ -59,7 +66,7 @@ export default function UsuariosPage() {
         }
     };
 
-    const filteredUsers = usuarios.filter(u =>
+    const filteredUsers = users.filter(u =>
         u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -100,6 +107,7 @@ export default function UsuariosPage() {
                                 <TableHead>Usuario</TableHead>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Rol</TableHead>
+                                <TableHead>Permisos Sidebar</TableHead> {/* New Column */}
                                 <TableHead>Estado</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
@@ -113,32 +121,62 @@ export default function UsuariosPage() {
                                                 {user.avatar ? <img src={user.avatar} className="rounded-full" /> : <UserCircle className="h-5 w-5" />}
                                             </div>
                                             {user.name}
+                                            {currentUser?.id === user.id && <Badge variant="outline" className="ml-2 text-[10px]">Tú</Badge>}
                                         </div>
                                     </TableCell>
                                     <TableCell>{user.email}</TableCell>
                                     <TableCell>{getRoleBadge(user.role)}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1 max-w-[300px]">
+                                            {user.sidebarAccess && user.sidebarAccess.length > 0 ? (
+                                                user.sidebarAccess.map((accessId) => {
+                                                    const item = systemNavItems.find(i => i.id === accessId);
+                                                    return (
+                                                        <Badge key={accessId} variant="outline" className="text-[10px] px-2 py-0.5 h-auto font-normal bg-secondary/20 border-secondary/30">
+                                                            {item ? item.label : accessId}
+                                                        </Badge>
+                                                    );
+                                                })
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs italic">Sin permisos específicos</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className="gap-1 pl-1 bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400">
                                             <CheckCircle2 className="h-3 w-3" /> Activo
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => toast({ title: "Editar", description: "Edición de usuario habilitada pronto" })}>
-                                                    Editar Roles
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-red-600" onClick={() => toast({ title: "Desactivar", description: "Usuario desactivado temporalmente" })}>
-                                                    Desactivar Acceso
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <div className="flex justify-end gap-2">
+                                            {/* Permission Editor Integration */}
+                                            <PermissionDialog
+                                                user={user}
+                                                onSave={updateUserPermissions}
+                                                trigger={
+                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Editar Permisos">
+                                                        <Shield className="h-4 w-4" />
+                                                    </Button>
+                                                }
+                                            />
+
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => setCurrentUser(user)}>
+                                                        Simular Sesión (Demo)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-red-600" onClick={() => toast({ title: "Desactivar", description: "Usuario desactivado temporalmente" })}>
+                                                        Desactivar Acceso
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}

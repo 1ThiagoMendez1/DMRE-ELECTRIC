@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   SidebarProvider,
   Sidebar,
@@ -26,15 +28,17 @@ import {
 } from "@/components/ui/collapsible"
 import { Button } from './ui/button';
 import { LogOut, LayoutDashboard as LayoutDashboardIcon, Users as UsersIcon, Package as PackageIcon, FileText as FileTextIcon, ClipboardList as ClipboardListIcon, ChevronDown, DollarSign, Truck, Car, Briefcase } from 'lucide-react';
-import { dashboardNavItems } from '@/lib/data';
+import { dashboardNavItems, systemNavItems } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import Image from 'next/image';
 import { ThemeToggle } from './theme-toggle';
 import { NotificationCenter } from './notification-center';
+import { useErp } from "@/components/providers/erp-provider";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { currentUser } = useErp();
 
   return (
     <SidebarProvider>
@@ -51,125 +55,35 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
 
-          {/* General Group */}
-          <Collapsible defaultOpen className="group/collapsible">
-            <SidebarGroup>
-              <SidebarGroupLabel asChild>
-                <CollapsibleTrigger className="flex w-full items-center justify-between p-2 text-xs font-semibold text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md group-data-[collapsible=icon]:hidden">
-                  General
-                  <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                </CollapsibleTrigger>
-              </SidebarGroupLabel>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {dashboardNavItems.map((item) => (
-                      <SidebarMenuItem key={item.label}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={pathname === item.href}
-                          tooltip={item.label}
-                          className={cn(pathname === item.href && "bg-sidebar-accent text-sidebar-accent-foreground")}
-                        >
-                          <Link href={item.href}>
-                            <item.icon />
-                            <span>{item.label}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
 
-          {/* Sistema Simplificado Group */}
-          <Collapsible defaultOpen className="group/collapsible">
-            <SidebarGroup>
-              <SidebarGroupLabel asChild>
-                <CollapsibleTrigger className="flex w-full items-center justify-between p-2 text-xs font-semibold text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md group-data-[collapsible=icon]:hidden">
-                  Sistema Simplificado
-                  <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                </CollapsibleTrigger>
-              </SidebarGroupLabel>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {/* Dashboard General */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname === "/dashboard/sistema"} tooltip="Dashboard">
-                        <Link href="/dashboard/sistema">
-                          <LayoutDashboardIcon className="h-4 w-4" />
-                          <span>Dashboard</span>
+
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {systemNavItems.map((item) => {
+                  // Check permissions
+                  const hasAccess = currentUser?.role === 'ADMIN' || currentUser?.sidebarAccess?.includes(item.id);
+                  if (!hasAccess) return null;
+
+                  return (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname.startsWith(item.href)}
+                        tooltip={item.label}
+                        className={cn(pathname.startsWith(item.href) && "bg-sidebar-accent text-sidebar-accent-foreground")}
+                      >
+                        <Link href={item.href}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-
-                    {/* A. COMERCIAL - includes Cotizador */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/comercial") || pathname.startsWith("/dashboard/sistema/cotizacion")} tooltip="Comercial">
-                        <Link href="/dashboard/sistema/comercial">
-                          <UsersIcon className="h-4 w-4" />
-                          <span>Comercial</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    {/* B. FINANCIERA - includes Créditos */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/financiera") || pathname.startsWith("/dashboard/sistema/creditos")} tooltip="Financiera">
-                        <Link href="/dashboard/sistema/financiera">
-                          <DollarSign className="h-4 w-4" />
-                          <span>Financiera</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    {/* C. LOGÍSTICA */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/logistica") || pathname.startsWith("/dashboard/sistema/inventario") || pathname.startsWith("/dashboard/sistema/suministro") || pathname.startsWith("/dashboard/sistema/dotacion") || pathname.startsWith("/dashboard/sistema/activos")} tooltip="Logística">
-                        <Link href="/dashboard/sistema/logistica">
-                          <PackageIcon className="h-4 w-4" />
-                          <span>Logística</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    {/* D. OPERACIONES - includes Registro, Códigos */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/operaciones") || pathname.startsWith("/dashboard/sistema/registro") || pathname.startsWith("/dashboard/sistema/codigos-trabajo")} tooltip="Operaciones">
-                        <Link href="/dashboard/sistema/operaciones">
-                          <ClipboardListIcon className="h-4 w-4" />
-                          <span>Operaciones</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    {/* E. TALENTO HUMANO */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/talento-humano")} tooltip="Talento Humano">
-                        <Link href="/dashboard/sistema/talento-humano">
-                          <Briefcase className="h-4 w-4" />
-                          <span>Talento Humano</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    {/* F. CONTROL Y SISTEMA */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/dashboard/sistema/control") || pathname.startsWith("/dashboard/sistema/usuarios") || pathname.startsWith("/dashboard/sistema/roles") || pathname.startsWith("/dashboard/sistema/agenda")} tooltip="Control">
-                        <Link href="/dashboard/sistema/control">
-                          <ClipboardListIcon className="h-4 w-4" />
-                          <span>Control</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
 
         </SidebarContent>
         <SidebarFooter>
@@ -202,6 +116,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <span className="hidden md:inline-block text-sm text-muted-foreground mr-2 capitalize font-medium">
+              {format(new Date(), "EEEE, dd 'de' MMM yyyy", { locale: es })}
+            </span>
             <NotificationCenter />
             <ThemeToggle />
           </div>

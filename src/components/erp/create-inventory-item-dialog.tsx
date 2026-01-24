@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Plus, Package } from "lucide-react";
+import { Loader2, Plus, Package, Check, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,8 +26,12 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
+import { useErp } from "@/components/providers/erp-provider";
 import { InventarioItem, CategoriaItem, UbicacionItem } from "@/types/sistema";
+import { cn } from "@/lib/utils";
 
 const itemSchema = z.object({
     sku: z.string().min(3, "SKU requerido"),
@@ -38,6 +42,7 @@ const itemSchema = z.object({
     cantidad: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
     stockMinimo: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, { message: "Inválido" }),
     valorUnitario: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
+    proveedorId: z.string().min(1, "Proveedor requerido"),
 });
 
 interface CreateInventoryItemDialogProps {
@@ -46,7 +51,9 @@ interface CreateInventoryItemDialogProps {
 
 export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItemDialogProps) {
     const [open, setOpen] = useState(false);
+    const [proveedorOpen, setProveedorOpen] = useState(false);
     const { toast } = useToast();
+    const { proveedores } = useErp();
 
     const form = useForm<z.infer<typeof itemSchema>>({
         resolver: zodResolver(itemSchema),
@@ -58,7 +65,8 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
             unidad: "Und",
             cantidad: "0",
             stockMinimo: "10",
-            valorUnitario: "0"
+            valorUnitario: "0",
+            proveedorId: ""
         },
     });
 
@@ -84,7 +92,8 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
             valorTotal: Number(values.valorUnitario),
             t1: Number(values.valorUnitario),
             t2: Number(values.valorUnitario),
-            t3: Number(values.valorUnitario)
+            t3: Number(values.valorUnitario),
+            proveedorId: values.proveedorId
         };
 
         onItemCreated(newItem);
@@ -151,6 +160,58 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                                     <FormControl>
                                         <Input placeholder="Nombre del producto" {...field} />
                                     </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Proveedor Combobox */}
+                        <FormField
+                            control={form.control}
+                            name="proveedorId"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Proveedor</FormLabel>
+                                    <Popover open={proveedorOpen} onOpenChange={setProveedorOpen}>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                                <Button
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                                >
+                                                    {field.value
+                                                        ? proveedores.find((p) => p.id === field.value)?.nombre
+                                                        : "Seleccionar proveedor..."}
+                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[400px] p-0">
+                                            <Command>
+                                                <CommandInput placeholder="Buscar proveedor..." />
+                                                <CommandList>
+                                                    <CommandEmpty>No se encontró el proveedor.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {proveedores.map((p) => (
+                                                            <CommandItem
+                                                                key={p.id}
+                                                                value={p.nombre}
+                                                                onSelect={() => {
+                                                                    form.setValue("proveedorId", p.id);
+                                                                    setProveedorOpen(false);
+                                                                }}
+                                                            >
+                                                                <Check className={cn("mr-2 h-4 w-4", field.value === p.id ? "opacity-100" : "opacity-0")} />
+                                                                {p.nombre}
+                                                                <span className="ml-auto text-xs text-muted-foreground">{p.nit}</span>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                     <FormMessage />
                                 </FormItem>
                             )}

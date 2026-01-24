@@ -6,6 +6,7 @@ export interface User {
     email: string;
     role: UserRole;
     avatar?: string;
+    sidebarAccess?: string[];
 }
 
 // --- SHARED / EXISTING ---
@@ -54,6 +55,7 @@ export interface InventarioItem {
     costoMateriales: number; // New
     margenUtilidad: number; // New
     valorTotal: number; // Precio Venta Sugerido
+    proveedorId?: string; // Link to primary supplier
     t1: number; // Lista de precios 1
     t2: number; // Lista de precios 2
     t3: number; // Lista de precios 3
@@ -62,10 +64,25 @@ export interface InventarioItem {
 export interface CotizacionItem {
     id: string;
     inventarioId: string;
+    tipo: 'PRODUCTO' | 'SERVICIO'; // New: Distinguish between simple products and work codes
     descripcion: string; // Snapshot of description
     cantidad: number;
     valorUnitario: number; // Snapshot of price
     valorTotal: number;
+
+    // New fields for extended functionality
+    descuentoValor?: number;
+    descuentoPorcentaje?: number; // 0-100
+    impuesto?: number; // % IVA, e.g., 19
+    ocultarDetalles?: boolean; // If true, only show total for this item
+    subItems?: MaterialAsociado[]; // Expanded materials for Work Codes
+
+    // AIU & Costing Fields
+    costoUnitario?: number; // Precio Proveedor
+    aiuAdminPorcentaje?: number;
+    aiuImprevistoPorcentaje?: number;
+    aiuUtilidadPorcentaje?: number;
+    ivaUtilidadPorcentaje?: number; // IVA specific to Utility portion
 }
 
 export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'APROBADA' | 'RECHAZADA' | 'PENDIENTE' | 'NO_APROBADA' | 'EN_EJECUCION' | 'FINALIZADA';
@@ -81,13 +98,32 @@ export interface Cotizacion {
     descripcionTrabajo: string; // New
     items: CotizacionItem[];
     subtotal: number;
-    aiuAdmin: number;  // New
-    aiuImprevistos: number; // New
-    aiuUtilidad: number; // New
+    descuentoGlobal?: number; // New: Global Discount Amount
+    descuentoGlobalPorcentaje?: number; // New: Global Discount %
+    impuestoGlobalPorcentaje?: number; // New: Global Tax % (e.g. 19)
+
+    // Global AIU Defaults
+    aiuAdminGlobalPorcentaje?: number;
+    aiuImprevistoGlobalPorcentaje?: number;
+    aiuUtilidadGlobalPorcentaje?: number;
+    ivaUtilidadGlobalPorcentaje?: number;
+
+    aiuAdmin: number;  // Calculated Amount
+    aiuImprevistos: number; // Calculated Amount
+    aiuUtilidad: number; // Calculated Amount
     iva: number;
     total: number;
     estado: EstadoCotizacion;
     fechaActualizacion?: Date; // Track last update
+    comentarios?: ComentarioCotizacion[]; // New: Negotiation thread
+}
+
+export interface ComentarioCotizacion {
+    id: string;
+    fecha: Date;
+    autor: string; // "Cliente" or "DMRE"
+    mensaje: string;
+    leido: boolean;
 }
 
 // --- NEW ERP MODULES TYPES ---
@@ -195,10 +231,41 @@ export interface CuentaPorPagar {
     valorTotal: number;
     valorPagado: number;
     saldoPendiente: number;
+    pagos?: { id: string; fecha: Date; valor: number; nota?: string; }[];
     ofertaId?: string; // Costeo
+    ordenCompraId?: string; // Link to PO
+}
+
+export type EstadoOrdenCompra = 'PENDIENTE' | 'ENVIADA' | 'PARCIAL' | 'RECIBIDA' | 'CANCELADA';
+
+export interface DetalleCompra {
+    id: string;
+    inventarioId: string;
+    descripcion: string;
+    cantidad: number;
+    valorUnitario: number; // Historical price
+    subtotal: number;
+    recibido: number; // Quantity received so far
+}
+
+export interface OrdenCompra {
+    id: string;
+    numero: string; // OC-001
+    proveedorId: string;
+    proveedor: Proveedor;
+    fechaEmision: Date;
+    fechaEntregaEstimada?: Date;
+    items: DetalleCompra[];
+    subtotal: number;
+    impuestos: number;
+    total: number;
+    estado: EstadoOrdenCompra;
+    observaciones?: string;
 }
 
 // 5. ACTIVOS
+export type EstadoVehiculo = 'OPERATIVO' | 'MANTENIMIENTO' | 'INACTIVO';
+
 export interface Vehiculo {
     id: string;
     placa: string;
@@ -207,6 +274,12 @@ export interface Vehiculo {
     vencimientoSoat: Date;
     vencimientoTecnomecanica: Date;
     vencimientoSeguro: Date;
+    // Campos adicionales
+    estado: EstadoVehiculo;
+    kilometrajeActual: number;
+    ano: number;
+    color: string;
+    fechaRegistro?: Date;
 }
 
 export type TipoGastoVehiculo = 'COMBUSTIBLE' | 'PEAJE' | 'MANTENIMIENTO' | 'PARQUEADERO' | 'OTROS';
@@ -220,6 +293,11 @@ export interface GastoVehiculo {
     kilometraje: number;
     valor: number;
     proveedor: string;
+    // Campos adicionales
+    galones?: number;
+    precioPorGalon?: number;
+    soporteUrl?: string;
+    observacion?: string;
 }
 
 // 6. TALENTO HUMANO
@@ -295,6 +373,8 @@ export interface DotacionItem {
     categoria: 'UNIFORME' | 'EPP' | 'HERRAMIENTA';
     genero: 'HOMBRE' | 'MUJER' | 'UNISEX';
     variantes: DotacionVariant[];
+    stockMinimo?: number;           // Para semáforo de stock
+    fechaVencimiento?: Date;        // Para alertas de EPP
 }
 
 export interface EntregaDotacionItem {
@@ -305,14 +385,19 @@ export interface EntregaDotacionItem {
     cantidad: number;
 }
 
+export type EstadoEntregaDotacion = 'ASIGNADO' | 'ACEPTADO' | 'ENTREGADO' | 'RECHAZADO' | 'DEVUELTO';
+
 export interface EntregaDotacion {
     id: string;
-    fecha: Date;
+    fecha: Date;                    // Fecha de asignación
     empleadoId: string;
     empleado: Empleado;
     items: EntregaDotacionItem[];
-    estado: 'ASIGNADO' | 'ENTREGADO' | 'RECHAZADO';
-    fechaAceptacion?: Date;
+    estado: EstadoEntregaDotacion;
+    usuarioAsigna?: string;         // Quien asignó
+    fechaAceptacion?: Date;         // Cuando el empleado aceptó
+    usuarioConfirma?: string;       // Quien confirmó entrega
+    fechaEntrega?: Date;            // Cuando se hizo la entrega física
     observacion: string;
 }
 
@@ -375,6 +460,7 @@ export interface CodigoTrabajo {
     nombre: string;
     descripcion: string;
     manoDeObra: number;
+    valorManoObra?: number; // Alias for consistency with new components
     materiales: MaterialAsociado[];
     costoTotalMateriales: number;
     costoTotal: number; // manoDeObra + costoTotalMateriales
