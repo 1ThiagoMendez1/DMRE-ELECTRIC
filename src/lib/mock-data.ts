@@ -3,6 +3,7 @@ import {
     InventarioItem,
     Cotizacion,
     CotizacionItem,
+    EstadoCotizacion,
     RegistroObra,
     Material,
     Factura,
@@ -200,7 +201,21 @@ const generateCotizaciones = (count: number, clientes: Cliente[], inventario: In
             aiuUtilidad,
             iva,
             total,
-            estado: randomItem(['PENDIENTE', 'APROBADA', 'NO_APROBADA', 'EN_EJECUCION', 'FINALIZADA'])
+            estado: randomItem(['BORRADOR', 'ENVIADA', 'EN_REVISION', 'APROBADA', 'PENDIENTE', 'RECHAZADA', 'EN_EJECUCION', 'FINALIZADA']) as EstadoCotizacion,
+            fechaActualizacion: randomDate(2024, 2025),
+            evidencia: Array.from({ length: randomInt(0, 3) }, (_, k) => ({
+                id: `EVID-${i}-${k}`,
+                fecha: randomDate(2024, 2025),
+                usuarioId: `USR-${k}`,
+                usuarioNombre: `Técnico ${randomInt(1, 5)}`,
+                tipo: randomItem(['FOTO', 'NOTA', 'UBICACION']) as 'FOTO' | 'NOTA' | 'UBICACION',
+                descripcion: `Evidencia de avance #${k + 1}`,
+                ubicacion: {
+                    lat: 4.6097 + (Math.random() - 0.5) * 0.01,
+                    lng: -74.0817 + (Math.random() - 0.5) * 0.01,
+                    timestamp: Date.now()
+                }
+            }))
         };
     });
 };

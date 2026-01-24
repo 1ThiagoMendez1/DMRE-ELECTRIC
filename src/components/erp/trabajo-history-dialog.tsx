@@ -16,7 +16,13 @@ import {
     EyeOff,
     Package,
     Trash2,
-    Save
+    Save,
+    Camera,
+    MapPin,
+    Image,
+    Share2,
+    Navigation, // For location
+    Wrench // Import added
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -58,12 +64,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem } from "@/types/sistema";
+import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem, EvidenciaTrabajo, Ubicacion } from "@/types/sistema";
 import { generateQuotePDF } from "@/utils/pdf-generator";
 import { initialInventory, initialCodigosTrabajo } from "@/lib/mock-data";
 import { ProductSelectorDialog } from "./product-selector-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface HistorialEntry {
     id: string;
@@ -146,6 +153,68 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     // Anexo materiales toggle
     const [showAnexoMateriales, setShowAnexoMateriales] = useState(true);
     const [showMaterialsInline, setShowMaterialsInline] = useState(false); // New: Inline materials in PDF preview
+
+    // EXECUTION / EVIDENCE STATE
+    const { toast } = useToast();
+    const [evidenceNote, setEvidenceNote] = useState("");
+    const [localEvidence, setLocalEvidence] = useState<EvidenciaTrabajo[]>(trabajo.evidencia || []);
+    const [isLocating, setIsLocating] = useState(false);
+
+    const handleAddEvidence = (type: 'FOTO' | 'VIDEO' | 'NOTA', content?: string) => {
+        const newEvidence: EvidenciaTrabajo = {
+            id: `EVID-NEW-${Date.now()}`,
+            fecha: new Date(),
+            usuarioId: 'CURRENT-USER',
+            usuarioNombre: 'Usuario Actual', // In real app, get from auth context
+            tipo: type,
+            descripcion: type === 'NOTA' ? content : (evidenceNote || `Nueva evidencia ${type}`),
+            url: type === 'FOTO' ? 'https://images.unsplash.com/photo-1581092921461-eab32e97f693?w=800&q=80' : undefined // Simulated URL
+        };
+
+        const updatedEvidence = [newEvidence, ...localEvidence];
+        setLocalEvidence(updatedEvidence);
+        onTrabajoUpdated({ ...trabajo, evidencia: updatedEvidence });
+        setEvidenceNote("");
+        toast({ title: "Evidencia Agregada", description: "Se ha registrado la evidencia correctamente." });
+    };
+
+    const handleAddLocation = () => {
+        setIsLocating(true);
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const newLocationEvidence: EvidenciaTrabajo = {
+                        id: `LOC-${Date.now()}`,
+                        fecha: new Date(),
+                        usuarioId: 'CURRENT-USER',
+                        usuarioNombre: 'Usuario Actual',
+                        tipo: 'UBICACION',
+                        descripcion: evidenceNote || 'Reporte de ubicación en sitio',
+                        ubicacion: {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            precision: position.coords.accuracy,
+                            timestamp: position.timestamp
+                        }
+                    };
+                    const updatedEvidence = [newLocationEvidence, ...localEvidence];
+                    setLocalEvidence(updatedEvidence);
+                    onTrabajoUpdated({ ...trabajo, evidencia: updatedEvidence });
+                    setEvidenceNote("");
+                    setIsLocating(false);
+                    toast({ title: "Ubicación Registrada", description: `Lat: ${position.coords.latitude.toFixed(5)}, Lng: ${position.coords.longitude.toFixed(5)}` });
+                },
+                (error) => {
+                    console.error("Error getting location", error);
+                    setIsLocating(false);
+                    toast({ title: "Error de Ubicación", description: "No se pudo obtener la ubicación actual.", variant: "destructive" });
+                }
+            );
+        } else {
+            setIsLocating(false);
+            toast({ title: "No soportado", description: "Geolocalización no disponible en este navegador.", variant: "destructive" });
+        }
+    };
 
     // Simulate history - in production this would come from backend
     const [historial, setHistorial] = useState<HistorialEntry[]>([
@@ -380,15 +449,17 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'items' | 'preview' | 'historial')} className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="detalles">Detalles</TabsTrigger>
                         <TabsTrigger value="items">Items & Edición</TabsTrigger>
+                        <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>
                         <TabsTrigger value="preview">Vista PDF</TabsTrigger>
                         <TabsTrigger value="historial">Historial</TabsTrigger>
                     </TabsList>
 
                     {/* DETALLES TAB */}
                     <TabsContent value="detalles" className="flex-1 overflow-auto space-y-4 mt-4">
+                        {/* ... Existing Details Content ... */}
                         <div className="grid grid-cols-3 gap-4">
                             {/* Client Info */}
                             <Card>
@@ -507,6 +578,147 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                 </div>
                             </CardContent>
                         </Card>
+                    </TabsContent>
+
+                    {/* EJECUCIÓN / EVIDENCIA TAB (NEW) */}
+                    <TabsContent value="ejecucion" className="flex-1 overflow-auto space-y-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Evidence Upload Form */}
+                            <Card className="h-fit">
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Camera className="h-4 w-4" /> Nueva Evidencia
+                                    </CardTitle>
+                                    <CardDescription>Sube fotos, videos o registra tu ubicación.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <Textarea
+                                        placeholder="Describe la evidencia o actividad..."
+                                        value={evidenceNote}
+                                        onChange={(e) => setEvidenceNote(e.target.value)}
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" className="flex-1" onClick={() => handleAddEvidence('FOTO')}>
+                                            <Camera className="mr-2 h-4 w-4" /> Foto
+                                        </Button>
+                                        <Button size="sm" variant="outline" className="flex-1" onClick={() => handleAddEvidence('VIDEO', 'https://example.com/video.mp4')}>
+                                            <Share2 className="mr-2 h-4 w-4" /> Video
+                                        </Button>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        className="w-full"
+                                        variant={isLocating ? "secondary" : "default"}
+                                        onClick={handleAddLocation}
+                                        disabled={isLocating}
+                                    >
+                                        {isLocating ? (
+                                            <>
+                                                <Navigation className="mr-2 h-4 w-4 animate-spin" /> Obteniendo ubicación...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <MapPin className="mr-2 h-4 w-4" /> Registrar Ubicación GPS
+                                            </>
+                                        )}
+                                    </Button>
+                                </CardContent>
+                            </Card>
+
+                            {/* Recent Location / Map Placeholder */}
+                            <Card className="h-fit">
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-primary" /> Última Ubicación
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {localEvidence.filter(e => e.tipo === 'UBICACION').length > 0 ? (
+                                        (() => {
+                                            const lastLoc = localEvidence.filter(e => e.tipo === 'UBICACION').sort((a, b) => b.fecha.getTime() - a.fecha.getTime())[0];
+                                            return (
+                                                <div className="space-y-2">
+                                                    <div className="h-[150px] bg-muted rounded-md flex items-center justify-center relative overflow-hidden group">
+                                                        {/* Simulated Map View */}
+                                                        <div className="absolute inset-0 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                                                            <MapPin className="h-8 w-8 text-primary drop-shadow-md" />
+                                                            <span className="sr-only">Mapa simulado</span>
+                                                        </div>
+                                                        <a
+                                                            href={`https://www.google.com/maps/search/?api=1&query=${lastLoc.ubicacion?.lat},${lastLoc.ubicacion?.lng}`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="absolute bottom-2 right-2 bg-white/90 dark:bg-black/90 text-xs px-2 py-1 rounded shadow-sm hover:bg-primary hover:text-white transition-colors"
+                                                        >
+                                                            Ver en Google Maps
+                                                        </a>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                                        <span>{format(lastLoc.fecha, "dd MMM HH:mm", { locale: es })}</span>
+                                                        <span>Lat: {lastLoc.ubicacion?.lat.toFixed(4)}, Lng: {lastLoc.ubicacion?.lng.toFixed(4)}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()
+                                    ) : (
+                                        <div className="h-[150px] border border-dashed rounded-md flex flex-col items-center justify-center text-muted-foreground">
+                                            <Navigation className="h-8 w-8 mb-2 opacity-50" />
+                                            <span className="text-xs">Sin ubicación registrada</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Evidence History Timeline */}
+                        <div className="mt-4">
+                            <h3 className="font-semibold mb-2 flex items-center gap-2">
+                                <Clock className="h-4 w-4" /> Historial de Ejecución ({localEvidence.length})
+                            </h3>
+                            <div className="space-y-4 pl-2">
+                                {localEvidence.sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).map((ev) => (
+                                    <div key={ev.id} className="flex gap-4 border-l-2 border-muted pl-4 relative pb-4 last:pb-0">
+                                        <div className="absolute -left-[9px] top-0 bg-background border rounded-full p-1">
+                                            {ev.tipo === 'FOTO' && <Camera className="h-3 w-3 text-blue-500" />}
+                                            {ev.tipo === 'VIDEO' && <Share2 className="h-3 w-3 text-purple-500" />}
+                                            {ev.tipo === 'NOTA' && <FileText className="h-3 w-3 text-amber-500" />}
+                                            {ev.tipo === 'UBICACION' && <MapPin className="h-3 w-3 text-red-500" />}
+                                        </div>
+                                        <div className="flex-1 bg-muted/30 p-3 rounded-md">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <div>
+                                                    <span className="font-medium text-sm">{ev.usuarioNombre}</span>
+                                                    <Badge variant="outline" className="ml-2 text-[10px]">{ev.tipo}</Badge>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">{format(ev.fecha, "dd MMM yyyy HH:mm", { locale: es })}</span>
+                                            </div>
+
+                                            {ev.descripcion && (
+                                                <p className="text-sm mb-2">{ev.descripcion}</p>
+                                            )}
+
+                                            {ev.url && ev.tipo === 'FOTO' && (
+                                                <div className="relative h-40 w-full max-w-sm rounded-md overflow-hidden bg-black/5 mt-2">
+                                                    {/* Simulated Image */}
+                                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-muted">
+                                                        <Image className="h-8 w-8 opacity-20" />
+                                                    </div>
+                                                    <img src={ev.url} alt="Evidencia" className="object-cover w-full h-full relative z-10" />
+                                                </div>
+                                            )}
+
+                                            {ev.tipo === 'UBICACION' && ev.ubicacion && (
+                                                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mt-1 bg-background/50 p-1 rounded w-fit">
+                                                    <MapPin className="h-3 w-3" />
+                                                    {ev.ubicacion.lat.toFixed(6)}, {ev.ubicacion.lng.toFixed(6)}
+                                                    <span className="text-[10px] opacity-70">(±{ev.ubicacion.precision?.toFixed(0)}m)</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </TabsContent>
 
                     {/* ITEMS TAB */}

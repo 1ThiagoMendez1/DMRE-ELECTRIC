@@ -115,6 +115,25 @@ export interface Cotizacion {
     total: number;
     estado: EstadoCotizacion;
     fechaActualizacion?: Date; // Track last update
+    evidencia?: EvidenciaTrabajo[]; // Nuevo campo para ejecución
+}
+
+export interface Ubicacion {
+    lat: number;
+    lng: number;
+    precision?: number;
+    timestamp: number;
+}
+
+export interface EvidenciaTrabajo {
+    id: string;
+    fecha: Date;
+    usuarioId: string;
+    usuarioNombre: string;
+    tipo: 'FOTO' | 'VIDEO' | 'NOTA' | 'UBICACION';
+    url?: string; // URL simulada para fotos/videos
+    descripcion?: string;
+    ubicacion?: Ubicacion; // Georreferenciación de la evidencia
 }
 
 // --- NEW ERP MODULES TYPES ---
