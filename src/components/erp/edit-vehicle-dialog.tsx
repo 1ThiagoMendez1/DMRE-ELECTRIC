@@ -48,12 +48,12 @@ export function EditVehicleDialog({ vehiculo, onVehicleUpdated }: EditVehicleDia
             marcaModelo: vehiculo.marcaModelo,
             conductorAsignado: vehiculo.conductorAsignado || "",
             estado: vehiculo.estado,
-            kilometrajeActual: vehiculo.kilometrajeActual.toString(),
-            ano: vehiculo.ano.toString(),
+            kilometrajeActual: (vehiculo.kilometrajeActual || 0).toString(),
+            ano: (vehiculo.ano || new Date().getFullYear()).toString(),
             color: vehiculo.color,
-            vencimientoSoat: format(new Date(vehiculo.vencimientoSoat), "yyyy-MM-dd"),
-            vencimientoTecnomecanica: format(new Date(vehiculo.vencimientoTecnomecanica), "yyyy-MM-dd"),
-            vencimientoSeguro: format(new Date(vehiculo.vencimientoSeguro), "yyyy-MM-dd")
+            vencimientoSoat: vehiculo.vencimientoSoat ? format(new Date(vehiculo.vencimientoSoat), "yyyy-MM-dd") : "",
+            vencimientoTecnomecanica: vehiculo.vencimientoTecnomecanica ? format(new Date(vehiculo.vencimientoTecnomecanica), "yyyy-MM-dd") : "",
+            vencimientoSeguro: vehiculo.vencimientoSeguro ? format(new Date(vehiculo.vencimientoSeguro), "yyyy-MM-dd") : ""
         }
     });
 
@@ -64,12 +64,12 @@ export function EditVehicleDialog({ vehiculo, onVehicleUpdated }: EditVehicleDia
                 marcaModelo: vehiculo.marcaModelo,
                 conductorAsignado: vehiculo.conductorAsignado || "",
                 estado: vehiculo.estado,
-                kilometrajeActual: vehiculo.kilometrajeActual.toString(),
-                ano: vehiculo.ano.toString(),
+                kilometrajeActual: (vehiculo.kilometrajeActual || 0).toString(),
+                ano: (vehiculo.ano || new Date().getFullYear()).toString(),
                 color: vehiculo.color,
-                vencimientoSoat: format(new Date(vehiculo.vencimientoSoat), "yyyy-MM-dd"),
-                vencimientoTecnomecanica: format(new Date(vehiculo.vencimientoTecnomecanica), "yyyy-MM-dd"),
-                vencimientoSeguro: format(new Date(vehiculo.vencimientoSeguro), "yyyy-MM-dd")
+                vencimientoSoat: vehiculo.vencimientoSoat ? format(new Date(vehiculo.vencimientoSoat), "yyyy-MM-dd") : "",
+                vencimientoTecnomecanica: vehiculo.vencimientoTecnomecanica ? format(new Date(vehiculo.vencimientoTecnomecanica), "yyyy-MM-dd") : "",
+                vencimientoSeguro: vehiculo.vencimientoSeguro ? format(new Date(vehiculo.vencimientoSeguro), "yyyy-MM-dd") : ""
             });
         }
     }, [vehiculo, open, form]);

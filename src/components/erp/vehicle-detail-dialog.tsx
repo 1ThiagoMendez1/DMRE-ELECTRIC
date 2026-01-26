@@ -110,7 +110,7 @@ export function VehicleDetailDialog({ open, onOpenChange, vehiculo, gastos }: Ve
                             </div>
                             <div className="space-y-2">
                                 <p className="text-sm text-muted-foreground">Kilometraje Actual</p>
-                                <p className="font-bold text-primary">{vehiculo.kilometrajeActual.toLocaleString()} km</p>
+                                <p className="font-bold text-primary">{(vehiculo.kilometrajeActual || 0).toLocaleString()} km</p>
                             </div>
                             <div className="space-y-2">
                                 <p className="text-sm text-muted-foreground">Año / Color</p>
