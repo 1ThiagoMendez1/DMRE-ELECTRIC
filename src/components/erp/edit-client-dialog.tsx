@@ -29,11 +29,14 @@ import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
     nombre: z.string().min(2, "El nombre es requerido."),
+    codigo: z.string().optional(),
     documento: z.string().min(5, "El documento es requerido."),
     correo: z.string().email("Correo inválido."),
     telefono: z.string().min(7, "Teléfono requerido."),
     direccion: z.string().min(5, "Dirección requerida."),
+    ciudad: z.string().optional(),
     contactoPrincipal: z.string().min(2, "Contacto requerido."),
+    notas: z.string().optional(),
 });
 
 interface EditClientDialogProps {
@@ -49,11 +52,14 @@ export function EditClientDialog({ cliente, onClientUpdated }: EditClientDialogP
         resolver: zodResolver(formSchema),
         defaultValues: {
             nombre: cliente.nombre,
+            codigo: cliente.codigo || "",
             documento: cliente.documento,
             correo: cliente.correo,
             telefono: cliente.telefono,
             direccion: cliente.direccion,
+            ciudad: cliente.ciudad || "",
             contactoPrincipal: cliente.contactoPrincipal,
+            notas: cliente.notas || "",
         },
     });
 
@@ -95,6 +101,19 @@ export function EditClientDialog({ cliente, onClientUpdated }: EditClientDialogP
                                     <FormLabel>Nombre / Razón Social</FormLabel>
                                     <FormControl>
                                         <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="codigo"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Código Interno</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} placeholder="CLI-000" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -162,6 +181,32 @@ export function EditClientDialog({ cliente, onClientUpdated }: EditClientDialogP
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Dirección</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="ciudad"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Ciudad</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="notas"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Notas</FormLabel>
                                     <FormControl>
                                         <Input {...field} />
                                     </FormControl>

@@ -59,10 +59,16 @@ export function ClientProfileDialog({ cliente, trigger }: ClientProfileDialogPro
                         </div>
                     </div>
 
-                    {/* Contact Details */}
+                    {/* Contact Details and Location */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-3">
                             <h4 className="text-sm font-semibold text-muted-foreground uppercase">Contacto</h4>
+                            {cliente.codigo && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-mono">{cliente.codigo}</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2 text-sm">
                                 <User className="h-4 w-4 text-muted-foreground" />
                                 {cliente.contactoPrincipal}
@@ -82,8 +88,20 @@ export function ClientProfileDialog({ cliente, trigger }: ClientProfileDialogPro
                                 <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                                 {cliente.direccion}
                             </div>
+                            {cliente.ciudad && (
+                                <div className="flex items-start gap-2 text-sm">
+                                    <Building className="h-4 w-4 text-muted-foreground mt-0.5" />
+                                    {cliente.ciudad}
+                                </div>
+                            )}
                         </div>
                     </div>
+
+                    {cliente.notas && (
+                        <div className="bg-muted p-3 rounded-md text-sm italic">
+                            {cliente.notas}
+                        </div>
+                    )}
 
                     {/* Stats Placeholder */}
                     <div className="bg-muted/50 p-4 rounded-lg grid grid-cols-3 gap-4 text-center">
@@ -101,7 +119,7 @@ export function ClientProfileDialog({ cliente, trigger }: ClientProfileDialogPro
                         </div>
                     </div>
                 </div>
-            </DialogContent>
-        </Dialog>
+            </DialogContent >
+        </Dialog >
     );
 }

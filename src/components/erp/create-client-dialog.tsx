@@ -24,15 +24,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast"; // Assuming this exists or using simple alert
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
     nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
+    codigo: z.string().optional(),
     documento: z.string().min(6, "Documento inválido"),
     correo: z.string().email("Correo electrónico inválido"),
     telefono: z.string().min(7, "Teléfono inválido"),
     direccion: z.string().min(5, "Dirección requerida"),
+    ciudad: z.string().optional(),
     contacto: z.string().min(3, "Nombre de contacto requerido"),
+    notas: z.string().optional(),
 });
 
 interface CreateClientDialogProps {
@@ -43,31 +46,46 @@ export function CreateClientDialog({ onClientCreated }: CreateClientDialogProps)
     const [open, setOpen] = useState(false);
 
     // 1. Define your form.
+    const [isManualCode, setIsManualCode] = useState(false);
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             nombre: "",
+            codigo: "",
             documento: "",
             correo: "",
             telefono: "",
             direccion: "",
+            ciudad: "",
             contacto: "",
+            notas: "",
         },
     });
 
+    // Reset code when switching modes
+    const handleModeChange = (checked: boolean) => {
+        setIsManualCode(checked);
+        if (!checked) {
+            form.setValue("codigo", "");
+        }
+    };
+
     // 2. Define a submit handler.
-    function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: z.infer<typeof formSchema>) {
         // In a real app, this would be an API call
         console.log(values);
 
         const newClient = {
-            id: `CLI-${Math.floor(Math.random() * 1000)}`,
             nombre: values.nombre,
+            codigo: isManualCode ? values.codigo : undefined, // Send undefined to trigger auto-gen
             documento: values.documento,
             correo: values.correo,
             telefono: values.telefono,
             direccion: values.direccion,
+            ciudad: values.ciudad,
             contactoPrincipal: values.contacto,
+            notas: values.notas,
             fechaCreacion: new Date(),
         };
 
@@ -100,6 +118,43 @@ export function CreateClientDialog({ onClientCreated }: CreateClientDialogProps)
                                     <FormLabel>Razón Social / Nombre</FormLabel>
                                     <FormControl>
                                         <Input placeholder="Ej: TechSol S.A.S" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+
+
+                        <div className="flex flex-col space-y-2 mt-2 mb-2">
+                            <div className="flex items-center space-x-2">
+                                <FormLabel className="text-sm font-medium">Código del Cliente</FormLabel>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    id="manual-code"
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    checked={isManualCode}
+                                    onChange={(e) => handleModeChange(e.target.checked)}
+                                />
+                                <label htmlFor="manual-code" className="text-sm text-muted-foreground">
+                                    Asignar código manualmente
+                                </label>
+                            </div>
+                        </div>
+
+                        <FormField
+                            control={form.control}
+                            name="codigo"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormControl>
+                                        <Input
+                                            placeholder={isManualCode ? "Ej: PERSONAL-001" : "Autogenerado (CLI-XXX)"}
+                                            {...field}
+                                            disabled={!isManualCode}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -161,6 +216,19 @@ export function CreateClientDialog({ onClientCreated }: CreateClientDialogProps)
                         />
                         <FormField
                             control={form.control}
+                            name="ciudad"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Ciudad</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Ej: Bogotá" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
                             name="contacto"
                             render={({ field }) => (
                                 <FormItem>
@@ -172,12 +240,25 @@ export function CreateClientDialog({ onClientCreated }: CreateClientDialogProps)
                                 </FormItem>
                             )}
                         />
+                        <FormField
+                            control={form.control}
+                            name="notas"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Notas Adicionales</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Observaciones..." {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <DialogFooter>
                             <Button type="submit">Guardar Cliente</Button>
                         </DialogFooter>
                     </form>
                 </Form>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

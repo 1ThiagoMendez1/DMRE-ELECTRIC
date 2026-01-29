@@ -6,6 +6,8 @@ import {
     initialFacturas, initialQuotes, initialClients, initialUsers,
     initialInventory, initialProveedores, initialVehiculos, initialDotacionItems, initialEntregasDotacion, initialCuentasPorPagar, initialGastosVehiculos, initialCodigosTrabajo, initialOrdenesCompra
 } from "@/lib/mock-data";
+import { getClientsAction, createClientAction, updateClientAction } from "@/app/dashboard/sistema/clientes/actions";
+import { useEffect } from "react";
 
 interface ErpContextType {
     facturas: Factura[];
@@ -54,9 +56,22 @@ const ErpContext = createContext<ErpContextType | undefined>(undefined);
 export function ErpProvider({ children }: { children: ReactNode }) {
     const [facturas, setFacturas] = useState<Factura[]>(initialFacturas);
     const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(initialQuotes);
-    const [clientes, setClientes] = useState<Cliente[]>(initialClients);
+    const [clientes, setClientes] = useState<Cliente[]>([]);
     const [users, setUsers] = useState<User[]>(initialUsers);
     const [currentUser, setCurrentUser] = useState<User | undefined>(initialUsers[0]); // Default to Admin
+
+    // Load real clients from DB
+    useEffect(() => {
+        const loadClients = async () => {
+            try {
+                const data = await getClientsAction();
+                setClientes(data);
+            } catch (error) {
+                console.error("Failed to load clients:", error);
+            }
+        };
+        loadClients();
+    }, []);
 
     // Logistics State
     const [inventario, setInventario] = useState<InventarioItem[]>(initialInventory);
@@ -85,12 +100,27 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         setCotizaciones(prev => prev.map(c => c.id === updated.id ? updated : c));
     };
 
-    const addCliente = (cliente: Cliente) => {
-        setClientes(prev => [cliente, ...prev]);
+    const addCliente = async (cliente: Cliente) => {
+        try {
+            // Remove ID if it's a temp/mock ID or handle in action
+            // server action expects Omit<Cliente, "id" | "fechaCreacion">
+            // We assume the dialog passes a full client, we strip ID for creation
+            const { id, fechaCreacion, ...rest } = cliente;
+            const saved = await createClientAction(rest);
+            setClientes(prev => [saved, ...prev]);
+        } catch (error) {
+            console.error("Failed to add client:", error);
+            // Optionally add toast here or propagate error
+        }
     };
 
-    const updateCliente = (updated: Cliente) => {
-        setClientes(prev => prev.map(c => c.id === updated.id ? updated : c));
+    const updateCliente = async (updated: Cliente) => {
+        try {
+            const saved = await updateClientAction(updated.id, updated);
+            setClientes(prev => prev.map(c => c.id === saved.id ? saved : c));
+        } catch (error) {
+            console.error("Failed to update client:", error);
+        }
     };
 
     const deleteCotizacion = (id: string) => {

@@ -15,12 +15,15 @@ export interface User {
 
 export interface Cliente {
     id: string;
+    codigo?: string; // New: optional or auto-generated
     nombre: string;
     documento: string; // NIT or CC
     direccion: string;
+    ciudad?: string;
     correo: string;
     telefono: string;
     contactoPrincipal: string; // New
+    notas?: string;
     fechaCreacion: Date;
 }
 
