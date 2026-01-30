@@ -68,20 +68,33 @@ import { CreateObligacionDialog } from "@/components/erp/create-obligacion-dialo
 import { ObligacionDetailDialog } from "@/components/erp/obligacion-detail-dialog";
 
 import { useToast } from "@/hooks/use-toast";
-import { initialCuentas, initialMovimientos, initialObligaciones } from "@/lib/mock-data";
-// import { useErp } from "@/components/providers/erp-provider"; // Not needed directly if only BillingModule uses it
+import { useErp } from "@/components/providers/erp-provider";
 import { formatCurrency, cn } from "@/lib/utils";
 import { CuentaBancaria, MovimientoFinanciero, ObligacionFinanciera } from "@/types/sistema";
 import { BillingModule } from "@/components/erp/billing-module";
 
 export default function FinancieraPage() {
     const { toast } = useToast();
-    // const { facturas, addFactura, updateFactura, cotizaciones } = useErp(); // Moved to BillingModule
+    const {
+        cuentasBancarias: cuentas,
+        movimientosFinancieros: movementsRaw,
+        addCuentaBancaria,
+        updateCuentaBancaria,
+        addMovimientoFinanciero
+    } = useErp();
 
-    // Local state for financial specific modules
-    const [cuentas, setCuentas] = useState<CuentaBancaria[]>(initialCuentas);
-    const [movimientos, setMovimientos] = useState<MovimientoFinanciero[]>(initialMovimientos);
-    const [obligaciones, setObligaciones] = useState<ObligacionFinanciera[]>(initialObligaciones);
+    // Map movements to ensure it has valor/concepto if DB uses monto/descripcion
+    const movimientos = movementsRaw.map(m => ({
+        ...m,
+        valor: m.valor || m.monto || 0,
+        concepto: m.concepto || m.descripcion || "Sin concepto",
+        cuenta: m.cuenta || cuentas.find(c => c.id === m.cuentaId) || { nombre: "Cuenta Desconocida" }
+    })) as any[];
+
+    // Keep obligations as mock for now as we don't have DB table yet
+    const [obligaciones, setObligaciones] = useState<ObligacionFinanciera[]>([]);
+    // Ideally fetch from context or empty if not implemented
+
     // const [invoiceSearch, setInvoiceSearch] = useState(""); // Moved
 
     // --- LOGIC MOVED TO BILLING MODULE ---
@@ -130,47 +143,31 @@ export default function FinancieraPage() {
         .reduce((acc, m) => acc + m.valor, 0);
 
     const handleCreateAccount = (newAccount: CuentaBancaria) => {
-        setCuentas([...cuentas, newAccount]);
+        addCuentaBancaria(newAccount);
         toast({ title: "Cuenta creada", description: "La cuenta ha sido registrada exitosamente." });
     };
 
     const handleUpdateAccount = (updatedAccount: CuentaBancaria) => {
-        setCuentas(cuentas.map(c => c.id === updatedAccount.id ? updatedAccount : c));
+        updateCuentaBancaria(updatedAccount);
         toast({ title: "Cuenta actualizada", description: "Los datos de la cuenta han sido guardados." });
     };
 
     const handleCreateTransaction = (newTransaction: MovimientoFinanciero) => {
-        setMovimientos([newTransaction, ...movimientos]);
-
-        // Update account balance
-        const updatedCuentas = cuentas.map(c => {
-            if (c.id === newTransaction.cuenta.id) {
-                const newBalance = newTransaction.tipo === 'INGRESO'
-                    ? c.saldoActual + newTransaction.valor
-                    : c.saldoActual - newTransaction.valor;
-                return { ...c, saldoActual: newBalance };
-            }
-            return c;
-        });
-        setCuentas(updatedCuentas);
-
+        addMovimientoFinanciero(newTransaction);
         toast({ title: "Transacción registrada", description: "El movimiento ha sido guardado exitosamente." });
     };
 
     const handleUpdateTransaction = (updatedMov: MovimientoFinanciero) => {
-        setMovimientos(movimientos.map(m => m.id === updatedMov.id ? updatedMov : m));
-        // Note: Logic to revert old balance and apply new one is complex, skipping for MVP UI demo
+        // updateMovimientoFinanciero(updatedMov); // If exists
         toast({ title: "Movimiento actualizado", description: "Los detalles han sido guardados." });
-    }
+    };
 
     const handleCreateObligacion = (newObligacion: ObligacionFinanciera) => {
         setObligaciones([...obligaciones, newObligacion]);
-        toast({ title: "Obligación registrada", description: "Nuevo crédito añadido." });
     };
 
     const handleUpdateObligacion = (updatedObl: ObligacionFinanciera) => {
         setObligaciones(obligaciones.map(o => o.id === updatedObl.id ? updatedObl : o));
-        toast({ title: "Obligación actualizada", description: "Cambios guardados." });
     };
 
     return (

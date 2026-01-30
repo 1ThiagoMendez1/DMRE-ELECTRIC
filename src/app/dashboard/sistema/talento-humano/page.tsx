@@ -63,7 +63,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-import { initialEmpleados, initialNovedades, initialLiquidaciones, initialCuentas } from "@/lib/mock-data";
+import { useErp } from "@/components/providers/erp-provider";
 import { formatCurrency } from "@/lib/utils";
 import { CreateEmployeeDialog } from "@/components/erp/create-employee-dialog";
 import { RegisterNovedadDialog } from "@/components/erp/register-novedad-dialog";
@@ -73,19 +73,29 @@ import { EmployeeDetailDialog } from "@/components/erp/employee-detail-dialog";
 
 export default function TalentoHumanoPage() {
     const { toast } = useToast();
-    const [empleados, setEmpleados] = useState(initialEmpleados);
-    const [novedades, setNovedades] = useState<NovedadNomina[]>(initialNovedades as any);
-    // Casting initialNovedades as any because mock data might lack new fields yet
-    const [liquidaciones, setLiquidaciones] = useState<LiquidacionNomina[]>(initialLiquidaciones as any);
+    const {
+        empleados,
+        novedadesNomina: novedades,
+        addEmpleado,
+        updateEmpleado,
+        addNovedadNomina,
+        payNomina,
+        cuentasBancarias
+    } = useErp();
+
+    // const [empleados, setEmpleados] = useState(initialEmpleados); // Replaced by context
+    // const [novedades, setNovedades] = useState<NovedadNomina[]>(initialNovedades as any); // Replaced by context in alias
+
+    const [liquidaciones, setLiquidaciones] = useState<LiquidacionNomina[]>([]);
 
     const [searchTerm, setSearchTerm] = useState("");
 
     const handleCreateEmployee = (newEmp: any) => {
-        setEmpleados([newEmp, ...empleados]);
+        addEmpleado(newEmp);
     };
 
     const handleCreateNovedad = (newNov: any) => {
-        setNovedades([newNov, ...novedades]);
+        addNovedadNomina(newNov);
     };
 
     // --- EMPLOYEE DETAIL ---
@@ -98,7 +108,7 @@ export default function TalentoHumanoPage() {
     };
 
     const handleEmployeeUpdate = (updated: Empleado) => {
-        setEmpleados(prev => prev.map(e => e.id === updated.id ? updated : e));
+        updateEmpleado(updated);
     };
 
     // --- FILTERS ---
@@ -132,11 +142,11 @@ export default function TalentoHumanoPage() {
 
                 const totalDevengadoExtras = empNovedades
                     .filter(n => n.efecto === 'SUMA')
-                    .reduce((acc, n) => acc + n.valorCalculado, 0);
+                    .reduce((acc, n) => acc + (n.valorCalculado || 0), 0);
 
                 const totalDeducciones = empNovedades
                     .filter(n => n.efecto === 'RESTA')
-                    .reduce((acc, n) => acc + n.valorCalculado, 0);
+                    .reduce((acc, n) => acc + (n.valorCalculado || 0), 0);
 
                 const totalDevengado = emp.salarioBase + totalDevengadoExtras;
                 const netoPagar = totalDevengado - totalDeducciones;
@@ -173,15 +183,28 @@ export default function TalentoHumanoPage() {
         setPaymentModalOpen(true);
     };
 
-    const handleConfirmPayment = () => {
+    const handleConfirmPayment = async () => {
         if (!selectedLiq || !selectedAccount) return;
 
-        setLiquidaciones(prev => prev.map(l => l.id === selectedLiq.id ? { ...l, estado: 'PAGADO' as any } : l));
+        try {
+            await payNomina(
+                selectedLiq.empleadoId,
+                selectedLiq.periodo,
+                selectedLiq.netoPagar,
+                selectedAccount,
+                new Date()
+            );
 
-        toast({ title: "Pago Realizado", description: `Se ha registrado el pago de ${formatCurrency(selectedLiq.netoPagar)} desde la cuenta seleccionada.` });
-        setPaymentModalOpen(false);
-        setSelectedLiq(null);
-        setSelectedAccount("");
+            // Update local state to reflect payment (since Liquidations are local for now)
+            setLiquidaciones(prev => prev.map(l => l.id === selectedLiq.id ? { ...l, estado: 'PAGADO' as any } : l));
+
+            toast({ title: "Pago Realizado", description: `Se ha registrado el pago de ${formatCurrency(selectedLiq.netoPagar)} desde la cuenta seleccionada.` });
+            setPaymentModalOpen(false);
+            setSelectedLiq(null);
+            setSelectedAccount("");
+        } catch (error) {
+            toast({ title: "Error", description: "No se pudo procesar el pago.", variant: "destructive" });
+        }
     };
 
     // --- DETALLE NOMINA ---
@@ -312,7 +335,7 @@ export default function TalentoHumanoPage() {
                                             </TableCell>
                                             <TableCell>{nov.cantidad} (Rate: {formatCurrency(nov.valorUnitario || 0)})</TableCell>
                                             <TableCell className={nov.efecto === 'RESTA' ? "text-red-500" : "text-green-600"}>
-                                                {nov.efecto === 'RESTA' ? '-' : '+'}{formatCurrency(nov.valorCalculado)}
+                                                {nov.efecto === 'RESTA' ? '-' : '+'}{formatCurrency(nov.valorCalculado || 0)}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -476,7 +499,7 @@ export default function TalentoHumanoPage() {
                                         <SelectValue placeholder="Seleccione cuenta..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {initialCuentas.map(acc => (
+                                        {cuentasBancarias.map(acc => (
                                             <SelectItem key={acc.id} value={acc.id}>
                                                 {acc.nombre} ({acc.banco} - {formatCurrency(acc.saldoActual)})
                                             </SelectItem>

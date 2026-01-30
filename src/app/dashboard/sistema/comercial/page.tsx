@@ -68,7 +68,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { initialClients, initialQuotes, initialFacturas, initialInventory } from "@/lib/mock-data";
+import { initialClients, initialQuotes, initialFacturas } from "@/lib/mock-data";
 import { EstadoCotizacion } from "@/types/sistema";
 import { CreateClientDialog } from "@/components/erp/create-client-dialog";
 import { CreateProjectDialog } from "@/components/erp/create-project-dialog";
@@ -81,13 +81,15 @@ import { TrabajoHistoryDialog } from "@/components/erp/trabajo-history-dialog";
 import { BillingModule } from "@/components/erp/billing-module";
 import { Factura } from "@/types/sistema";
 import { useErp } from "@/components/providers/erp-provider";
+import { CodigoTrabajo } from "@/types/sistema";
 
 export default function CommercialPage() {
     const { toast } = useToast();
     const {
         facturas, addFactura, updateFactura,
         cotizaciones, addCotizacion, updateCotizacion, deleteCotizacion,
-        clientes, addCliente, updateCliente
+        clientes, addCliente, updateCliente,
+        inventario, codigosTrabajo
     } = useErp();
 
     const [searchTerm, setSearchTerm] = useState("");
@@ -479,8 +481,8 @@ export default function CommercialPage() {
                                             </TableCell>
                                             <TableCell className="w-[120px]">
                                                 <div className="flex flex-col gap-1">
-                                                    <Progress value={getProgressValue(quote.estado)} className="h-2" />
-                                                    <span className="text-[10px] text-muted-foreground text-right">{getProgressValue(quote.estado)}%</span>
+                                                    <Progress value={quote.progreso || getProgressValue(quote.estado)} className="h-2" />
+                                                    <span className="text-[10px] text-muted-foreground text-right">{quote.progreso || getProgressValue(quote.estado)}%</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="font-mono text-sm">{formatCurrency(quote.total)}</TableCell>
@@ -552,7 +554,13 @@ export default function CommercialPage() {
                             <CardDescription>Use el formulario para generar una nueva oferta comercial.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <Cotizador clientes={clientes} inventario={initialInventory} onClose={() => { }} />
+                            <Cotizador
+                                clientes={clientes}
+                                inventario={inventario}
+                                codigosTrabajo={codigosTrabajo}
+                                onSave={handleCreateQuote}
+                                onClose={() => { }}
+                            />
                         </CardContent>
                     </Card>
                 </TabsContent>

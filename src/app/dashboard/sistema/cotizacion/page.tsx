@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Cotizador } from "./cotizador";
-import { initialClients, initialInventory, initialQuotes } from "@/lib/mock-data";
+import { useErp } from "@/components/providers/erp-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,8 +16,17 @@ import { Cotizacion } from "@/types/sistema";
 import { generateQuotePDF } from "@/utils/pdf-generator";
 
 export default function CotizacionPage() {
+    const {
+        cotizaciones: quotes,
+        addCotizacion,
+        updateCotizacion,
+        deleteCotizacion,
+        clientes,
+        inventario,
+        codigosTrabajo
+    } = useErp();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [quotes, setQuotes] = useState<Cotizacion[]>(initialQuotes);
+    // const [quotes, setQuotes] = useState<Cotizacion[]>(initialQuotes); // Removed local state
     const [selectedQuote, setSelectedQuote] = useState<Cotizacion | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -126,7 +135,7 @@ export default function CotizacionPage() {
                                             </Button>
                                             <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => {
                                                 if (confirm("¿Estás seguro de eliminar esta cotización?")) {
-                                                    setQuotes(quotes.filter(q => q.id !== quote.id));
+                                                    deleteCotizacion(quote.id);
                                                 }
                                             }}>
                                                 <Trash2 className="h-4 w-4" />
@@ -178,10 +187,15 @@ export default function CotizacionPage() {
                     </div>
                     <div className="flex-1 overflow-hidden p-6">
                         <Cotizador
-                            clientes={initialClients}
-                            inventario={initialInventory}
+                            clientes={clientes}
+                            inventario={inventario}
+                            codigosTrabajo={codigosTrabajo}
                             initialData={selectedQuote}
                             onClose={() => setIsModalOpen(false)}
+                            onSave={(q) => {
+                                if (selectedQuote) updateCotizacion(q);
+                                else addCotizacion(q);
+                            }}
                         />
                     </div>
                 </DialogContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Fragment } from "react";
+import React, { useState, useMemo, Fragment, useRef } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -68,9 +68,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { formatCurrency } from "@/lib/utils";
 import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem, EvidenciaTrabajo, Ubicacion } from "@/types/sistema";
 import { generateQuotePDF } from "@/utils/pdf-generator";
-import { initialInventory, initialCodigosTrabajo } from "@/lib/mock-data";
+import { useErp } from "@/components/providers/erp-provider";
 import { ProductSelectorDialog } from "./product-selector-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@/utils/supabase/client";
+
 
 interface HistorialEntry {
     id: string;
@@ -107,15 +109,23 @@ const getStatusColor = (estado: EstadoCotizacion): string => {
 };
 
 export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defaultTab = 'detalles' }: TrabajoHistoryDialogProps) {
+    const { inventario, codigosTrabajo } = useErp();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState(defaultTab);
     const [newNote, setNewNote] = useState("");
-    const [newProgress, setNewProgress] = useState<string>(trabajo.estado);
-    const [progressPercent, setProgressPercent] = useState<number>(50);
+    const [newProgress, setNewProgress] = useState<EstadoCotizacion>(trabajo.estado);
+    const [progressPercent, setProgressPercent] = useState<number>(trabajo.progreso || 0);
 
     // Items with visibility control
     const [items, setItems] = useState<ItemConVisibilidad[]>(
-        trabajo.items.map(item => ({ ...item, visibleEnPdf: true }))
+        trabajo.items.map(item => ({
+            ...item,
+            aiuAdminPorcentaje: item.aiuAdminPorcentaje || trabajo.aiuAdminGlobalPorcentaje || 0,
+            aiuImprevistoPorcentaje: item.aiuImprevistoPorcentaje || trabajo.aiuImprevistoGlobalPorcentaje || 0,
+            aiuUtilidadPorcentaje: item.aiuUtilidadPorcentaje || trabajo.aiuUtilidadGlobalPorcentaje || 0,
+            ivaUtilidadPorcentaje: item.ivaUtilidadPorcentaje || trabajo.ivaUtilidadGlobalPorcentaje || 19,
+            visibleEnPdf: true
+        }))
     );
 
     // Add item dialog
@@ -159,23 +169,75 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     const [evidenceNote, setEvidenceNote] = useState("");
     const [localEvidence, setLocalEvidence] = useState<EvidenciaTrabajo[]>(trabajo.evidencia || []);
     const [isLocating, setIsLocating] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
-    const handleAddEvidence = (type: 'FOTO' | 'VIDEO' | 'NOTA', content?: string) => {
+    const photoInputRef = useRef<HTMLInputElement>(null);
+    const videoInputRef = useRef<HTMLInputElement>(null);
+    const supabase = createClient();
+
+    // Job Execution Details State
+    const [direccionProyecto, setDireccionProyecto] = useState(trabajo.direccionProyecto || "");
+    const [fechaInicio, setFechaInicio] = useState(trabajo.fechaInicio ? new Date(trabajo.fechaInicio).toISOString().split('T')[0] : "");
+    const [fechaFinEstimada, setFechaFinEstimada] = useState(trabajo.fechaFinEstimada ? new Date(trabajo.fechaFinEstimada).toISOString().split('T')[0] : "");
+    const [fechaFinReal, setFechaFinReal] = useState(trabajo.fechaFinReal ? new Date(trabajo.fechaFinReal).toISOString().split('T')[0] : "");
+    const [costoReal, setCostoReal] = useState(trabajo.costoReal || 0);
+    const [responsableId, setResponsableId] = useState(trabajo.responsableId || "");
+
+    const handleAddEvidence = (type: 'FOTO' | 'VIDEO' | 'NOTA', content?: string, fileUrl?: string) => {
         const newEvidence: EvidenciaTrabajo = {
             id: `EVID-NEW-${Date.now()}`,
             fecha: new Date(),
             usuarioId: 'CURRENT-USER',
-            usuarioNombre: 'Usuario Actual', // In real app, get from auth context
+            usuarioNombre: 'Usuario Actual',
             tipo: type,
-            descripcion: type === 'NOTA' ? content : (evidenceNote || `Nueva evidencia ${type}`),
-            url: type === 'FOTO' ? 'https://images.unsplash.com/photo-1581092921461-eab32e97f693?w=800&q=80' : undefined // Simulated URL
+            descripcion: type === 'NOTA' ? content : (evidenceNote || `Evidencia ${type}: ${new Date().toLocaleTimeString()}`),
+            url: fileUrl || (type === 'NOTA' ? undefined : 'https://images.unsplash.com/photo-1581092921461-eab32e97f693?w=800&q=80')
         };
 
         const updatedEvidence = [newEvidence, ...localEvidence];
         setLocalEvidence(updatedEvidence);
         onTrabajoUpdated({ ...trabajo, evidencia: updatedEvidence });
         setEvidenceNote("");
-        toast({ title: "Evidencia Agregada", description: "Se ha registrado la evidencia correctamente." });
+        if (!fileUrl && type !== 'NOTA') {
+            toast({ title: "Modo Simulación", description: "Se agregó una imagen de ejemplo. Usa el botón de subir para archivos reales." });
+        } else {
+            toast({ title: "Evidencia Guardada", description: "La evidencia se ha registrado correctamente." });
+        }
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'FOTO' | 'VIDEO') => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const bucket = type === 'FOTO' ? 'imagenes' : 'videos';
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${trabajo.id}/${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { data, error } = await supabase.storage
+                .from(bucket)
+                .upload(filePath, file);
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from(bucket)
+                .getPublicUrl(filePath);
+
+            handleAddEvidence(type, undefined, publicUrl);
+        } catch (error: any) {
+            console.error("Error uploading file:", error);
+            toast({
+                title: "Error al subir",
+                description: error.message || "No se pudo subir el archivo.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUploading(false);
+            if (event.target) event.target.value = '';
+        }
     };
 
     const handleAddLocation = () => {
@@ -317,30 +379,51 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     };
 
     const handleUpdateProgress = () => {
+        // Log to history
         const entry: HistorialEntry = {
             id: Date.now().toString(),
             fecha: new Date(),
             tipo: 'PROGRESO',
-            descripcion: `Progreso actualizado a ${progressPercent}%`,
+            descripcion: `Progreso actualizado a ${progressPercent}% y datos de ejecución actualizados`,
             usuario: 'Usuario Actual',
-            valorAnterior: `${progressPercent - 10}%`,
-            valorNuevo: `${progressPercent}%`,
+            valorAnterior: `Estado: ${trabajo.estado}`,
+            valorNuevo: `Estado: ${progressPercent === 100 ? 'FINALIZADA' : (progressPercent > 0 ? 'EN_EJECUCION' : trabajo.estado)}`,
         };
 
         setHistorial([entry, ...historial]);
 
-        // Update trabajo estado based on progress
-        let nuevoEstado: EstadoCotizacion = trabajo.estado;
-        if (progressPercent >= 100) nuevoEstado = 'FINALIZADA';
-        else if (progressPercent >= 60) nuevoEstado = 'EN_EJECUCION';
-        else if (progressPercent >= 40) nuevoEstado = 'APROBADA';
+        // We use the status from the dropdown/manual selection OR force it if progress is 100
+        const finalEstado = progressPercent === 100 ? 'FINALIZADA' : newProgress;
 
-        const updated = {
+        const updated: Cotizacion = {
             ...trabajo,
-            estado: nuevoEstado,
-            fechaActualizacion: new Date()
+            items: items.map(({ visibleEnPdf, ...item }) => item), // Strip UI-only field
+            subtotal,
+            iva,
+            total,
+            aiuAdmin: totalAiuAdmin,
+            aiuImprevistos: totalAiuImprev,
+            aiuUtilidad: totalAiuUtil,
+            descuentoGlobal: descuento,
+            descuentoGlobalPorcentaje: globalDiscountPct,
+            impuestoGlobalPorcentaje: globalIvaPct,
+            aiuAdminGlobalPorcentaje: aiuAdminPct,
+            aiuImprevistoGlobalPorcentaje: aiuImprevPct,
+            aiuUtilidadGlobalPorcentaje: aiuUtilPct,
+            ivaUtilidadGlobalPorcentaje: ivaUtilPct,
+            estado: finalEstado,
+            progreso: progressPercent,
+            fechaActualizacion: new Date(),
+            direccionProyecto,
+            fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
+            fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
+            fechaFinReal: fechaFinReal ? new Date(fechaFinReal) : undefined,
+            costoReal,
+            responsableId,
+            evidencia: localEvidence
         };
         onTrabajoUpdated(updated);
+        toast({ title: "Cambios guardados", description: "La información del trabajo ha sido actualizada." });
     };
 
     const handleToggleItemVisibility = (itemId: string) => {
@@ -365,6 +448,10 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     const handleAddItem = (newItem: CotizacionItem) => {
         const itemWithVis: ItemConVisibilidad = {
             ...newItem,
+            aiuAdminPorcentaje: aiuAdminPct,
+            aiuImprevistoPorcentaje: aiuImprevPct,
+            aiuUtilidadPorcentaje: aiuUtilPct,
+            ivaUtilidadPorcentaje: ivaUtilPct,
             visibleEnPdf: true
         };
 
@@ -484,17 +571,38 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    <div>
+                                    <div className="space-y-1">
                                         <span className="text-xs text-muted-foreground">Descripción:</span>
-                                        <p className="text-sm">{trabajo.descripcionTrabajo}</p>
+                                        <div className="flex gap-2 items-center">
+                                            <Input
+                                                value={trabajo.descripcionTrabajo}
+                                                onChange={(e) => onTrabajoUpdated({ ...trabajo, descripcionTrabajo: e.target.value })}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <Badge variant="outline">{trabajo.tipo}</Badge>
+                                    <div className="flex gap-2 items-center mt-2">
+                                        <Select
+                                            value={trabajo.tipo}
+                                            onValueChange={(val) => onTrabajoUpdated({ ...trabajo, tipo: val as any })}
+                                        >
+                                            <SelectTrigger className="h-7 w-[110px] text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="NORMAL">Normal</SelectItem>
+                                                <SelectItem value="SIMPLIFICADA">Simplificada</SelectItem>
+                                            </SelectContent>
+                                        </Select>
 
                                         <div className="flex-1">
                                             <Select
-                                                value={trabajo.estado}
-                                                onValueChange={(val) => onTrabajoUpdated({ ...trabajo, estado: val as any, fechaActualizacion: new Date() })}
+                                                value={newProgress}
+                                                onValueChange={(val) => {
+                                                    const status = val as EstadoCotizacion;
+                                                    setNewProgress(status);
+                                                    // Optional: auto-adjust progress if needed, but better to keep them independent as requested
+                                                }}
                                             >
                                                 <SelectTrigger className="h-7 w-auto text-xs">
                                                     <SelectValue />
@@ -580,8 +688,99 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                         </Card>
                     </TabsContent>
 
-                    {/* EJECUCIÓN / EVIDENCIA TAB (NEW) */}
+                    {/* EJECUCIÓN / EVIDENCIA TAB */}
                     <TabsContent value="ejecucion" className="flex-1 overflow-auto space-y-4 mt-4">
+                        {/* Project Management Fields */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Card>
+                                <CardHeader className="py-2 px-4 border-b">
+                                    <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
+                                        <MapPin className="h-3 w-3" /> Ubicación y Datos
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 space-y-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px]">Dirección del Proyecto</Label>
+                                        <Input
+                                            value={direccionProyecto}
+                                            onChange={(e) => setDireccionProyecto(e.target.value)}
+                                            placeholder="Calle 123 #45-67..."
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px]">Responsable (ID)</Label>
+                                        <Input
+                                            value={responsableId}
+                                            onChange={(e) => setResponsableId(e.target.value)}
+                                            placeholder="ID del Empleado"
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px]">Costo Real Ejecución</Label>
+                                        <Input
+                                            type="number"
+                                            value={costoReal}
+                                            onChange={(e) => setCostoReal(Number(e.target.value))}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="py-2 px-4 border-b">
+                                    <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
+                                        <Clock className="h-3 w-3" /> Cronograma Ejecución
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 space-y-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px]">Fecha Inicio</Label>
+                                        <Input
+                                            type="date"
+                                            value={fechaInicio}
+                                            onChange={(e) => setFechaInicio(e.target.value)}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px]">Fin Estimado</Label>
+                                        <Input
+                                            type="date"
+                                            value={fechaFinEstimada}
+                                            onChange={(e) => setFechaFinEstimada(e.target.value)}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px]">Fin Real</Label>
+                                        <Input
+                                            type="date"
+                                            value={fechaFinReal}
+                                            onChange={(e) => setFechaFinReal(e.target.value)}
+                                            className="h-8 text-sm cursor-pointer border-green-200 focus:border-green-500 bg-green-50/30"
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="flex flex-col">
+                                <CardHeader className="py-2 px-4 border-b">
+                                    <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
+                                        <TrendingUp className="h-3 w-3" /> Guardar Cambios
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 flex-1 flex flex-col justify-center items-center gap-4">
+                                    <p className="text-xs text-center text-muted-foreground">Recuerda guardar los cambios despues de actualizar los datos de ejecución.</p>
+                                    <Button className="w-full" onClick={handleUpdateProgress}>
+                                        <Save className="mr-2 h-4 w-4" /> Guardar Todo
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Evidence Upload Form */}
                             <Card className="h-fit">
@@ -598,11 +797,49 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                         onChange={(e) => setEvidenceNote(e.target.value)}
                                     />
                                     <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" className="flex-1" onClick={() => handleAddEvidence('FOTO')}>
-                                            <Camera className="mr-2 h-4 w-4" /> Foto
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            className="hidden"
+                                            ref={photoInputRef}
+                                            onChange={(e) => handleFileUpload(e, 'FOTO')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept="video/*"
+                                            capture="environment"
+                                            className="hidden"
+                                            ref={videoInputRef}
+                                            onChange={(e) => handleFileUpload(e, 'VIDEO')}
+                                        />
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={() => photoInputRef.current?.click()}
+                                            disabled={isUploading}
+                                        >
+                                            <Camera className="mr-2 h-4 w-4" />
+                                            {isUploading ? "..." : "Foto"}
                                         </Button>
-                                        <Button size="sm" variant="outline" className="flex-1" onClick={() => handleAddEvidence('VIDEO', 'https://example.com/video.mp4')}>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={() => videoInputRef.current?.click()}
+                                            disabled={isUploading}
+                                        >
                                             <Share2 className="mr-2 h-4 w-4" /> Video
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={() => handleAddEvidence('NOTA', evidenceNote)}
+                                            disabled={!evidenceNote}
+                                        >
+                                            <FileText className="mr-2 h-4 w-4" /> Nota
                                         </Button>
                                     </div>
                                     <Button
@@ -614,7 +851,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                     >
                                         {isLocating ? (
                                             <>
-                                                <Navigation className="mr-2 h-4 w-4 animate-spin" /> Obteniendo ubicación...
+                                                <Navigation className="mr-2 h-4 w-4 animate-spin" /> ...
                                             </>
                                         ) : (
                                             <>
@@ -622,6 +859,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                             </>
                                         )}
                                     </Button>
+
                                 </CardContent>
                             </Card>
 
@@ -635,7 +873,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                 <CardContent>
                                     {localEvidence.filter(e => e.tipo === 'UBICACION').length > 0 ? (
                                         (() => {
-                                            const lastLoc = localEvidence.filter(e => e.tipo === 'UBICACION').sort((a, b) => b.fecha.getTime() - a.fecha.getTime())[0];
+                                            const lastLoc = localEvidence.filter(e => e.tipo === 'UBICACION').sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
                                             return (
                                                 <div className="space-y-2">
                                                     <div className="h-[150px] bg-muted rounded-md flex items-center justify-center relative overflow-hidden group">
@@ -676,7 +914,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                 <Clock className="h-4 w-4" /> Historial de Ejecución ({localEvidence.length})
                             </h3>
                             <div className="space-y-4 pl-2">
-                                {localEvidence.sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).map((ev) => (
+                                {localEvidence.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((ev) => (
                                     <div key={ev.id} className="flex gap-4 border-l-2 border-muted pl-4 relative pb-4 last:pb-0">
                                         <div className="absolute -left-[9px] top-0 bg-background border rounded-full p-1">
                                             {ev.tipo === 'FOTO' && <Camera className="h-3 w-3 text-blue-500" />}
@@ -800,8 +1038,8 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                             const rowTotal = finalUnitTotal * item.cantidad;
 
                                             return (
-                                                <>
-                                                    <TableRow key={item.id} className={!item.visibleEnPdf ? 'opacity-50 bg-muted/30' : ''}>
+                                                <React.Fragment key={item.id}>
+                                                    <TableRow className={!item.visibleEnPdf ? 'opacity-50 bg-muted/30' : ''}>
                                                         <TableCell className="min-w-[200px]">
                                                             <div className="flex flex-col gap-1">
                                                                 <div className="flex items-center gap-2">
@@ -831,11 +1069,8 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                                                 type="number"
                                                                 value={item.costoUnitario || ''}
                                                                 placeholder={formatCurrency(cost)}
-                                                                onChange={e => {
-                                                                    const val = parseFloat(e.target.value);
-                                                                    setItems(prev => prev.with(index, { ...item, costoUnitario: val }));
-                                                                }}
-                                                                className="h-7 w-20 text-xs text-right p-1"
+                                                                disabled
+                                                                className="h-7 w-20 text-xs text-right p-1 bg-muted/50 cursor-not-allowed"
                                                             />
                                                         </TableCell>
                                                         {/* P. Venta (Calc) */}
@@ -875,7 +1110,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                                             <TableCell colSpan={6}></TableCell>
                                                         </TableRow>
                                                     ))}
-                                                </>
+                                                </React.Fragment>
                                             );
                                         })}
                                     </TableBody>
@@ -888,6 +1123,8 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                             open={showAddItem}
                             onOpenChange={setShowAddItem}
                             onItemSelected={handleAddItem}
+                            inventario={inventario}
+                            codigosTrabajo={codigosTrabajo}
                         />
 
                         {/* Totals */}

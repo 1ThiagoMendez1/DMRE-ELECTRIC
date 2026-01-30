@@ -22,27 +22,28 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { initialInventory, initialCodigosTrabajo } from "@/lib/mock-data";
-import { CotizacionItem } from "@/types/sistema";
+import { CotizacionItem, InventarioItem, CodigoTrabajo } from "@/types/sistema";
 
 interface ProductSelectorDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onItemSelected: (item: CotizacionItem) => void;
+    inventario: InventarioItem[];
+    codigosTrabajo: CodigoTrabajo[];
 }
 
-export function ProductSelectorDialog({ open, onOpenChange, onItemSelected }: ProductSelectorDialogProps) {
+export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inventario, codigosTrabajo }: ProductSelectorDialogProps) {
     const [searchTerm, setSearchTerm] = useState("");
     const [activeFilter, setActiveFilter] = useState<'ALL' | 'PRODUCTO' | 'SERVICIO'>('ALL');
 
     const filteredItems = useMemo(() => {
-        const products = initialInventory.map(p => ({
+        const products = inventario.map(p => ({
             ...p,
             sourceType: 'PRODUCTO' as const,
             searchStr: `${p.descripcion} ${p.sku} ${p.categoria}`.toLowerCase()
         }));
 
-        const services = initialCodigosTrabajo.map(s => ({
+        const services = codigosTrabajo.map(s => ({
             ...s,
             sourceType: 'SERVICIO' as const,
             searchStr: `${s.nombre} ${s.codigo} ${s.descripcion}`.toLowerCase()
@@ -67,7 +68,8 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected }: Pr
 
         const newItem: CotizacionItem = {
             id: crypto.randomUUID(), // Temp ID for the quote item
-            inventarioId: item.id,
+            inventarioId: isService ? undefined : item.id,
+            codigoTrabajoId: isService ? item.id : undefined,
             tipo: isService ? 'SERVICIO' : 'PRODUCTO',
             descripcion: isService ? item.nombre : item.descripcion,
             cantidad: 1,
@@ -77,6 +79,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected }: Pr
             descuentoPorcentaje: 0,
             impuesto: 19, // Default IVA
             ocultarDetalles: false,
+            costoUnitario: isService ? item.costoTotal : item.valorUnitario,
             // If it's a service (Code), include subitems
             subItems: isService ? item.materiales : undefined
         };

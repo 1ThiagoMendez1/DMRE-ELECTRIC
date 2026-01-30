@@ -80,6 +80,7 @@ export default function LogisticaPage() {
         dotacionItems,
         entregasDotacion: entregas,
         gastosVehiculos: gastos,
+        empleados, // Fetch real employees
         addProveedor,
         addVehiculo,
         addGastoVehiculo,
@@ -326,8 +327,8 @@ export default function LogisticaPage() {
                                                             <Progress value={(item.cantidad / (item.stockMinimo * 3)) * 100} className={cn("h-2", stockStatus === 'BAJO' ? "bg-orange-200" : "")} />
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-right text-muted-foreground">{formatCurrency(precioProveedor)}</TableCell>
-                                                    <TableCell className="text-right font-medium">{formatCurrency(item.valorUnitario)}</TableCell>
+                                                    <TableCell className="text-right font-medium text-amber-600 dark:text-amber-400">{formatCurrency(precioProveedor)}</TableCell>
+                                                    <TableCell className="text-right font-bold text-primary">{formatCurrency(item.valorUnitario)}</TableCell>
                                                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                                         <EditInventoryDialog articulo={item} onItemUpdated={updateInventarioItem} />
                                                     </TableCell>
@@ -440,7 +441,7 @@ export default function LogisticaPage() {
                         </div>
                         <NewEntregaDialog
                             items={dotacionItems}
-                            empleados={initialEmpleados}
+                            empleados={empleados}
                             onSave={(ent) => {
                                 addEntregaDotacion(ent);
                                 const updatedItems = dotacionItems.map(item => {
@@ -706,7 +707,7 @@ export default function LogisticaPage() {
                                         </TableHeader>
                                         <TableBody>
                                             {vehiculos.map((veh) => {
-                                                const vehicleGastos = gastos.filter(g => g.vehiculo.placa === veh.placa);
+                                                const vehicleGastos = gastos.filter(g => g.vehiculoId === veh.id);
                                                 const totalVehicleGastos = vehicleGastos.reduce((acc, g) => acc + g.valor, 0);
 
                                                 // Document status semaphore

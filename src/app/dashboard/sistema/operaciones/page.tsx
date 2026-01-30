@@ -7,15 +7,7 @@ import {
     Package,
     ArrowUpFromLine,
     ArrowDownToLine,
-    Search,
     AlertTriangle,
-    Boxes,
-    LayoutDashboard as LayoutDashboardIcon,
-    PieChart as PieChartIcon,
-    BarChart3,
-    LineChart as LineChartIcon,
-    Activity,
-    MoreHorizontal
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -26,8 +18,6 @@ import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
 
 import { Button } from "@/components/ui/button";
-
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
     Card,
@@ -50,27 +40,28 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
 
-import { initialInventory, initialMovimientosInventario, initialRegistros, initialCodigosTrabajo } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
+import { initialMovimientosInventario } from "@/lib/mock-data";
 import { RegisterInventoryMovementDialog } from "@/components/erp/register-inventory-movement-dialog";
 import { RegistroTable } from "../registro/registro-table";
 
-import { EditInventoryDialog } from "@/components/erp/edit-inventory-dialog";
-import { CreateInventoryItemDialog } from "@/components/erp/create-inventory-item-dialog";
-import { CreateCodigoTrabajoDialog } from "@/components/erp/create-codigo-trabajo-dialog";
+import { useErp } from "@/components/providers/erp-provider";
+import { RegistroObra } from "@/types/sistema";
 import { MovementDetailDialog } from "@/components/erp/movement-detail-dialog";
 import { CodigoDetailDialog } from "@/components/erp/codigo-detail-dialog";
 
 export default function OperacionesPage() {
     const { toast } = useToast();
-    const [searchTerm, setSearchTerm] = useState("");
+    const {
+        inventario,
+        cotizaciones,
+        codigosTrabajo,
+        isLoading,
+        updateCodigoTrabajo
+    } = useErp();
 
-    // Core Data State
+    // Movements are still local state for now as they are not in ErpProvider primary state
     const [movements, setMovements] = useState(initialMovimientosInventario);
-    const [inventory, setInventory] = useState(initialInventory);
-    const [codigos, setCodigos] = useState(initialCodigosTrabajo);
 
     // Filter/Chart State
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -87,11 +78,28 @@ export default function OperacionesPage() {
     const [selectedCodigo, setSelectedCodigo] = useState<any>(null);
     const [codigoDetailOpen, setCodigoDetailOpen] = useState(false);
 
+    // Derive Registers from Quotes
+    const registros = useMemo(() => {
+        return cotizaciones
+            .filter(q => q.estado === 'EN_EJECUCION' || q.estado === 'FINALIZADA')
+            .map(q => ({
+                id: `REG-${q.id}`,
+                cotizacionId: q.id,
+                cotizacion: q,
+                fechaInicio: q.fecha,
+                estado: q.estado === 'FINALIZADA' ? 'FINALIZADO' : 'EN_PROCESO',
+                anticipos: [],
+                saldoPendiente: q.total,
+                nombreObra: q.descripcionTrabajo?.substring(0, 30) + "..." || "Obra sin nombre",
+                cliente: q.cliente?.nombre || "Cliente desconocido",
+                valorTotal: q.total
+            } as RegistroObra));
+    }, [cotizaciones]);
+
     // Alerts Effect
     useEffect(() => {
-        const lowStockCount = inventory.filter(i => i.cantidad <= i.stockMinimo).length;
-        if (lowStockCount > 0) {
-            // Use a small timeout to avoid initial render clashes or double toasts
+        const lowStockCount = inventario.filter(i => i.cantidad <= i.stockMinimo).length;
+        if (lowStockCount > 0 && !isLoading) {
             const timer = setTimeout(() => {
                 toast({
                     title: "⚠️ Alerta de Stock",
@@ -101,14 +109,11 @@ export default function OperacionesPage() {
             }, 1000);
             return () => clearTimeout(timer);
         }
-    }, [inventory, toast]);
+    }, [inventario, toast, isLoading]);
 
     const handleCreateMovement = (newMov: any) => {
         setMovements([newMov, ...movements]);
-    };
-
-    const handleItemUpdate = (updatedItem: any) => {
-        setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+        toast({ title: "Movimiento registrado", description: "Se ha actualizado la bitácora local." });
     };
 
     // Calculations
@@ -117,41 +122,41 @@ export default function OperacionesPage() {
         return movements.filter(m => isWithinInterval(m.fecha, { start: dateRange.from!, end: dateRange.to || dateRange.from! }));
     }, [movements, dateRange]);
 
-    const totalValue = inventory.reduce((acc, item) => acc + (item.cantidad * item.valorUnitario), 0);
-    const totalItems = inventory.length;
-    const lowStockItems = inventory.filter(i => i.cantidad <= i.stockMinimo).length;
+    const totalValue = inventario.reduce((acc, item) => acc + (item.cantidad * item.valorUnitario), 0);
+    const totalItems = inventario.length;
+    const lowStockItems = inventario.filter(i => i.cantidad <= i.stockMinimo).length;
     const kpiMovementsIn = filteredMovements.filter(m => m.tipo === 'ENTRADA').length;
     const kpiMovementsOut = filteredMovements.filter(m => m.tipo === 'SALIDA').length;
 
     // Chart Data Preparation
     const valueByCategory = useMemo(() => {
-        const ag = inventory.reduce((acc, item) => {
+        const ag = inventario.reduce((acc, item) => {
             acc[item.categoria] = (acc[item.categoria] || 0) + (item.cantidad * item.valorUnitario);
             return acc;
         }, {} as Record<string, number>);
         return Object.entries(ag).map(([name, value]) => ({ name, value }));
-    }, [inventory]);
+    }, [inventario]);
 
     const movementTrend = useMemo(() => {
-        // Group by day for the last 30 days or range
         const ag = filteredMovements.reduce((acc, m) => {
             const day = format(m.fecha, "dd MMM", { locale: es });
             acc[day] = (acc[day] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
-        // Sort by date would require clearer objects, here we rely on mock order or randomness
-        // Ideally fill blanks.
-        return Object.entries(ag).map(([name, count]) => ({ name, count })).slice(0, 7); // Show last 7 active days for demo
+        return Object.entries(ag).map(([name, count]) => ({ name, count })).slice(0, 7);
     }, [filteredMovements]);
 
     const lowStockDist = useMemo(() => {
-        const ag = inventory.filter(i => i.cantidad <= i.stockMinimo).reduce((acc, item) => {
+        const ag = inventario.filter(i => i.cantidad <= i.stockMinimo).reduce((acc, item) => {
             acc[item.categoria] = (acc[item.categoria] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
         return Object.entries(ag).map(([name, count]) => ({ name, count }));
-    }, [inventory]);
+    }, [inventario]);
 
+    if (isLoading) {
+        return <div className="p-8 text-center text-muted-foreground animate-pulse">Cargando Operaciones...</div>;
+    }
 
     return (
         <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -222,7 +227,7 @@ export default function OperacionesPage() {
                     </div>
 
                     {/* Quick Filters - Low Stock Alert Box */}
-                    {inventory.some(i => i.cantidad <= i.stockMinimo) && (
+                    {lowStockItems > 0 && (
                         <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 p-4 rounded-lg flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -231,9 +236,6 @@ export default function OperacionesPage() {
                                     <p className="text-sm text-orange-700 dark:text-orange-400">Hay items que requieren reabastecimiento urgente.</p>
                                 </div>
                             </div>
-                            <Button variant="outline" className="border-orange-200 hover:bg-orange-100 hover:text-orange-800 dark:border-orange-800 dark:hover:bg-orange-900" onClick={() => document.getElementById("tab-catalogo")?.click()}>
-                                Ver Inventario
-                            </Button>
                         </div>
                     )}
 
@@ -257,7 +259,7 @@ export default function OperacionesPage() {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Bitácora de Movimientos</CardTitle>
-                                <RegisterInventoryMovementDialog articulos={initialInventory} onMovementCreated={handleCreateMovement} />
+                                <RegisterInventoryMovementDialog articulos={inventario} onMovementCreated={handleCreateMovement} />
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -307,13 +309,10 @@ export default function OperacionesPage() {
 
                 {/* --- REGISTRO OBRAS TAB --- */}
                 <TabsContent value="registro" className="space-y-4">
-                    <RegistroTable data={initialRegistros} />
+                    <RegistroTable data={registros} />
                 </TabsContent>
-
-
             </Tabs>
 
-            {/* Dialogs outside Tabs to prevent nesting issues */}
             <MovementDetailDialog
                 open={movementDetailOpen}
                 onOpenChange={setMovementDetailOpen}
@@ -324,7 +323,7 @@ export default function OperacionesPage() {
                 open={codigoDetailOpen}
                 onOpenChange={setCodigoDetailOpen}
                 codigo={selectedCodigo}
-                onUpdate={(updated) => setCodigos(codigos.map(c => c.id === updated.id ? updated : c))}
+                onUpdate={(updated) => updateCodigoTrabajo(updated)}
             />
         </div>
     );

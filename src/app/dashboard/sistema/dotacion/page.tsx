@@ -10,13 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { initialEntregasDotacion, initialDotacionItems } from "@/lib/mock-data";
+import { useErp } from "@/components/providers/erp-provider";
 
 export default function DotacionPage() {
     const { toast } = useToast();
+    const { dotacionItems: inventory, entregasDotacion: entregas } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
-    const [entregas, setEntregas] = useState(initialEntregasDotacion);
-    const [inventory, setInventory] = useState(initialDotacionItems);
 
     return (
         <div className="flex flex-col space-y-6">

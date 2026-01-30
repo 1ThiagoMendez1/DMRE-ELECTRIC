@@ -43,30 +43,39 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { initialProveedores, initialCuentasPorPagar } from "@/lib/mock-data";
+import { useErp } from "@/components/providers/erp-provider";
 import { formatCurrency } from "@/lib/utils";
 import { CreateSupplierDialog } from "@/components/erp/create-supplier-dialog";
 import { SupplierProfileDialog } from "@/components/erp/supplier-profile-dialog";
 
 export default function SuministroPage() {
-    const [proveedores, setProveedores] = useState(initialProveedores);
-    const [cuentasPorPagar, setCuentasPorPagar] = useState(initialCuentasPorPagar);
+    const {
+        proveedores,
+        cuentasPorPagar,
+        addProveedor,
+        // updateCuentaPorPagar, // Use pay action instead
+        payCuentaPorPagar,
+        cuentasBancarias
+    } = useErp();
 
     const handleCreateSupplier = (newProv: any) => {
-        setProveedores([newProv, ...proveedores]);
+        addProveedor(newProv);
     };
 
     const handleRegisterPayment = (id: string) => {
-        setCuentasPorPagar(prev => prev.map(cxp => {
-            if (cxp.id === id) {
-                return {
-                    ...cxp,
-                    valorPagado: cxp.valorTotal,
-                    saldoPendiente: 0
-                };
+        const cxp = cuentasPorPagar.find(c => c.id === id);
+        if (cxp) {
+            // Auto-select first bank account with balance or just first one
+            const bank = cuentasBancarias.find(b => b.saldoActual >= cxp.saldoPendiente) || cuentasBancarias[0];
+
+            if (bank) {
+                payCuentaPorPagar(id, bank.id, cxp.saldoPendiente, new Date());
+            } else {
+                console.error("No bank account available for payment");
+                // Fallback to update if no bank (to at least clear flag) - optional
+                // updateCuentaPorPagar({ ...cxp, valorPagado: cxp.valorTotal, saldoPendiente: 0 });
             }
-            return cxp;
-        }));
+        }
     };
 
     // --- DASHBOARD STATE ---
@@ -172,7 +181,7 @@ export default function SuministroPage() {
                                 <Truck className="h-4 w-4 text-primary" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{initialProveedores.length}</div>
+                                <div className="text-2xl font-bold">{proveedores.length}</div>
                                 <p className="text-xs text-muted-foreground">Directorio registrado</p>
                             </CardContent>
                         </Card>

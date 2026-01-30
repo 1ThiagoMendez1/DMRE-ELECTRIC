@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Cliente, InventarioItem, CotizacionItem, Cotizacion } from "@/types/sistema";
+import { useState, useMemo, useEffect, Fragment } from "react";
+import { Cliente, InventarioItem, CotizacionItem, Cotizacion, CodigoTrabajo } from "@/types/sistema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,22 +15,25 @@ import {
 } from "@/components/ui/table";
 import { Trash2, User, Search, Plus, Save, FileDown, X, Package, Wrench, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/utils";
 import { ProductSelectorDialog } from "@/components/erp/product-selector-dialog";
 import { Checkbox as CheckboxUI } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CotizadorProps {
     clientes: Cliente[];
     inventario: InventarioItem[];
+    codigosTrabajo: CodigoTrabajo[];
     initialData?: Cotizacion | null;
     onClose: () => void;
+    onSave?: (quote: Cotizacion) => void;
 }
 
-export function Cotizador({ clientes, inventario, initialData, onClose }: CotizadorProps) {
+export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, onClose, onSave }: CotizadorProps) {
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
     const [items, setItems] = useState<CotizacionItem[]>([]);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -38,19 +41,71 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
     const [searchTerm, setSearchTerm] = useState("");
     const [showProductsInPdf, setShowProductsInPdf] = useState(true);
     const [fechaCotizacion, setFechaCotizacion] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [descripcionTrabajo, setDescripcionTrabajo] = useState("");
+    const [tipoOferta, setTipoOferta] = useState<Cotizacion['tipo']>('NORMAL');
 
-    // Global Settings State
+    // Global AIU & Tax State
     const [globalDiscountPct, setGlobalDiscountPct] = useState(0);
     const [globalIvaPct, setGlobalIvaPct] = useState(19);
+    const [aiuAdminPct, setAiuAdminPct] = useState(0);
+    const [aiuImprevistoPct, setAiuImprevistoPct] = useState(0);
+    const [aiuUtilidadPct, setAiuUtilidadPct] = useState(0);
+    const [ivaUtilidadPct, setIvaUtilidadPct] = useState(19);
+
+    const handleInternalSave = () => {
+        if (!selectedCliente || !onSave) return;
+
+        const quote: Cotizacion = {
+            id: initialData?.id || `COT-${Math.floor(Math.random() * 10000)}`,
+            numero: initialData?.numero || `COT-${Math.floor(Math.random() * 10000)}`,
+            tipo: tipoOferta,
+            fecha: new Date(fechaCotizacion),
+            cliente: selectedCliente,
+            clienteId: selectedCliente.id,
+            descripcionTrabajo: descripcionTrabajo,
+            items: items,
+            subtotal: subtotal,
+            iva: iva,
+            descuentoGlobal: descuento,
+            descuentoGlobalPorcentaje: globalDiscountPct,
+            impuestoGlobalPorcentaje: globalIvaPct,
+            aiuAdminGlobalPorcentaje: aiuAdminPct,
+            aiuImprevistoGlobalPorcentaje: aiuImprevistoPct,
+            aiuUtilidadGlobalPorcentaje: aiuUtilidadPct,
+            ivaUtilidadGlobalPorcentaje: ivaUtilidadPct,
+            aiuAdmin: aiuAdminVal,
+            aiuImprevistos: aiuImprevistoVal,
+            aiuUtilidad: aiuUtilidadVal,
+            total: total,
+            estado: initialData?.estado || 'BORRADOR'
+        };
+
+        onSave(quote);
+        onClose();
+    };
+
+    // Removal of old global state as we moved it up
 
     // Cargar datos iniciales si existen (Modo Edición/Visualización)
     useEffect(() => {
         if (initialData) {
             setSelectedCliente(initialData.cliente);
-            setItems(initialData.items);
+            setItems(initialData.items.map(item => ({
+                ...item,
+                aiuAdminPorcentaje: item.aiuAdminPorcentaje || initialData.aiuAdminGlobalPorcentaje || 0,
+                aiuImprevistoPorcentaje: item.aiuImprevistoPorcentaje || initialData.aiuImprevistoGlobalPorcentaje || 0,
+                aiuUtilidadPorcentaje: item.aiuUtilidadPorcentaje || initialData.aiuUtilidadGlobalPorcentaje || 0,
+                ivaUtilidadPorcentaje: item.ivaUtilidadPorcentaje || initialData.ivaUtilidadGlobalPorcentaje || 19,
+            })));
             setFechaCotizacion(new Date(initialData.fecha).toISOString().split('T')[0]);
-            // If we stored global discount/tax in data, we would load it here. 
-            // Assuming default for now or inferring from totals if possible, but simplest is reset or default.
+            setDescripcionTrabajo(initialData.descripcionTrabajo || "");
+            setTipoOferta(initialData.tipo || 'NORMAL');
+            setGlobalDiscountPct(initialData.descuentoGlobalPorcentaje || 0);
+            setGlobalIvaPct(initialData.impuestoGlobalPorcentaje || 19);
+            setAiuAdminPct(initialData.aiuAdminGlobalPorcentaje || 0);
+            setAiuImprevistoPct(initialData.aiuImprevistoGlobalPorcentaje || 0);
+            setAiuUtilidadPct(initialData.aiuUtilidadGlobalPorcentaje || 0);
+            setIvaUtilidadPct(initialData.ivaUtilidadGlobalPorcentaje || 19);
         }
     }, [initialData]);
 
@@ -64,24 +119,28 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
     };
 
     // Totales
-    const { subtotal, descuento, iva, total } = useMemo(() => {
-        // 1. Sum up item totals (qty * price)
+    const { subtotal, descuento, aiuAdminVal, aiuImprevistoVal, aiuUtilidadVal, iva, total } = useMemo(() => {
         const sub = items.reduce((acc, item) => acc + (item.cantidad * item.valorUnitario), 0);
-
-        // 2. Apply Global Discount
         const discountVal = sub * (globalDiscountPct / 100);
         const subAfterDiscount = sub - discountVal;
 
-        // 3. Apply Global IVA
-        const totalIva = subAfterDiscount * (globalIvaPct / 100);
+        const aiuAdmin = subAfterDiscount * (aiuAdminPct / 100);
+        const aiuImprevisto = subAfterDiscount * (aiuImprevistoPct / 100);
+        const aiuUtilidad = subAfterDiscount * (aiuUtilidadPct / 100);
+
+        const taxableBase = subAfterDiscount + (aiuUtilidad); // Usually IVA is on Utility
+        const totalIva = taxableBase * (globalIvaPct / 100);
 
         return {
             subtotal: sub,
             descuento: discountVal,
+            aiuAdminVal: aiuAdmin,
+            aiuImprevistoVal: aiuImprevisto,
+            aiuUtilidadVal: aiuUtilidad,
             iva: totalIva,
-            total: subAfterDiscount + totalIva
+            total: subAfterDiscount + aiuAdmin + aiuImprevisto + aiuUtilidad + totalIva
         };
-    }, [items, globalDiscountPct, globalIvaPct]);
+    }, [items, globalDiscountPct, globalIvaPct, aiuAdminPct, aiuImprevistoPct, aiuUtilidadPct]);
 
     // Handlers
     const handleSelectClient = (cliente: Cliente) => {
@@ -90,7 +149,14 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
     };
 
     const handleAddItem = (newItem: CotizacionItem) => {
-        setItems([...items, newItem]);
+        const itemWithAiu: CotizacionItem = {
+            ...newItem,
+            aiuAdminPorcentaje: aiuAdminPct,
+            aiuImprevistoPorcentaje: aiuImprevistoPct,
+            aiuUtilidadPorcentaje: aiuUtilidadPct,
+            ivaUtilidadPorcentaje: ivaUtilidadPct,
+        };
+        setItems([...items, itemWithAiu]);
         setIsInventoryModalOpen(false);
     };
 
@@ -138,6 +204,28 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                     className="h-8 text-sm"
                                 />
                             </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="tipo" className="text-xs">Tipo de Oferta</Label>
+                                <Select value={tipoOferta} onValueChange={(v: any) => setTipoOferta(v)}>
+                                    <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue placeholder="Tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="NORMAL">Normal</SelectItem>
+                                        <SelectItem value="SIMPLIFICADA">Simplificada</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                                <Label htmlFor="descripcion" className="text-xs">Descripción del Trabajo</Label>
+                                <Input
+                                    id="descripcion"
+                                    value={descripcionTrabajo}
+                                    onChange={(e) => setDescripcionTrabajo(e.target.value)}
+                                    placeholder="Ej: Instalación eléctrica trifásica..."
+                                    className="h-8 text-sm"
+                                />
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -176,8 +264,9 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                     <TableRow>
                                         <TableHead>Descripción</TableHead>
                                         <TableHead className="w-[80px]">Cant.</TableHead>
-                                        <TableHead className="text-right w-[120px]">Precio Unit.</TableHead>
-                                        <TableHead className="text-right w-[120px]">Total</TableHead>
+                                        <TableHead className="text-right w-[100px]">Precio Prov.</TableHead>
+                                        <TableHead className="text-right w-[100px]">Precio Venta</TableHead>
+                                        <TableHead className="text-right w-[100px]">Total</TableHead>
                                         <TableHead className="w-[40px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -192,8 +281,8 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                         const finalTotal = item.cantidad * item.valorUnitario;
 
                                         return (
-                                            <>
-                                                <TableRow key={item.id}>
+                                            <Fragment key={item.id}>
+                                                <TableRow>
                                                     <TableCell className="text-xs">
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
@@ -224,12 +313,33 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                                             type="number"
                                                             value={item.cantidad}
                                                             onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
-                                                            className="h-7 w-16 text-xs"
+                                                            className="h-7 w-14 text-xs"
                                                             min={1}
                                                         />
                                                     </TableCell>
-                                                    <TableCell className="text-right text-xs font-medium">
-                                                        {formatCurrency(item.valorUnitario)}
+                                                    <TableCell>
+                                                        <Input
+                                                            type="number"
+                                                            value={item.costoUnitario}
+                                                            onChange={(e) => {
+                                                                const updated = [...items];
+                                                                updated[index].costoUnitario = parseFloat(e.target.value) || 0;
+                                                                setItems(updated);
+                                                            }}
+                                                            className="h-7 w-20 text-xs text-right"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Input
+                                                            type="number"
+                                                            value={item.valorUnitario}
+                                                            onChange={(e) => {
+                                                                const updated = [...items];
+                                                                updated[index].valorUnitario = parseFloat(e.target.value) || 0;
+                                                                setItems(updated);
+                                                            }}
+                                                            className="h-7 w-20 text-xs text-right"
+                                                        />
                                                     </TableCell>
                                                     <TableCell className="text-right text-xs font-bold">
                                                         {formatCurrency(finalTotal)}
@@ -257,7 +367,7 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                                         </TableRow>
                                                     ))
                                                 )}
-                                            </>
+                                            </Fragment>
                                         );
                                     })}
                                 </TableBody>
@@ -279,20 +389,6 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                     <span>{formatCurrency(subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-muted-foreground">Descuento</span>
-                                    <div className="flex items-center gap-1">
-                                        <Input
-                                            type="number"
-                                            className="h-6 w-12 text-right text-xs p-1"
-                                            value={globalDiscountPct}
-                                            onChange={e => setGlobalDiscountPct(Number(e.target.value))}
-                                            placeholder="0"
-                                        />
-                                        <span className="text-xs">%</span>
-                                        <span className="text-red-500 ml-2">-{formatCurrency(descuento)}</span>
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
                                     <span className="text-muted-foreground">IVA</span>
                                     <div className="flex items-center gap-1">
                                         <Input
@@ -306,6 +402,31 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                                         <span className="ml-2">{formatCurrency(iva)}</span>
                                     </div>
                                 </div>
+
+                                <Separator className="my-2" />
+
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase">Desglose AIU</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px]">Admin %</Label>
+                                            <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct} onChange={e => setAiuAdminPct(Number(e.target.value))} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px]">Impr. %</Label>
+                                            <Input type="number" className="h-6 text-[10px] p-1" value={aiuImprevistoPct} onChange={e => setAiuImprevistoPct(Number(e.target.value))} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px]">Util. %</Label>
+                                            <Input type="number" className="h-6 text-[10px] p-1" value={aiuUtilidadPct} onChange={e => setAiuUtilidadPct(Number(e.target.value))} />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                                        <span>Total Amortización:</span>
+                                        <span className="font-mono">{formatCurrency(aiuAdminVal + aiuImprevistoVal + aiuUtilidadVal)}</span>
+                                    </div>
+                                </div>
+
                                 <Separator className="my-2" />
                                 <div className="flex justify-between font-bold text-base">
                                     <span>Total</span>
@@ -329,7 +450,7 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                             </div>
 
                             <div className="grid gap-2 pt-2">
-                                <Button className="w-full" size="sm" disabled={items.length === 0 || !selectedCliente} onClick={onClose}>
+                                <Button className="w-full" size="sm" disabled={items.length === 0 || !selectedCliente} onClick={handleInternalSave}>
                                     <Save className="mr-2 h-3 w-3" /> {initialData ? "Actualizar" : "Guardar"}
                                 </Button>
                                 <Button variant="outline" className="w-full" size="sm" disabled={items.length === 0} onClick={handleExportPDF}>
@@ -350,6 +471,9 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                 <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
                         <DialogTitle>Seleccionar Cliente</DialogTitle>
+                        <DialogDescription>
+                            Busque y seleccione un cliente para asociar a la cotización.
+                        </DialogDescription>
                     </DialogHeader>
                     {/* ... Client Search Content ... */}
                     <div className="space-y-4">
@@ -380,6 +504,8 @@ export function Cotizador({ clientes, inventario, initialData, onClose }: Cotiza
                 open={isInventoryModalOpen}
                 onOpenChange={setIsInventoryModalOpen}
                 onItemSelected={handleAddItem}
+                inventario={inventario}
+                codigosTrabajo={codigosTrabajo}
             />
         </div>
     );

@@ -25,6 +25,7 @@ import {
 
 import { formatDateES } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { useErp } from "@/components/providers/erp-provider";
 import { InventoryFormDialog } from "@/components/erp/inventory-form-dialog";
 import { RegisterInventoryMovementDialog } from "@/components/erp/register-inventory-movement-dialog";
 import { Cotizacion } from "@/types/sistema";
@@ -34,8 +35,9 @@ interface InventoryTableProps {
     cotizaciones?: Cotizacion[];
 }
 
-export function InventoryTable({ data: initialData, cotizaciones = [] }: InventoryTableProps) {
-    const [data, setData] = useState<InventarioItem[]>(initialData);
+export function InventoryTable({ data: initialData }: InventoryTableProps) {
+    const { addInventarioItem, updateInventarioItem, deleteInventarioItem, cotizaciones } = useErp();
+    const data = initialData; // Now it comes from props (which come from context)
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -82,19 +84,17 @@ export function InventoryTable({ data: initialData, cotizaciones = [] }: Invento
     };
 
     const handleRegisterMovement = (mov: any) => {
-        // Logic to update inventory based on movement
-        const itemIndex = data.findIndex(i => i.id === mov.articuloId);
-        if (itemIndex > -1) {
-            const updatedItems = [...data];
-            const item = { ...updatedItems[itemIndex] };
-
+        // Find the item
+        const item = data.find(i => i.id === mov.articuloId);
+        if (item) {
+            const updatedItem = { ...item };
             if (mov.tipo === 'ENTRADA') {
-                item.cantidad += mov.cantidad;
+                updatedItem.cantidad += mov.cantidad;
             } else {
-                item.cantidad -= mov.cantidad;
+                updatedItem.cantidad -= mov.cantidad;
             }
-            updatedItems[itemIndex] = item;
-            setData(updatedItems);
+            // Update in DB via Context
+            updateInventarioItem(updatedItem);
         }
     };
 
@@ -105,22 +105,15 @@ export function InventoryTable({ data: initialData, cotizaciones = [] }: Invento
 
     const handleDelete = (id: string) => {
         if (confirm("¿Estás seguro de eliminar este item?")) {
-            setData(data.filter((item) => item.id !== id));
+            deleteInventarioItem(id);
         }
     };
 
     const handleSave = (item: InventarioItem) => {
         if (item.id && data.some(i => i.id === item.id)) {
-            // Update
-            setData(data.map(i => i.id === item.id ? item : i));
+            updateInventarioItem(item);
         } else {
-            // Create
-            const newItem = {
-                ...item,
-                id: item.id || `INV-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-                fechaCreacion: new Date()
-            } as InventarioItem;
-            setData([newItem, ...data]);
+            addInventarioItem(item);
         }
         setIsDialogOpen(false);
     };

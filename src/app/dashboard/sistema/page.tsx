@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle
 } from "@/components/ui/card";
@@ -16,42 +15,31 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
-    Users,
-    Package,
     FileText,
     DollarSign,
-    AlertCircle,
-    CheckCircle2,
     BarChart3,
-    LineChart as LineChartIcon,
-    PieChart as PieChartIcon,
-    Table as TableIcon
 } from "lucide-react";
-import {
-    initialClients,
-    initialInventory,
-    initialQuotes,
-    initialRegistros
-} from "@/lib/mock-data";
 import {
     DynamicChart,
     DashboardPanel
 } from "@/components/erp/charts";
-import { Badge } from "@/components/ui/badge";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
-import { addDays, isWithinInterval, startOfYear, endOfYear } from "date-fns";
+import { isWithinInterval, startOfYear, endOfYear } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
-
-// --- Components ---
-
-
-
+import { useErp } from "@/components/providers/erp-provider";
+import { RegistroObra } from "@/types/sistema";
 
 export default function SistemaPage() {
+    const {
+        clientes,
+        inventario,
+        cotizaciones,
+        facturas,
+        isLoading
+    } = useErp();
+
     // --- State ---
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: startOfYear(new Date()),
@@ -67,8 +55,26 @@ export default function SistemaPage() {
     const [clientVolumeType, setClientVolumeType] = useState("bar");
     const [inventoryType, setInventoryType] = useState("table");
 
+    // --- Derived Data ---
+    const registros = useMemo(() => {
+        return cotizaciones
+            .filter(q => q.estado === 'EN_EJECUCION' || q.estado === 'FINALIZADA')
+            .map(q => ({
+                id: `REG-${q.id}`,
+                cotizacionId: q.id,
+                cotizacion: q,
+                fechaInicio: q.fecha,
+                estado: q.estado === 'FINALIZADA' ? 'FINALIZADO' : 'EN_PROCESO',
+                anticipos: [],
+                saldoPendiente: q.total,
+                nombreObra: q.descripcionTrabajo?.substring(0, 30) + "..." || "Obra sin nombre",
+                cliente: q.cliente?.nombre || "Cliente desconocido",
+                valorTotal: q.total
+            } as RegistroObra));
+    }, [cotizaciones]);
+
     // --- Filtering ---
-    const filterData = (date: Date | string, clientId?: string, productDesc?: string) => {
+    const filterByDateAndClient = (date: Date | string, clientId?: string) => {
         const d = new Date(date);
 
         // Date Logic
@@ -87,17 +93,13 @@ export default function SistemaPage() {
             clientMatch = clientId === selectedClient;
         }
 
-        // Product Logic (Indirect)
-        // This is tricky as Quotes/Registros have multiple items.
-        // We will filter if ANY item matches the product.
-
         return dateMatch && clientMatch;
     };
 
     // Memos
     const filteredQuotes = useMemo(() => {
-        return initialQuotes.filter(q => {
-            const matchesFilter = filterData(q.fecha, q.cliente.id);
+        return cotizaciones.filter(q => {
+            const matchesFilter = filterByDateAndClient(q.fecha, q.clienteId);
             if (!matchesFilter) return false;
 
             // Product Filter
@@ -106,34 +108,33 @@ export default function SistemaPage() {
             }
             return true;
         });
-    }, [dateRange, selectedClient, selectedProduct]);
+    }, [dateRange, selectedClient, selectedProduct, cotizaciones]);
 
     const filteredRegistros = useMemo(() => {
-        return initialRegistros.filter(r => {
-            // Registros are linked to Quotes, so same logic
+        return registros.filter(r => {
             const q = r.cotizacion;
-            const matchesFilter = filterData(q.fecha, q.cliente.id);
+            const matchesFilter = filterByDateAndClient(q.fecha, q.clienteId);
             if (!matchesFilter) return false;
 
             if (selectedProduct !== 'all') {
-                return q.items.some(i => i.descripcion.includes(selectedProduct));
+                return q.items.some(i => i.descripcion.toLowerCase().includes(selectedProduct.toLowerCase()));
             }
             return true;
         });
-    }, [dateRange, selectedClient, selectedProduct, filteredQuotes]);
+    }, [dateRange, selectedClient, selectedProduct, registros]);
 
     // --- Derived Data for Charts ---
 
-    // 1. Ingresos
+    // 1. Ingresos (based on invoices / facturas)
     const revenueData = useMemo(() => {
         const agg: Record<string, number> = {};
-        filteredRegistros.forEach(r => {
-            if (r.estado !== 'FINALIZADO') return;
-            const dateStr = new Date(r.cotizacion.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
-            agg[dateStr] = (agg[dateStr] || 0) + r.cotizacion.total;
+        facturas.forEach(f => {
+            // Using emission date for trend
+            const dateStr = new Date(f.fechaEmision).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
+            agg[dateStr] = (agg[dateStr] || 0) + f.valorFacturado;
         });
         return Object.keys(agg).map(key => ({ name: key, total: agg[key] })).sort((a, b) => a.name.localeCompare(b.name));
-    }, [filteredRegistros]);
+    }, [facturas]);
 
     // 2. Status
     const quoteStatusData = useMemo(() => {
@@ -149,7 +150,8 @@ export default function SistemaPage() {
         const productCount: Record<string, number> = {};
         filteredQuotes.forEach(q => {
             q.items.forEach(item => {
-                productCount[item.descripcion.substring(0, 15)] = (productCount[item.descripcion.substring(0, 15)] || 0) + item.cantidad;
+                const shortLabel = item.descripcion.substring(0, 15);
+                productCount[shortLabel] = (productCount[shortLabel] || 0) + item.cantidad;
             });
         });
         return Object.entries(productCount)
@@ -162,7 +164,8 @@ export default function SistemaPage() {
     const clientVolumeData = useMemo(() => {
         const clientAgg: Record<string, number> = {};
         filteredQuotes.forEach(q => {
-            clientAgg[q.cliente.nombre] = (clientAgg[q.cliente.nombre] || 0) + q.total;
+            const name = q.cliente?.nombre || "Otros";
+            clientAgg[name] = (clientAgg[name] || 0) + q.total;
         });
         return Object.entries(clientAgg)
             .map(([name, total]) => ({ name, total }))
@@ -170,9 +173,9 @@ export default function SistemaPage() {
             .slice(0, 8);
     }, [filteredQuotes]);
 
-    // 5. Inventory Overview (Filtered by product search mainly)
+    // 5. Inventory Overview
     const inventoryData = useMemo(() => {
-        let items = initialInventory;
+        let items = inventario;
         if (selectedProduct !== 'all') {
             items = items.filter(i => i.descripcion.toLowerCase().includes(selectedProduct.toLowerCase()));
         }
@@ -180,16 +183,18 @@ export default function SistemaPage() {
             name: i.descripcion.substring(0, 20),
             stock: i.cantidad,
             value: i.valorUnitario * i.cantidad,
-            status: i.cantidad < 10 ? 'Bajo' : 'OK'
-        })).sort((a, b) => b.value - a.value).slice(0, 50); // Limit for table
-    }, [selectedProduct]);
+            status: i.cantidad <= i.stockMinimo ? 'Bajo' : 'OK'
+        })).sort((a, b) => b.value - a.value).slice(0, 50);
+    }, [selectedProduct, inventario]);
 
 
     // KPI Values
     const totalRevenue = revenueData.reduce((acc, curr) => acc + curr.total, 0);
     const totalQuotesValue = filteredQuotes.reduce((acc, q) => acc + q.total, 0);
 
-
+    if (isLoading) {
+        return <div className="p-8 text-center text-muted-foreground animate-pulse">Cargando Dashboard...</div>;
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-10">
@@ -204,7 +209,7 @@ export default function SistemaPage() {
                         <DatePickerWithRange value={dateRange} onChange={(d) => setDateRange(d)} />
                     </div>
 
-                    <div className="flex flex-col gap-1 w-[200px]">
+                    <div className="flex flex-col gap-1 w-[240px]">
                         <span className="text-xs font-semibold text-muted-foreground uppercase">Cliente</span>
                         <Select value={selectedClient} onValueChange={setSelectedClient}>
                             <SelectTrigger>
@@ -212,15 +217,15 @@ export default function SistemaPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">Todos los Clientes</SelectItem>
-                                {initialClients.map(c => (
+                                {clientes.map(c => (
                                     <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
 
-                    <div className="flex flex-col gap-1 w-[200px]">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase">Producto (Filtro Mock)</span>
+                    <div className="flex flex-col gap-1 w-[240px]">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Filtrar por Producto</span>
                         <Select value={selectedProduct} onValueChange={setSelectedProduct}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Todos" />
@@ -245,7 +250,7 @@ export default function SistemaPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="shadow-sm border-l-4 border-l-primary bg-card">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Ingresos Filtrados</CardTitle>
+                        <CardTitle className="text-sm font-medium">Ingresos (Facturado)</CardTitle>
                         <DollarSign className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
@@ -267,7 +272,7 @@ export default function SistemaPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* 1. Ingresos */}
-                <DashboardPanel title="Tendencia de Ingresos" sub="Evolución financiera en el tiempo" typeState={[revenueType, setRevenueType]}>
+                <DashboardPanel title="Tendencia de Facturación" sub="Evolución de ventas mensuales" typeState={[revenueType, setRevenueType]}>
                     <DynamicChart type={revenueType} data={revenueData} dataKey="total" xAxisKey="name" color="#0088FE" />
                 </DashboardPanel>
 
@@ -289,7 +294,7 @@ export default function SistemaPage() {
             </div>
 
             {/* Full Width Table Panel */}
-            <DashboardPanel title="Detalle de Inventario (Filtrado)" sub="Vista detallada de stock y valorización" typeState={[inventoryType, setInventoryType]}>
+            <DashboardPanel title="Estado de Inventario" sub="Vista de valorización y alertas de stock" typeState={[inventoryType, setInventoryType]}>
                 <DynamicChart type={inventoryType} data={inventoryData} dataKey="value" xAxisKey="name" color="#8884d8" height={400} />
             </DashboardPanel>
 

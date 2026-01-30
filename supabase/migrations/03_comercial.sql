@@ -202,3 +202,98 @@ CREATE POLICY "Facturas access for authenticated"
     TO authenticated
     USING (true)
     WITH CHECK (true);
+
+
+
+    -- =============================================
+-- Atualizacion tablas cotizaciones schema update
+-- =============================================
+-- Add missing columns to 'cotizaciones' table
+ALTER TABLE cotizaciones
+ADD COLUMN IF NOT EXISTS direccion_proyecto TEXT,
+ADD COLUMN IF NOT EXISTS ubicacion JSONB,
+ADD COLUMN IF NOT EXISTS fecha_inicio TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS fecha_fin_estimada TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS fecha_fin_real TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS costo_real NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS responsable_id TEXT,
+ADD COLUMN IF NOT EXISTS evidencia JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS comentarios JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS descuento_global NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS descuento_global_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS impuesto_global_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_admin_global_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_imprevisto_global_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_utilidad_global_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS iva_utilidad_global_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_admin NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_imprevistos NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_utilidad NUMERIC DEFAULT 0;
+-- Add missing columns to 'cotizacion_items' table
+ALTER TABLE cotizacion_items
+ADD COLUMN IF NOT EXISTS descuento_valor NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS descuento_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS impuesto NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS ocultar_detalles BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS sub_items JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS costo_unitario NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_admin_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_imprevisto_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS aiu_utilidad_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS iva_utilidad_porcentaje NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS notas TEXT;
+-- Verify columns (Optional for user, just output to confirm)
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'cotizaciones';
+
+
+    -- =============================================
+-- Atualizacion tablas cotizaciones schema repair precision
+-- =============================================
+-- Add missing columns to 'cotizaciones' table
+
+
+-- DEFINITIVE FIX FOR NUMERIC OVERFLOW (V2 - Handling Generated Columns)
+-- This script broadens all numeric columns in 'cotizaciones' and 'cotizacion_items'
+-- and correctly handles the 'valor_total' generated column blocker.
+-- 1. DROP Generated columns that block type alteration
+ALTER TABLE cotizacion_items DROP COLUMN IF EXISTS valor_total;
+-- 2. Broaden 'cotizaciones' columns
+ALTER TABLE cotizaciones 
+  ALTER COLUMN subtotal TYPE NUMERIC,
+  ALTER COLUMN iva TYPE NUMERIC,
+  ALTER COLUMN total TYPE NUMERIC,
+  ALTER COLUMN descuento_global TYPE NUMERIC,
+  ALTER COLUMN descuento_global_porcentaje TYPE NUMERIC,
+  ALTER COLUMN impuesto_global_porcentaje TYPE NUMERIC,
+  ALTER COLUMN aiu_admin_global_porcentaje TYPE NUMERIC,
+  ALTER COLUMN aiu_imprevisto_global_porcentaje TYPE NUMERIC,
+  ALTER COLUMN aiu_utilidad_global_porcentaje TYPE NUMERIC,
+  ALTER COLUMN iva_utilidad_global_porcentaje TYPE NUMERIC,
+  ALTER COLUMN aiu_admin TYPE NUMERIC,
+  ALTER COLUMN aiu_imprevistos TYPE NUMERIC,
+  ALTER COLUMN aiu_utilidad TYPE NUMERIC,
+  ALTER COLUMN costo_real TYPE NUMERIC;
+-- 3. Broaden 'cotizacion_items' source columns
+ALTER TABLE cotizacion_items
+  ALTER COLUMN cantidad TYPE NUMERIC,
+  ALTER COLUMN valor_unitario TYPE NUMERIC,
+  ALTER COLUMN descuento_valor TYPE NUMERIC,
+  ALTER COLUMN descuento_porcentaje TYPE NUMERIC,
+  ALTER COLUMN impuesto TYPE NUMERIC,
+  ALTER COLUMN costo_unitario TYPE NUMERIC,
+  ALTER COLUMN aiu_admin_porcentaje TYPE NUMERIC,
+  ALTER COLUMN aiu_imprevisto_porcentaje TYPE NUMERIC,
+  ALTER COLUMN aiu_utilidad_porcentaje TYPE NUMERIC,
+  ALTER COLUMN iva_utilidad_porcentaje TYPE NUMERIC;
+-- 4. RECREATE 'valor_total' as a broader NUMERIC generated column
+ALTER TABLE cotizacion_items 
+  ADD COLUMN valor_total NUMERIC GENERATED ALWAYS AS (cantidad * valor_unitario) STORED;
+-- 5. Ensure defaults are set to 0 where they might be null
+UPDATE cotizaciones SET 
+  subtotal = COALESCE(subtotal, 0),
+  iva = COALESCE(iva, 0),
+  total = COALESCE(total, 0);
+UPDATE cotizacion_items SET
+  valor_unitario = COALESCE(valor_unitario, 0);

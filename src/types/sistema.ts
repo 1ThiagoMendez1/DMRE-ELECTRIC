@@ -45,28 +45,35 @@ export interface InventarioItem {
     item: string; // Código interno
     sku: string; // Código de barras/SKU
     descripcion: string;
-    categoria: CategoriaItem; // New
-    ubicacion: UbicacionItem; // New
+    categoria: CategoriaItem;
+    ubicacion: UbicacionItem;
     unidad: string;
     cantidad: number; // Stock Actual
-    stockMinimo: number; // New
+    stockMinimo: number;
     valorUnitario: number; // Precio Base / Costo
     fechaCreacion: Date;
     tipo: 'SIMPLE' | 'COMPUESTO';
     materiales?: Material[]; // Si es compuesto
     // Financials
-    costoMateriales: number; // New
-    margenUtilidad: number; // New
+    costoMateriales: number;
+    margenUtilidad: number;
     valorTotal: number; // Precio Venta Sugerido
     proveedorId?: string; // Link to primary supplier
     t1: number; // Lista de precios 1
     t2: number; // Lista de precios 2
     t3: number; // Lista de precios 3
+    // Extended DB fields
+    nombre?: string;
+    marca?: string;
+    modelo?: string;
+    imagenUrl?: string;
+    activo?: boolean;
 }
 
 export interface CotizacionItem {
     id: string;
-    inventarioId: string;
+    inventarioId?: string;
+    codigoTrabajoId?: string;
     tipo: 'PRODUCTO' | 'SERVICIO'; // New: Distinguish between simple products and work codes
     descripcion: string; // Snapshot of description
     cantidad: number;
@@ -86,6 +93,8 @@ export interface CotizacionItem {
     aiuImprevistoPorcentaje?: number;
     aiuUtilidadPorcentaje?: number;
     ivaUtilidadPorcentaje?: number; // IVA specific to Utility portion
+    // Extended
+    notas?: string;
 }
 
 export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'APROBADA' | 'RECHAZADA' | 'PENDIENTE' | 'NO_APROBADA' | 'EN_EJECUCION' | 'FINALIZADA';
@@ -117,9 +126,19 @@ export interface Cotizacion {
     iva: number;
     total: number;
     estado: EstadoCotizacion;
-    fechaActualizacion?: Date; // Track last update
-    evidencia?: EvidenciaTrabajo[]; // Nuevo campo para ejecución
-    comentarios?: ComentarioCotizacion[]; // New: Negotiation thread
+    fechaActualizacion?: Date;
+    evidencia?: EvidenciaTrabajo[];
+    comentarios?: ComentarioCotizacion[];
+
+    // Job Execution Fields
+    direccionProyecto?: string;
+    ubicacion?: Ubicacion;
+    fechaInicio?: Date;
+    fechaFinEstimada?: Date;
+    fechaFinReal?: Date;
+    costoReal?: number;
+    responsableId?: string;
+    progreso?: number; // New: Percentage 0-100
 }
 
 export interface Ubicacion {
@@ -166,6 +185,14 @@ export interface Factura {
     retencionIva: number;
     saldoPendiente: number;
     estado: EstadoFactura;
+    // Extended DB fields
+    numero?: string;
+    trabajoId?: string;
+    clienteId?: string;
+    subtotal?: number;
+    iva?: number;
+    valorPagado?: number;
+    observaciones?: string;
 }
 
 // 2. FINANCIERA
@@ -178,6 +205,11 @@ export interface CuentaBancaria {
     saldoActual: number;
     numeroCuenta?: string;
     banco?: string;
+    // Extended DB fields (aliases)
+    saldo?: number; // alias for saldoActual
+    moneda?: string;
+    estado?: string;
+    titular?: string;
 }
 
 export type TipoMovimiento = 'INGRESO' | 'EGRESO';
@@ -188,12 +220,19 @@ export interface MovimientoFinanciero {
     fecha: Date;
     tipo: TipoMovimiento;
     cuentaId: string;
-    cuenta: CuentaBancaria; // Relación
+    cuenta?: CuentaBancaria; // Relación
     categoria: CategoriaMovimiento;
-    tercero: string; // Beneficiario o Pagador
-    concepto: string;
-    valor: number;
+    tercero?: string; // Beneficiario o Pagador
+    concepto?: string; // or descripcion
+    valor?: number; // or monto
     ofertaId?: string; // Trazabilidad opcional
+    // Extended DB fields
+    descripcion?: string;
+    monto?: number;
+    referencia?: string;
+    comprobanteUrl?: string;
+    usuarioId?: string;
+    conciliado?: boolean;
 }
 
 export interface ObligacionFinanciera {
@@ -241,6 +280,15 @@ export interface Proveedor {
     categoria: CategoriaProveedor;
     datosBancarios: string;
     correo: string;
+    // Extended DB fields
+    codigo?: string;
+    direccion?: string;
+    ciudad?: string;
+    telefono?: string;
+    contacto?: string;
+    calificacion?: number;
+    activo?: boolean;
+    notas?: string;
 }
 
 export interface CuentaPorPagar {
@@ -256,6 +304,10 @@ export interface CuentaPorPagar {
     pagos?: { id: string; fecha: Date; valor: number; nota?: string; }[];
     ofertaId?: string; // Costeo
     ordenCompraId?: string; // Link to PO
+    // Extended DB fields
+    fechaVencimiento?: Date;
+    estado?: string;
+    observaciones?: string;
 }
 
 export type EstadoOrdenCompra = 'PENDIENTE' | 'ENVIADA' | 'PARCIAL' | 'RECIBIDA' | 'CANCELADA';
@@ -296,12 +348,18 @@ export interface Vehiculo {
     vencimientoSoat: Date;
     vencimientoTecnomecanica: Date;
     vencimientoSeguro: Date;
-    // Campos adicionales
     estado: EstadoVehiculo;
     kilometrajeActual: number;
     ano: number;
     color: string;
     fechaRegistro?: Date;
+    // Extended DB fields
+    tipo?: string;
+    marca?: string;
+    modelo?: string;
+    conductorId?: string;
+    vencimientoLicenciaTransito?: Date;
+    observaciones?: string;
 }
 
 export type TipoGastoVehiculo = 'COMBUSTIBLE' | 'PEAJE' | 'MANTENIMIENTO' | 'PARQUEADERO' | 'OTROS';
@@ -315,11 +373,15 @@ export interface GastoVehiculo {
     kilometraje: number;
     valor: number;
     proveedor: string;
-    // Campos adicionales
     galones?: number;
     precioPorGalon?: number;
     soporteUrl?: string;
     observacion?: string;
+    // Extended DB fields
+    descripcion?: string;
+    numeroFactura?: string;
+    responsableId?: string;
+    observaciones?: string;
 }
 
 // 6. TALENTO HUMANO
@@ -333,6 +395,30 @@ export interface Empleado {
     salarioBase: number;
     fechaIngreso: Date;
     estado: EstadoEmpleado;
+    // Extended DB fields
+    codigo?: string;
+    tipoDocumento?: string;
+    fechaNacimiento?: Date;
+    genero?: string;
+    direccion?: string;
+    ciudad?: string;
+    telefono?: string;
+    correo?: string;
+    contactoEmergencia?: string;
+    telefonoEmergencia?: string;
+    area?: string;
+    tipoContrato?: string;
+    fechaRetiro?: Date;
+    auxilioTransporte?: boolean;
+    eps?: string;
+    arl?: string;
+    fondoPensiones?: string;
+    cajaCompensacion?: string;
+    banco?: string;
+    tipoCuentaBanco?: string;
+    numeroCuentaBanco?: string;
+    fotoUrl?: string;
+    observaciones?: string;
 }
 
 export type TipoNovedad = 'HORA_EXTRA_DIURNA' | 'HORA_EXTRA_NOCTURNA' | 'FESTIVA' | 'PRESTAMO' | 'AUSENCIA';
@@ -340,12 +426,17 @@ export type TipoNovedad = 'HORA_EXTRA_DIURNA' | 'HORA_EXTRA_NOCTURNA' | 'FESTIVA
 export interface NovedadNomina {
     id: string;
     empleadoId: string;
+    empleado?: Empleado; // Optional because in some views we might just have the ID
     fecha: Date;
     tipo: TipoNovedad;
     cantidad: number; // Horas o Valor
     valorUnitario: number; // Valor por hora/día
-    valorCalculado: number;
-    efecto: 'SUMA' | 'RESTA';
+    valorCalculado?: number;
+    efecto?: 'SUMA' | 'RESTA';
+    // Extended DB fields
+    valorTotal?: number;
+    estado?: string;
+    observacion?: string;
 }
 
 export interface LiquidacionNomina {
@@ -395,8 +486,15 @@ export interface DotacionItem {
     categoria: 'UNIFORME' | 'EPP' | 'HERRAMIENTA';
     genero: 'HOMBRE' | 'MUJER' | 'UNISEX';
     variantes: DotacionVariant[];
-    stockMinimo?: number;           // Para semáforo de stock
-    fechaVencimiento?: Date;        // Para alertas de EPP
+    stockMinimo?: number;
+    fechaVencimiento?: Date;
+    // Extended DB fields
+    codigo?: string;
+    activo?: boolean;
+    // Legacy fields for frontend compatibility
+    talla?: string;
+    color?: string;
+    cantidadDisponible?: number;
 }
 
 export interface EntregaDotacionItem {
@@ -433,7 +531,15 @@ export interface CreditoEmpleado {
     cuotaMensual: number;
     saldoPendiente: number;
     fechaOtorgado: Date;
-    estado: 'ACTIVO' | 'PAGADO';
+    estado: 'ACTIVO' | 'PAGADO' | 'PENDIENTE';
+    // Extended DB fields
+    tipo?: string;
+    concepto?: string;
+    montoSolicitado?: number;
+    cuotasPagadas?: number;
+    fechaSolicitud?: Date;
+    fechaInicioDescuento?: Date;
+    observaciones?: string;
 }
 
 // 9. AGENDA
@@ -448,6 +554,11 @@ export interface TareaAgenda {
     asignadoA?: string;
     prioridad: PrioridadTarea;
     estado: EstadoTarea;
+    // Extended DB fields
+    hora?: string;
+    creadoPor?: string;
+    etiquetas?: string[];
+    recordatorio?: boolean;
 }
 
 
