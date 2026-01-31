@@ -1,8 +1,16 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { Cotizacion, CotizacionItem, Cliente } from "@/types/sistema";
+import { Cotizacion, CotizacionItem, Cliente, HistorialCotizacion } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
+
+// ... (previous helper functions remain effectively the same, just not repeated here for brevity if replace_file_content handles partials well, but I will provide full file content or targeted replacement to be safe. Since I'm using replace_file_content with range, I'll target the end of file for new functions and the top for imports)
+
+// Actually, I need to add the functions at the end and update imports at the top.
+// I will do this in two steps or use multi_replace if provided? 
+// The tool is replace_file_content (single block) or multi_replace.
+// I'll use multi_replace to do both at once.
+
 
 function mapItemToUI(db: any): CotizacionItem {
     return {
@@ -60,7 +68,7 @@ function mapToUI(db: any, items: any[] = [], cliente?: any): Cotizacion {
         aiuUtilidad: Number(db.aiu_utilidad) || 0,
         iva: Number(db.iva) || 0,
         total: Number(db.total) || 0,
-        estado: db.estado || "BORRADOR",
+        estado: db.cotizacion_estado || db.estado || "BORRADOR",
         fechaActualizacion: db.updated_at ? new Date(db.updated_at) : undefined,
         // Job execution fields
         direccionProyecto: db.direccion_proyecto,
@@ -71,6 +79,7 @@ function mapToUI(db: any, items: any[] = [], cliente?: any): Cotizacion {
         costoReal: Number(db.costo_real) || 0,
         responsableId: db.responsable_id,
         progreso: Number(db.progreso) || 0,
+        notas: db.notas || "",
         evidencia: db.evidencia || [],
         comentarios: db.comentarios || [],
     };
@@ -83,10 +92,18 @@ function round2(num: number | undefined | null): number {
 }
 
 function mapToDB(ui: any): any {
+    // Helper to convert Date to ISO string or return undefined
+    const formatDate = (date: any) => {
+        if (!date) return null;
+        if (date instanceof Date) return date.toISOString();
+        if (typeof date === 'string') return date;
+        return null;
+    };
+
     return {
         numero: ui.numero,
         tipo: ui.tipo,
-        fecha: ui.fecha,
+        fecha: formatDate(ui.fecha),
         cliente_id: ui.clienteId,
         descripcion_trabajo: ui.descripcionTrabajo,
         subtotal: round2(ui.subtotal),
@@ -102,18 +119,20 @@ function mapToDB(ui: any): any {
         aiu_utilidad: round2(ui.aiuUtilidad),
         iva: round2(ui.iva),
         total: round2(ui.total),
-        estado: ui.estado,
+        cotizacion_estado: ui.estado,
+        estado: ui.estado, // Keep both for safety during migration
         // Job execution fields
         direccion_proyecto: ui.direccionProyecto,
         ubicacion: ui.ubicacion,
-        fecha_inicio: ui.fechaInicio,
-        fecha_fin_estimada: ui.fechaFinEstimada,
-        fecha_fin_real: ui.fechaFinReal,
+        fecha_inicio: formatDate(ui.fechaInicio),
+        fecha_fin_estimada: formatDate(ui.fechaFinEstimada),
+        fecha_fin_real: formatDate(ui.fechaFinReal),
         costo_real: round2(ui.costoReal),
         responsable_id: ui.responsableId,
         progreso: round2(ui.progreso),
-        evidencia: ui.evidencia,
-        comentarios: ui.comentarios,
+        notas: ui.notas,
+        evidencia: ui.evidencia || [],
+        comentarios: ui.comentarios || [],
     };
 }
 
@@ -232,6 +251,10 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
 
 export async function updateCotizacionAction(id: string, cotizacion: Partial<Cotizacion>): Promise<Cotizacion> {
     const supabase = await createClient();
+
+    // Fetch current state for history comparison
+    const { data: currentDb } = await supabase.from("cotizaciones").select("estado, progreso").eq("id", id).single();
+
     const dbData = mapToDB(cotizacion);
 
     const { data, error } = await supabase
@@ -242,12 +265,51 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
         .single();
 
     if (error) {
+        console.dir(error, { depth: null }); // Deep debug as planned
         console.error("Error updating cotizacion:", error);
-        throw new Error("Failed to update cotizacion");
+        throw new Error(error.message || "Failed to update cotizacion");
+    }
+
+    // Auto-log state changes
+    if (currentDb && cotizacion.estado && currentDb.estado !== cotizacion.estado) {
+        await addHistorialEntryAction({
+            cotizacionId: id,
+            fecha: new Date(),
+            usuarioId: "system", // Or fetch user if possible
+            usuarioNombre: "Sistema",
+            tipo: "ESTADO",
+            descripcion: `Estado actualizado automáticamente`,
+            valorAnterior: currentDb.estado,
+            valorNuevo: cotizacion.estado
+        });
+    }
+
+    // Auto-log progress changes
+    if (currentDb && cotizacion.progreso !== undefined && currentDb.progreso !== cotizacion.progreso) {
+        await addHistorialEntryAction({
+            cotizacionId: id,
+            fecha: new Date(),
+            usuarioId: "system",
+            usuarioNombre: "Sistema",
+            tipo: "PROGRESO",
+            descripcion: `Progreso actualizado`,
+            valorAnterior: `${currentDb.progreso || 0}%`,
+            valorNuevo: `${cotizacion.progreso}%`
+        });
     }
 
     // Update items if provided
     if (cotizacion.items !== undefined) {
+        // Log item update
+        await addHistorialEntryAction({
+            cotizacionId: id,
+            fecha: new Date(),
+            usuarioId: "system",
+            usuarioNombre: "Sistema",
+            tipo: "EDICION",
+            descripcion: `Items de la cotización actualizados`
+        });
+
         await supabase.from("cotizacion_items").delete().eq("cotizacion_id", id);
 
         if (cotizacion.items.length > 0) {
@@ -300,4 +362,50 @@ export async function deleteCotizacionAction(id: string): Promise<boolean> {
     revalidatePath("/dashboard/sistema/cotizacion");
     revalidatePath("/dashboard/sistema/comercial");
     return true;
+}
+
+export async function getHistorialAction(cotizacionId: string): Promise<HistorialCotizacion[]> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from("cotizacion_historial")
+        .select("*")
+        .eq("cotizacion_id", cotizacionId)
+        .order("fecha", { ascending: false });
+
+    if (error) {
+        console.error("Error fetching historial:", error);
+        return [];
+    }
+
+    return data.map((d: any) => ({
+        id: d.id,
+        cotizacionId: d.cotizacion_id,
+        fecha: new Date(d.fecha),
+        usuarioId: d.usuario_id,
+        usuarioNombre: d.usuario_nombre,
+        tipo: d.tipo,
+        descripcion: d.descripcion,
+        valorAnterior: d.valor_anterior,
+        valorNuevo: d.valor_nuevo,
+        metadata: d.metadata
+    }));
+}
+
+export async function addHistorialEntryAction(entry: Omit<HistorialCotizacion, "id">): Promise<void> {
+    const supabase = await createClient();
+    const { error } = await supabase.from("cotizacion_historial").insert({
+        cotizacion_id: entry.cotizacionId,
+        fecha: entry.fecha.toISOString(),
+        usuario_id: entry.usuarioId,
+        usuario_nombre: entry.usuarioNombre,
+        tipo: entry.tipo,
+        descripcion: entry.descripcion,
+        valor_anterior: entry.valorAnterior,
+        valor_nuevo: entry.valorNuevo,
+        metadata: entry.metadata || {}
+    });
+
+    if (error) {
+        console.error("Error adding historial entry:", error);
+    }
 }

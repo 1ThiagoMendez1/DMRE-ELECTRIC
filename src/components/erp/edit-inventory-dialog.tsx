@@ -66,7 +66,7 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
             unidad: articulo.unidad,
             cantidad: articulo.cantidad?.toString() || "0",
             stockMinimo: articulo.stockMinimo?.toString() || "10",
-            precioProveedor: (articulo.costoMateriales || Math.round(articulo.valorUnitario * 0.7)).toString(),
+            precioProveedor: (articulo.precioProveedor || articulo.costoMateriales || 0).toString(),
             valorUnitario: articulo.valorUnitario?.toString() || "0",
             proveedorId: articulo.proveedorId || ""
         },
@@ -83,7 +83,7 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
                 unidad: articulo.unidad,
                 cantidad: articulo.cantidad?.toString() || "0",
                 stockMinimo: articulo.stockMinimo?.toString() || "10",
-                precioProveedor: (articulo.costoMateriales || Math.round(articulo.valorUnitario * 0.7)).toString(),
+                precioProveedor: (articulo.precioProveedor || articulo.costoMateriales || 0).toString(),
                 valorUnitario: articulo.valorUnitario?.toString() || "0",
                 proveedorId: articulo.proveedorId || ""
             });
@@ -102,7 +102,8 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
             unidad: values.unidad,
             cantidad: Number(values.cantidad),
             stockMinimo: Number(values.stockMinimo),
-            costoMateriales: Number(values.precioProveedor),
+            precioProveedor: Number(values.precioProveedor),
+            costoMateriales: Number(values.precioProveedor), // Keep for compat
             valorUnitario: Number(values.valorUnitario),
             valorTotal: Number(values.cantidad) * Number(values.valorUnitario),
             proveedorId: values.proveedorId

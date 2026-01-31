@@ -339,3 +339,11 @@ ALTER TABLE public.cotizacion_items
 ALTER TABLE public.cotizacion_items 
     ADD CONSTRAINT fk_cotizacion_items_codigo_trabajo 
     FOREIGN KEY (codigo_trabajo_id) REFERENCES public.codigos_trabajo(id) ON DELETE SET NULL;
+
+
+
+-- =============================================
+-- Agregar columnas a inventario
+-- =============================================
+ALTER TABLE inventario
+ADD COLUMN IF NOT EXISTS precio_proveedor NUMERIC DEFAULT 0;

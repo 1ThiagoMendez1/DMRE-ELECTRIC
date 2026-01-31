@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, Fragment, useRef } from "react";
+import React, { useState, useMemo, Fragment, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -22,7 +22,9 @@ import {
     Image,
     Share2,
     Navigation, // For location
-    Wrench // Import added
+    Wrench,
+    Video,
+    Settings
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem, EvidenciaTrabajo, Ubicacion } from "@/types/sistema";
@@ -72,16 +75,31 @@ import { useErp } from "@/components/providers/erp-provider";
 import { ProductSelectorDialog } from "./product-selector-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/client";
+import { getHistorialAction, addHistorialEntryAction } from "@/app/dashboard/sistema/cotizacion/actions";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PDF_STYLES, getStyleById, PDFStyleConfig } from '@/utils/pdf-styles';
+
+// Helper: RGB to Hex
+const rgbToHex = (c: [number, number, number]) => "#" + c.map(x => x.toString(16).padStart(2, '0')).join('');
+// Helper: Hex to RGB
+const hexToRgb = (hex: string): [number, number, number] => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0, 0, 0];
+};
+
+export type MaterialVisibilityMode = 'MOSTRAR_TODO' | 'MODO_PRIVADO' | 'OCULTAR_TODO';
 
 
 interface HistorialEntry {
     id: string;
     fecha: Date;
-    tipo: 'CREACION' | 'ESTADO' | 'PROGRESO' | 'EDICION' | 'NOTA' | 'ITEM_AGREGADO' | 'ITEM_OCULTO';
+    tipo: 'CREACION' | 'ESTADO' | 'PROGRESO' | 'EDICION' | 'NOTA' | 'ITEM_AGREGADO' | 'ITEM_OCULTO' | 'ITEM_ELIMINADO' | 'UBICACION' | 'FOTO' | 'VIDEO';
     descripcion: string;
     usuario: string;
     valorAnterior?: string;
     valorNuevo?: string;
+    url?: string; // For evidence compatibility
+    metadata?: any;
 }
 
 interface ItemConVisibilidad extends CotizacionItem {
@@ -109,7 +127,7 @@ const getStatusColor = (estado: EstadoCotizacion): string => {
 };
 
 export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defaultTab = 'detalles' }: TrabajoHistoryDialogProps) {
-    const { inventario, codigosTrabajo } = useErp();
+    const { inventario, codigosTrabajo, deductInventoryItem } = useErp();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState(defaultTab);
     const [newNote, setNewNote] = useState("");
@@ -160,9 +178,58 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     };
 
 
-    // Anexo materiales toggle
-    const [showAnexoMateriales, setShowAnexoMateriales] = useState(true);
-    const [showMaterialsInline, setShowMaterialsInline] = useState(false); // New: Inline materials in PDF preview
+
+    // Material visibility mode for PDF
+    const [materialVisibilityMode, setMaterialVisibilityMode] = useState<MaterialVisibilityMode>('MOSTRAR_TODO');
+
+    // PDF Style State
+    const [selectedStyleId, setSelectedStyleId] = useState<string>('corporate_blue');
+    const [customColors, setCustomColors] = useState<{ primary: string, secondary: string } | null>(null);
+
+    // Current Style Config (Memoized)
+    const currentStyle = useMemo(() => {
+        const base = getStyleById(selectedStyleId);
+        if (customColors) {
+            return {
+                ...base,
+                colors: {
+                    ...base.colors,
+                    primary: hexToRgb(customColors.primary),
+                    secondary: hexToRgb(customColors.secondary)
+                }
+            };
+        }
+        return base;
+    }, [selectedStyleId, customColors]);
+
+    // Company info state (editable for PDF generation)
+    const [companyInfo, setCompanyInfo] = useState({
+        nombre: "D.M.R.E. S.A.S.",
+        nit: "900.123.456-7",
+        direccion: "Calle 123 #45-67, Bogotá D.C.",
+        telefono: "(601) 123 4567",
+        email: "info@dmre.com.co",
+        descripcion: "Diseño y Montajes de Redes Eléctricas"
+    });
+
+    // Helper to calculate item totals with AIU (Fix for Display Discrepancy)
+    const calculateItemDetails = (item: ItemConVisibilidad) => {
+        const pVenta = item.valorUnitario || 0;
+        const admin = pVenta * ((item.aiuAdminPorcentaje || 0) / 100);
+        const imprev = pVenta * ((item.aiuImprevistoPorcentaje || 0) / 100);
+        const util = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
+
+        // Base for sale = P.Venta + AIU
+        const priceSale = pVenta + admin + imprev + util;
+
+        // IVA on utility
+        const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
+
+        const unitTotal = priceSale + ivaUtilVal;
+        const lineTotal = unitTotal * item.cantidad;
+
+        return { unitTotal, lineTotal };
+    };
 
     // EXECUTION / EVIDENCE STATE
     const { toast } = useToast();
@@ -170,6 +237,8 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     const [localEvidence, setLocalEvidence] = useState<EvidenciaTrabajo[]>(trabajo.evidencia || []);
     const [isLocating, setIsLocating] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    // Track consumed materials by item ID (Set of material inventory IDs that have been deducted)
+    const [materialesUsados, setMaterialesUsados] = useState<Set<string>>(new Set());
 
     const photoInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
@@ -182,8 +251,9 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     const [fechaFinReal, setFechaFinReal] = useState(trabajo.fechaFinReal ? new Date(trabajo.fechaFinReal).toISOString().split('T')[0] : "");
     const [costoReal, setCostoReal] = useState(trabajo.costoReal || 0);
     const [responsableId, setResponsableId] = useState(trabajo.responsableId || "");
+    const [notas, setNotas] = useState(trabajo.notas || "");
 
-    const handleAddEvidence = (type: 'FOTO' | 'VIDEO' | 'NOTA', content?: string, fileUrl?: string) => {
+    const handleAddEvidence = async (type: 'FOTO' | 'VIDEO' | 'NOTA', content?: string, fileUrl?: string) => {
         const newEvidence: EvidenciaTrabajo = {
             id: `EVID-NEW-${Date.now()}`,
             fecha: new Date(),
@@ -198,6 +268,36 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
         setLocalEvidence(updatedEvidence);
         onTrabajoUpdated({ ...trabajo, evidencia: updatedEvidence });
         setEvidenceNote("");
+
+        // Persist to History Table
+        await addHistorialEntryAction({
+            cotizacionId: trabajo.id,
+            fecha: new Date(),
+            usuarioId: "current-user-id", // Should act. get current user
+            usuarioNombre: "Usuario Actual",
+            tipo: type,
+            descripcion: newEvidence.descripcion || `Nueva evidencia: ${type}`,
+            metadata: {
+                url: newEvidence.url,
+                evidenceId: newEvidence.id
+            }
+        });
+
+        // Refresh history list
+        getHistorialAction(trabajo.id).then(data => {
+            setHistorial(data.map(d => ({
+                id: d.id,
+                fecha: d.fecha,
+                tipo: d.tipo as any,
+                descripcion: d.descripcion,
+                usuario: d.usuarioNombre || 'Sistema',
+                valorAnterior: d.valorAnterior,
+                valorNuevo: d.valorNuevo,
+                url: d.metadata?.url,
+                metadata: d.metadata
+            })));
+        });
+
         if (!fileUrl && type !== 'NOTA') {
             toast({ title: "Modo Simulación", description: "Se agregó una imagen de ejemplo. Usa el botón de subir para archivos reales." });
         } else {
@@ -244,7 +344,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
         setIsLocating(true);
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
-                (position) => {
+                async (position) => {
                     const newLocationEvidence: EvidenciaTrabajo = {
                         id: `LOC-${Date.now()}`,
                         fecha: new Date(),
@@ -264,6 +364,38 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                     onTrabajoUpdated({ ...trabajo, evidencia: updatedEvidence });
                     setEvidenceNote("");
                     setIsLocating(false);
+
+                    // Persist to History Table
+                    await addHistorialEntryAction({
+                        cotizacionId: trabajo.id,
+                        fecha: new Date(),
+                        usuarioId: "current-user-id",
+                        usuarioNombre: "Usuario Actual",
+                        tipo: 'UBICACION',
+                        descripcion: evidenceNote || 'Reporte de ubicación en sitio',
+                        metadata: {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            precision: position.coords.accuracy,
+                            timestamp: position.timestamp
+                        }
+                    });
+
+                    // Refresh history list
+                    getHistorialAction(trabajo.id).then(data => {
+                        setHistorial(data.map(d => ({
+                            id: d.id,
+                            fecha: d.fecha,
+                            tipo: d.tipo as any,
+                            descripcion: d.descripcion,
+                            usuario: d.usuarioNombre || 'Sistema',
+                            valorAnterior: d.valorAnterior,
+                            valorNuevo: d.valorNuevo,
+                            url: d.metadata?.url,
+                            metadata: d.metadata
+                        })));
+                    });
+
                     toast({ title: "Ubicación Registrada", description: `Lat: ${position.coords.latitude.toFixed(5)}, Lng: ${position.coords.longitude.toFixed(5)}` });
                 },
                 (error) => {
@@ -278,25 +410,27 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
         }
     };
 
-    // Simulate history - in production this would come from backend
-    const [historial, setHistorial] = useState<HistorialEntry[]>([
-        {
-            id: '1',
-            fecha: trabajo.fecha,
-            tipo: 'CREACION',
-            descripcion: 'Trabajo creado',
-            usuario: 'Sistema',
-        },
-        ...(trabajo.estado !== 'BORRADOR' ? [{
-            id: '2',
-            fecha: new Date(new Date(trabajo.fecha).getTime() + 86400000),
-            tipo: 'ESTADO' as const,
-            descripcion: 'Estado actualizado',
-            usuario: 'Admin',
-            valorAnterior: 'BORRADOR',
-            valorNuevo: trabajo.estado,
-        }] : [])
-    ]);
+    // Real History Loading
+    const [historial, setHistorial] = useState<HistorialEntry[]>([]);
+
+    useEffect(() => {
+        if (isOpen && trabajo.id) {
+            getHistorialAction(trabajo.id).then(data => {
+                const formatted: HistorialEntry[] = data.map(d => ({
+                    id: d.id,
+                    fecha: d.fecha,
+                    tipo: d.tipo as any,
+                    descripcion: d.descripcion,
+                    usuario: d.usuarioNombre || 'Sistema',
+                    valorAnterior: d.valorAnterior,
+                    valorNuevo: d.valorNuevo,
+                    url: d.metadata?.url, // Map metadata if needed
+                    metadata: d.metadata
+                }));
+                setHistorial(formatted);
+            });
+        }
+    }, [isOpen, trabajo.id]);
 
 
 
@@ -311,15 +445,19 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
 
         // Sum up derived values from items
         const itemResults = items.map(item => {
-            const cost = item.costoUnitario || (item.valorUnitario * 0.7); // Fallback if no cost (approx margin)
+            // P. Venta is the base sale price from inventory
+            const pVenta = item.valorUnitario || 0;
+            const cost = item.costoUnitario || 0; // P. Prov (for reference/margin calculation)
 
-            // Item AIU Values
-            const admin = cost * ((item.aiuAdminPorcentaje || 0) / 100);
-            const imprev = cost * ((item.aiuImprevistoPorcentaje || 0) / 100);
-            const util = cost * ((item.aiuUtilidadPorcentaje || 0) / 100);
+            // AIU is traditionally a percentage of the COST (P. Prov) added on top
+            // However, if the user wants P. Venta to be the "base price for final",
+            // we apply AIU as additional charges on top of P. Venta.
+            const admin = pVenta * ((item.aiuAdminPorcentaje || 0) / 100);
+            const imprev = pVenta * ((item.aiuImprevistoPorcentaje || 0) / 100);
+            const util = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
 
-            // Price Sale Base (Cost + AIU)
-            const priceSale = cost + admin + imprev + util;
+            // Final Price = P. Venta + AIU components
+            const priceSale = pVenta + admin + imprev + util;
 
             // IVA on Utility (if applicable)
             const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
@@ -365,16 +503,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
 
     const handleAddNote = () => {
         if (!newNote.trim()) return;
-
-        const entry: HistorialEntry = {
-            id: Date.now().toString(),
-            fecha: new Date(),
-            tipo: 'NOTA',
-            descripcion: newNote,
-            usuario: 'Usuario Actual',
-        };
-
-        setHistorial([entry, ...historial]);
+        handleAddEvidence('NOTA', newNote);
         setNewNote("");
     };
 
@@ -413,6 +542,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
             ivaUtilidadGlobalPorcentaje: ivaUtilPct,
             estado: finalEstado,
             progreso: progressPercent,
+            notas: notas,
             fechaActualizacion: new Date(),
             direccionProyecto,
             fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
@@ -726,6 +856,15 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                             className="h-8 text-sm"
                                         />
                                     </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px]">Notas Generales Trabajo</Label>
+                                        <Textarea
+                                            value={notas}
+                                            onChange={(e) => setNotas(e.target.value)}
+                                            placeholder="Notas generales sobre el trabajo..."
+                                            className="min-h-[60px] text-xs"
+                                        />
+                                    </div>
                                 </CardContent>
                             </Card>
 
@@ -780,6 +919,80 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                 </CardContent>
                             </Card>
                         </div>
+
+                        {/* Materials Consumption Section */}
+                        <Collapsible defaultOpen className="mt-4">
+                            <Card>
+                                <CollapsibleTrigger className="w-full">
+                                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Package className="h-4 w-4 text-orange-500" /> Materiales del Trabajo
+                                            <Badge variant="outline" className="ml-auto">{items.filter(i => i.tipo === 'PRODUCTO').length} items</Badge>
+                                        </CardTitle>
+                                        <CardDescription>Marca como utilizado para descontar del inventario.</CardDescription>
+                                    </CardHeader>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                    <CardContent className="p-4 space-y-2">
+                                        {items.filter(i => i.tipo === 'PRODUCTO').length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-4">No hay productos en esta cotización.</p>
+                                        ) : (
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead className="w-12">Usado</TableHead>
+                                                        <TableHead>Material</TableHead>
+                                                        <TableHead className="text-right">Cant.</TableHead>
+                                                        <TableHead className="text-right">Existencias</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {items.filter(i => i.tipo === 'PRODUCTO').map((item) => {
+                                                        const itemKey = `${trabajo.id}-${item.inventarioId || item.id}`;
+                                                        const inventoryItem = inventario.find(inv => inv.id === item.inventarioId);
+                                                        const isUsed = materialesUsados.has(itemKey);
+
+                                                        return (
+                                                            <TableRow key={item.id} className={isUsed ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                                                                <TableCell>
+                                                                    <Checkbox
+                                                                        checked={isUsed}
+                                                                        disabled={!item.inventarioId || isUsed}
+                                                                        onCheckedChange={async (checked) => {
+                                                                            if (checked && item.inventarioId) {
+                                                                                const success = await deductInventoryItem(item.inventarioId, item.cantidad);
+                                                                                if (success) {
+                                                                                    setMaterialesUsados(prev => new Set(prev).add(itemKey));
+                                                                                    toast({
+                                                                                        title: "Inventario Actualizado",
+                                                                                        description: `Se descontaron ${item.cantidad} unidades de ${item.descripcion}.`
+                                                                                    });
+                                                                                } else {
+                                                                                    toast({
+                                                                                        title: "Error",
+                                                                                        description: "No se pudo actualizar el inventario.",
+                                                                                        variant: "destructive"
+                                                                                    });
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell className="font-medium">{item.descripcion}</TableCell>
+                                                                <TableCell className="text-right">{item.cantidad}</TableCell>
+                                                                <TableCell className="text-right text-muted-foreground">
+                                                                    {inventoryItem ? inventoryItem.cantidad : 'N/A'}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        )}
+                                    </CardContent>
+                                </CollapsibleContent>
+                            </Card>
+                        </Collapsible>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Evidence Upload Form */}
@@ -918,7 +1131,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                     <div key={ev.id} className="flex gap-4 border-l-2 border-muted pl-4 relative pb-4 last:pb-0">
                                         <div className="absolute -left-[9px] top-0 bg-background border rounded-full p-1">
                                             {ev.tipo === 'FOTO' && <Camera className="h-3 w-3 text-blue-500" />}
-                                            {ev.tipo === 'VIDEO' && <Share2 className="h-3 w-3 text-purple-500" />}
+                                            {ev.tipo === 'VIDEO' && <Video className="h-3 w-3 text-purple-500" />}
                                             {ev.tipo === 'NOTA' && <FileText className="h-3 w-3 text-amber-500" />}
                                             {ev.tipo === 'UBICACION' && <MapPin className="h-3 w-3 text-red-500" />}
                                         </div>
@@ -944,6 +1157,16 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                                     <img src={ev.url} alt="Evidencia" className="object-cover w-full h-full relative z-10" />
                                                 </div>
                                             )}
+                                            {ev.url && ev.tipo === 'VIDEO' && (
+                                                <div className="relative mt-2 rounded-md overflow-hidden bg-black max-w-sm aspect-video">
+                                                    <video
+                                                        src={ev.url}
+                                                        controls
+                                                        playsInline
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                </div>
+                                            )}
 
                                             {ev.tipo === 'UBICACION' && ev.ubicacion && (
                                                 <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mt-1 bg-background/50 p-1 rounded w-fit">
@@ -963,10 +1186,15 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                     <TabsContent value="items" className="flex-1 overflow-auto space-y-4 mt-4">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold">Items de la Cotización</h3>
-                            <Button size="sm" onClick={() => setShowAddItem(true)}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Agregar Item
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button size="sm" variant="secondary" className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20" onClick={handleUpdateProgress}>
+                                    <Save className="mr-2 h-4 w-4" /> Guardar Actualización
+                                </Button>
+                                <Button size="sm" onClick={() => setShowAddItem(true)}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Agregar Item
+                                </Button>
+                            </div>
                         </div>
                         <div className="bg-muted p-2 rounded mb-4 grid grid-cols-4 gap-4">
                             <div>
@@ -1028,11 +1256,17 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                     <TableBody>
                                         {items.map((item, index) => {
                                             // Calculations per item
-                                            const cost = item.costoUnitario || (item.valorUnitario * 0.7); // Simulation if missing
-                                            const admin = cost * ((item.aiuAdminPorcentaje || 0) / 100);
-                                            const imprev = cost * ((item.aiuImprevistoPorcentaje || 0) / 100);
-                                            const util = cost * ((item.aiuUtilidadPorcentaje || 0) / 100);
-                                            const priceSale = cost + admin + imprev + util;
+                                            const cost = item.costoUnitario || 0; // P. Prov (for reference)
+                                            const pVenta = item.valorUnitario || 0; // P. Venta - Base price
+
+                                            // AIU is calculated on top of P. Venta
+                                            const admin = pVenta * ((item.aiuAdminPorcentaje || 0) / 100);
+                                            const imprev = pVenta * ((item.aiuImprevistoPorcentaje || 0) / 100);
+                                            const util = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
+
+                                            // Final Price = P. Venta + AIU components
+                                            const priceSale = pVenta + admin + imprev + util;
+
                                             const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
                                             const finalUnitTotal = priceSale + ivaUtilVal;
                                             const rowTotal = finalUnitTotal * item.cantidad;
@@ -1067,15 +1301,25 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                                         <TableCell className="text-right p-1">
                                                             <Input
                                                                 type="number"
-                                                                value={item.costoUnitario || ''}
-                                                                placeholder={formatCurrency(cost)}
-                                                                disabled
-                                                                className="h-7 w-20 text-xs text-right p-1 bg-muted/50 cursor-not-allowed"
+                                                                value={item.costoUnitario || 0}
+                                                                onChange={(e) => {
+                                                                    const newVal = parseFloat(e.target.value) || 0;
+                                                                    setItems(prev => prev.map((it, i) => i === index ? { ...it, costoUnitario: newVal } : it));
+                                                                }}
+                                                                className="h-7 w-24 text-xs text-right p-1"
                                                             />
                                                         </TableCell>
-                                                        {/* P. Venta (Calc) */}
-                                                        <TableCell className="text-right text-xs font-mono">
-                                                            {formatCurrency(priceSale)}
+                                                        {/* P. Venta (Base) */}
+                                                        <TableCell className="text-right p-1">
+                                                            <Input
+                                                                type="number"
+                                                                value={item.valorUnitario || 0}
+                                                                onChange={(e) => {
+                                                                    const newVal = parseFloat(e.target.value) || 0;
+                                                                    setItems(prev => prev.map((it, i) => i === index ? { ...it, valorUnitario: newVal } : it));
+                                                                }}
+                                                                className="h-7 w-24 text-xs text-right p-1 font-semibold text-primary"
+                                                            />
                                                         </TableCell>
                                                         {/* AIU Inputs per Item */}
                                                         <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" value={item.aiuAdminPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, aiuAdminPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
@@ -1183,192 +1427,293 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                         </Card>
                     </TabsContent>
 
-                    {/* PREVIEW TAB */}
-                    <TabsContent value="preview" className="flex-1 overflow-auto mt-4">
-                        <Card className="bg-white dark:bg-gray-950 border-2">
-                            <CardContent className="p-8">
-                                {/* PDF Preview Header */}
-                                <div className="flex justify-between items-start mb-8 border-b pb-4">
-                                    <div>
-                                        <h1 className="text-2xl font-bold text-primary">D.M.R.E</h1>
-                                        <p className="text-sm text-muted-foreground">DISEÑO, MONTAJE Y REPARACIÓN ELÉCTRICA</p>
-                                        <p className="text-xs text-muted-foreground mt-2">NIT: 123.456.789-0</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <h2 className="text-xl font-bold">COTIZACIÓN</h2>
-                                        <p className="text-lg font-mono">{trabajo.numero}</p>
-                                        <p className="text-sm text-muted-foreground">{format(trabajo.fecha, "dd/MM/yyyy", { locale: es })}</p>
-                                    </div>
-                                </div>
+                    {/* PREVIEW & DESIGN TAB */}
+                    <TabsContent value="preview" className="flex-1 overflow-hidden mt-4 h-full">
+                        <div className="flex flex-col md:flex-row gap-6 h-full">
 
-                                {/* Client Info */}
-                                <div className="mb-6 p-4 bg-muted/30 rounded">
-                                    <h3 className="font-semibold mb-2">Cliente:</h3>
-                                    <p className="font-bold">{trabajo.cliente.nombre}</p>
-                                    <p className="text-sm">{trabajo.cliente.documento}</p>
-                                    <p className="text-sm">{trabajo.cliente.direccion}</p>
-                                    <p className="text-sm">{trabajo.cliente.telefono}</p>
-                                </div>
+                            {/* LEFT SIDEBAR: CONTROLS */}
+                            <div className="w-full md:w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto pr-2 pb-4">
 
-                                {/* Description */}
-                                <div className="mb-6">
-                                    <h3 className="font-semibold mb-2">Descripción del Trabajo:</h3>
-                                    <p className="text-sm">{trabajo.descripcionTrabajo}</p>
-                                </div>
+                                {/* 1. Style Selector */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                            <Package className="w-4 h-4" /> Estilo PDF
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="grid grid-cols-2 gap-2">
+                                        {PDF_STYLES.map(style => (
+                                            <div
+                                                key={style.id}
+                                                onClick={() => {
+                                                    setSelectedStyleId(style.id);
+                                                    setCustomColors(null); // Reset custom colors on style switch
+                                                }}
+                                                className={`cursor-pointer rounded-lg border-2 p-2 text-center transition-all hover:bg-muted ${selectedStyleId === style.id ? 'border-primary bg-primary/10' : 'border-transparent bg-muted/50'}`}
+                                            >
+                                                <div className="w-full h-8 rounded mb-2" style={{ background: `linear-gradient(135deg, rgb(${style.colors.primary.join(',')}) 0%, rgb(${style.colors.secondary.join(',')}) 100%)` }} />
+                                                <p className="text-xs font-medium truncate">{style.name}</p>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
 
-                                {/* Items Table - Only visible ones */}
-                                <Table className="mb-6">
-                                    <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                            <TableHead>Descripción</TableHead>
-                                            <TableHead className="text-center">Cant.</TableHead>
-                                            <TableHead className="text-right">V. Unit.</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {visibleItems.map((item) => {
-                                            const itemSub = item.valorTotal; // Already includes AIU + IvaU per item
-                                            // Logic: Show item ONLY if it is a 'SERVICIO' (Work Code) OR if visibility toggle is ON.
-                                            // This ensures Products (Materials) or untyped items are hidden by default when toggle is off.
-                                            const isService = item.tipo === 'SERVICIO';
-                                            const shouldRender = isService || showMaterialsInline;
+                                {/* 2. Brand Colors */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                            <Settings className="w-4 h-4" /> Personalización
+                                        </CardTitle>
+                                        <CardDescription className="text-xs">Ajusta los colores de tu marca</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-xs">Color Primario</Label>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full border shadow-sm" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
+                                                <Input
+                                                    type="color"
+                                                    value={rgbToHex(currentStyle.colors.primary)}
+                                                    onChange={(e) => setCustomColors({
+                                                        primary: e.target.value,
+                                                        secondary: customColors ? customColors.secondary : rgbToHex(currentStyle.colors.secondary)
+                                                    })}
+                                                    className="w-12 h-8 p-1 cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-xs">Color Secundario</Label>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full border shadow-sm" style={{ backgroundColor: rgbToHex(currentStyle.colors.secondary) }} />
+                                                <Input
+                                                    type="color"
+                                                    value={rgbToHex(currentStyle.colors.secondary)}
+                                                    onChange={(e) => setCustomColors({
+                                                        primary: customColors ? customColors.primary : rgbToHex(currentStyle.colors.primary),
+                                                        secondary: e.target.value
+                                                    })}
+                                                    className="w-12 h-8 p-1 cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                                            if (!shouldRender) return null;
+                                {/* 3. Data & Actions */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm font-bold">Opciones</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs">Visibilidad</Label>
+                                            <Select
+                                                value={materialVisibilityMode}
+                                                onValueChange={(value) => setMaterialVisibilityMode(value as MaterialVisibilityMode)}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="MOSTRAR_TODO">📋 Mostrar Todo</SelectItem>
+                                                    <SelectItem value="MODO_PRIVADO">🔒 Modo Privado</SelectItem>
+                                                    <SelectItem value="OCULTAR_TODO">🚫 Ocultar Todo</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
 
-                                            return (
-                                                <Fragment key={item.id}>
-                                                    <TableRow>
-                                                        <TableCell className="font-medium">{item.descripcion}</TableCell>
-                                                        <TableCell className="text-center">{item.cantidad}</TableCell>
-                                                        <TableCell className="text-right font-mono">{formatCurrency(item.valorUnitario)}</TableCell>
-                                                        <TableCell className="text-right font-mono">{formatCurrency(item.valorTotal)}</TableCell>
-                                                    </TableRow>
-                                                    {showMaterialsInline && item.subItems && item.subItems.map((sub, sIdx) => (
-                                                        <TableRow key={`${item.id}-sub-${sIdx}`} className="bg-muted/5 border-0">
-                                                            <TableCell className="pl-8 text-xs text-muted-foreground flex items-center gap-2">
-                                                                <span>•</span> {sub.nombre}
-                                                            </TableCell>
-                                                            <TableCell className="text-center text-xs text-muted-foreground">{sub.cantidad * item.cantidad}</TableCell>
-                                                            <TableCell className="text-right text-xs font-mono text-muted-foreground">{formatCurrency(sub.valorUnitario)}</TableCell>
-                                                            <TableCell></TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </Fragment>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" size="sm" className="w-full">
+                                                    <Pencil className="mr-2 h-3 w-3" /> Editar Info Empresa
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[340px]">
+                                                <div className="space-y-3">
+                                                    <div><Label className="text-xs">Nombre</Label><Input value={companyInfo.nombre} onChange={(e) => setCompanyInfo({ ...companyInfo, nombre: e.target.value })} className="h-8 text-sm" /></div>
+                                                    <div><Label className="text-xs">NIT</Label><Input value={companyInfo.nit} onChange={(e) => setCompanyInfo({ ...companyInfo, nit: e.target.value })} className="h-8 text-sm" /></div>
+                                                    <div><Label className="text-xs">Dirección</Label><Input value={companyInfo.direccion} onChange={(e) => setCompanyInfo({ ...companyInfo, direccion: e.target.value })} className="h-8 text-sm" /></div>
+                                                    <div><Label className="text-xs">Teléfono</Label><Input value={companyInfo.telefono} onChange={(e) => setCompanyInfo({ ...companyInfo, telefono: e.target.value })} className="h-8 text-sm" /></div>
+                                                    <div><Label className="text-xs">Email</Label><Input value={companyInfo.email} onChange={(e) => setCompanyInfo({ ...companyInfo, email: e.target.value })} className="h-8 text-sm" /></div>
+                                                    <div><Label className="text-xs">Slogan</Label><Input value={companyInfo.descripcion} onChange={(e) => setCompanyInfo({ ...companyInfo, descripcion: e.target.value })} className="h-8 text-sm" /></div>
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
 
-                                {/* Totals */}
-                                <div className="flex justify-end">
-                                    <div className="w-64 space-y-1">
-                                        {(() => {
-                                            // Recalculate totals for Visible Items
-                                            const subVisible = visibleItems.reduce((a, i) => a + i.valorTotal, 0);
-                                            const descVisible = subVisible * (globalDiscountPct / 100);
-                                            const baseVisible = subVisible - descVisible;
-                                            const ivaVisible = baseVisible * (globalIvaPct / 100);
-                                            const totalVisible = baseVisible + ivaVisible;
+                                        <Button className="w-full" onClick={() => {
+                                            try {
+                                                const itemsCalculados = visibleItems.map((item) => {
+                                                    const { unitTotal, lineTotal } = calculateItemDetails(item);
+                                                    const { visibleEnPdf, ...rest } = item;
+                                                    return { ...rest, valorUnitario: unitTotal, valorTotal: lineTotal };
+                                                });
 
-                                            return (
-                                                <>
-                                                    <div className="flex justify-between text-sm">
-                                                        <span>Subtotal ({visibleItems.length} items):</span>
-                                                        <span className="font-mono">{formatCurrency(subVisible)}</span>
-                                                    </div>
-                                                    {descVisible > 0 && (
-                                                        <div className="flex justify-between text-sm text-red-500">
-                                                            <span>Desc. Global ({globalDiscountPct}%):</span>
-                                                            <span className="font-mono">-{formatCurrency(descVisible)}</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex justify-between text-sm">
-                                                        <span>IVA ({globalIvaPct}%):</span>
-                                                        <span className="font-mono">{formatCurrency(ivaVisible)}</span>
-                                                    </div>
-                                                    <Separator />
-                                                    <div className="flex justify-between font-bold text-lg">
-                                                        <span>TOTAL:</span>
-                                                        <span className="font-mono">{formatCurrency(totalVisible)}</span>
-                                                    </div>
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
+                                                const subTotalPDF = itemsCalculados.reduce((a, b) => a + b.valorTotal, 0);
+                                                const descuentoPDF = subTotalPDF * (globalDiscountPct / 100);
+                                                const basePDF = subTotalPDF - descuentoPDF;
+                                                const ivaPDF = basePDF * (globalIvaPct / 100);
+                                                const totalPDF = basePDF + ivaPDF;
 
-                                {/* Footer */}
-                                <div className="mt-8 pt-4 border-t text-center text-xs text-muted-foreground">
-                                    <p>Cotización válida por 30 días</p>
-                                    <p>Forma de pago: 50% anticipo, 50% contra entrega</p>
-                                </div>
-
-                                {/* Anexo Materiales Preview */}
-                                {showAnexoMateriales && (
-                                    <div className="mt-8 pt-6 border-t-2">
-                                        <h3 className="text-lg font-bold mb-4">Anexo: Listado de Materiales</h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow className="bg-primary/10">
-                                                    <TableHead className="w-[40px]">#</TableHead>
-                                                    <TableHead>Material / Insumo</TableHead>
-                                                    <TableHead className="w-[80px]">Unidad</TableHead>
-                                                    <TableHead className="w-[60px]">Cant</TableHead>
-                                                    <TableHead>Obs</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {visibleItems.map((item, index) => (
-                                                    <TableRow key={item.id}>
-                                                        <TableCell>{index + 1}</TableCell>
-                                                        <TableCell>Materiales para {item.descripcion}</TableCell>
-                                                        <TableCell>Global</TableCell>
-                                                        <TableCell>{item.cantidad}</TableCell>
-                                                        <TableCell className="text-muted-foreground">Disponibilidad Inmediata</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <div className="flex justify-between items-center mt-4">
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="show-anexo"
-                                    checked={showAnexoMateriales}
-                                    onCheckedChange={(checked) => setShowAnexoMateriales(checked === true)}
-                                />
-                                <label htmlFor="show-anexo" className="text-sm cursor-pointer">
-                                    Incluir Anexo de Materiales en PDF
-                                </label>
+                                                const cotizacionFiltrada = {
+                                                    ...trabajo,
+                                                    items: itemsCalculados,
+                                                    subtotal: subTotalPDF,
+                                                    iva: ivaPDF,
+                                                    total: totalPDF
+                                                };
+                                                generateQuotePDF(cotizacionFiltrada, materialVisibilityMode, companyInfo, currentStyle);
+                                                toast({ title: "PDF Generado", description: `Estilo: ${currentStyle.name}` });
+                                            } catch (error) {
+                                                console.error(error);
+                                                toast({ variant: "destructive", title: "Error", description: "No se pudo generar el PDF." });
+                                            }
+                                        }}>
+                                            <FileText className="mr-2 h-4 w-4" /> Descargar PDF
+                                        </Button>
+                                    </CardContent>
+                                </Card>
                             </div>
 
-                            <div className="flex items-center gap-2 ml-4">
-                                <Checkbox
-                                    id="show-inline-materials"
-                                    checked={showMaterialsInline}
-                                    onCheckedChange={(checked) => setShowMaterialsInline(checked === true)}
-                                />
-                                <label htmlFor="show-inline-materials" className="text-sm cursor-pointer">
-                                    Mostrar Materiales en Lista Principal
-                                </label>
-                            </div>
+                            {/* RIGHT: LIVE PREVIEW */}
+                            <div className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded-xl border shadow-inner flex justify-center">
+                                {/* A4 Ratio Container (approx) */}
+                                <Card
+                                    className="w-full max-w-[800px] bg-white shadow-xl min-h-[1000px] origin-top transition-all duration-300"
+                                    style={{ fontFamily: currentStyle.fonts.body === 'times' ? 'Times New Roman, serif' : currentStyle.fonts.body === 'courier' ? 'Courier New, monospace' : 'Arial, sans-serif' }}
+                                >
+                                    <div className="relative p-0 overflow-hidden h-full flex flex-col">
 
-                            <Button onClick={() => {
-                                // Create cotizacion with only visible items
-                                const cotizacionFiltrada = {
-                                    ...trabajo,
-                                    items: visibleItems.map(({ visibleEnPdf, ...item }) => item)
-                                };
-                                generateQuotePDF(cotizacionFiltrada, showAnexoMateriales);
-                            }}>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Descargar PDF
-                            </Button>
+                                        {/* HEADER BAR if applicable */}
+                                        {currentStyle.components.headerStyle === 'bar' && (
+                                            <div className="h-2 w-full" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
+                                        )}
+                                        {currentStyle.layout === 'bold' && (
+                                            <div className="h-32 w-full absolute top-0 left-0" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
+                                        )}
+                                        {currentStyle.layout === 'sidebar' && (
+                                            <div className="absolute top-0 left-0 bottom-0 w-20 h-full" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
+                                        )}
+
+                                        <div className={`p-8 relative z-10 ${currentStyle.layout === 'sidebar' ? 'pl-28' : ''}`}>
+                                            {/* HEADER CONTENT */}
+                                            <div className={`flex justify-between items-start mb-8 ${currentStyle.layout === 'centered' ? 'flex-col items-center text-center' : ''} ${currentStyle.layout === 'bold' ? 'text-white' : ''}`}>
+                                                <div className={`flex items-start gap-4 ${currentStyle.layout === 'centered' ? 'flex-col items-center' : ''}`}>
+                                                    <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain bg-white rounded-md p-1" />
+                                                    <div>
+                                                        <h3 className="text-2xl font-bold" style={{ color: currentStyle.layout === 'bold' ? '#fff' : rgbToHex(currentStyle.colors.primary) }}>{companyInfo.nombre}</h3>
+                                                        <p className={`text-sm font-medium ${currentStyle.layout === 'bold' ? 'text-gray-100' : 'text-gray-600'}`}>{companyInfo.descripcion}</p>
+
+                                                        {/* If not sidebar, show contact here */}
+                                                        {currentStyle.layout !== 'sidebar' && (
+                                                            <div className={`text-xs mt-2 space-y-0.5 ${currentStyle.layout === 'bold' ? 'text-gray-200' : 'text-gray-500'}`}>
+                                                                <p>NIT: {companyInfo.nit}</p>
+                                                                <p>{companyInfo.direccion}</p>
+                                                                <p>{companyInfo.telefono} | {companyInfo.email}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* In Sidebar layout, company info is in the sidebar (simulated in CSS above) */}
+
+                                                {/* QUOTE BOX */}
+                                                <div className={`mt-4 ${currentStyle.layout === 'centered' ? 'mt-8 text-center' : 'text-right'}`}>
+                                                    <div className={`p-4 rounded-lg ${currentStyle.components.clientBoxStyle === 'box' && currentStyle.layout !== 'bold' ? 'bg-gray-50' : ''}`}>
+                                                        <h2 className="text-xl font-bold" style={{ color: currentStyle.layout === 'bold' ? '#fff' : rgbToHex(currentStyle.colors.secondary) }}>COTIZACIÓN</h2>
+                                                        <p className="text-lg font-mono text-red-600">{trabajo.numero}</p>
+                                                        <p className={`text-sm ${currentStyle.layout === 'bold' ? 'text-gray-200' : 'text-gray-500'}`}>{format(trabajo.fecha, "dd MMMM yyyy", { locale: es })}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* CLIENT */}
+                                            <div className={`mb-8 p-4 rounded ${currentStyle.components.clientBoxStyle === 'filled' ? 'text-white' : 'bg-gray-50'} ${currentStyle.components.clientBoxStyle === 'line' ? 'border-t-2 border-gray-200 bg-transparent px-0' : ''}`}
+                                                style={{ backgroundColor: currentStyle.components.clientBoxStyle === 'filled' ? rgbToHex(currentStyle.colors.accent) : (currentStyle.components.clientBoxStyle === 'box' ? '#f9fafb' : 'transparent') }}
+                                            >
+                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: currentStyle.components.clientBoxStyle === 'filled' ? rgbToHex(currentStyle.colors.primary) : rgbToHex(currentStyle.colors.secondary) }}>Cliente:</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm">
+                                                    <p className="font-bold col-span-2 text-base">{trabajo.cliente.nombre}</p>
+                                                    <p><span className="opacity-70">NIT/CC:</span> {trabajo.cliente.documento}</p>
+                                                    <p><span className="opacity-70">Contacto:</span> {trabajo.cliente.contactoPrincipal}</p>
+                                                    <p className="col-span-2"><span className="opacity-70">Dirección:</span> {trabajo.cliente.direccion}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* BODY */}
+                                            <div className="mb-8">
+                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>Objeto:</h3>
+                                                <p className="text-sm bg-white p-2 rounded border border-transparent">{trabajo.descripcionTrabajo}</p>
+                                            </div>
+
+                                            {/* TABLE */}
+                                            <div className="mb-8">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr style={{ backgroundColor: currentStyle.components.tableTheme === 'plain' ? 'transparent' : rgbToHex(currentStyle.colors.secondary), color: currentStyle.components.tableTheme === 'plain' ? '#000' : '#fff' }}>
+                                                            <th className="p-2 text-left">Item</th>
+                                                            <th className="p-2 text-left">Descripción</th>
+                                                            <th className="p-2 text-center">Cant</th>
+                                                            <th className="p-2 text-center">Und</th>
+                                                            <th className="p-2 text-right">V. Unit</th>
+                                                            <th className="p-2 text-right">Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {visibleItems.map((item, idx) => {
+                                                            const details = calculateItemDetails(item);
+                                                            const isProduct = item.tipo === 'PRODUCTO';
+                                                            const hide = isProduct && materialVisibilityMode === 'OCULTAR_TODO';
+                                                            const showValues = !isProduct || materialVisibilityMode === 'MOSTRAR_TODO';
+                                                            if (hide) return null;
+
+                                                            return (
+                                                                <tr key={item.id} className={`border-b ${currentStyle.components.tableTheme === 'striped' && idx % 2 === 0 ? 'bg-gray-50' : ''}`}>
+                                                                    <td className="p-2 font-mono text-xs">{idx + 1}</td>
+                                                                    <td className="p-2">{item.descripcion}</td>
+                                                                    <td className="p-2 text-center">{showValues ? item.cantidad : '-'}</td>
+                                                                    <td className="p-2 text-center">UND</td>
+                                                                    <td className="p-2 text-right font-mono">{showValues ? formatCurrency(details.unitTotal) : '-'}</td>
+                                                                    <td className="p-2 text-right font-bold font-mono">{showValues ? formatCurrency(details.lineTotal) : '-'}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* TOTALS */}
+                                            <div className="flex justify-end mb-12">
+                                                <div className="w-64 space-y-2">
+                                                    {(() => {
+                                                        const subVisible = visibleItems.reduce((a, i) => a + calculateItemDetails(i).lineTotal, 0);
+                                                        const ivaVisible = (subVisible * (100 - globalDiscountPct) / 100) * (globalIvaPct / 100);
+                                                        const totalVisible = subVisible + ivaVisible; // Simplification for preview
+                                                        return (
+                                                            <>
+                                                                <div className="flex justify-between text-sm"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(subVisible)}</span></div>
+                                                                <div className="flex justify-between text-sm"><span>IVA:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
+                                                                <div className="border-t pt-2 flex justify-between text-lg font-bold" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>
+                                                                    <span>TOTAL:</span>
+                                                                    <span className="font-mono">{formatCurrency(totalVisible)}</span>
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+
+                                            {/* FOOTER */}
+                                            {currentStyle.components.footerStyle === 'branded' && (
+                                                <div className="absolute bottom-0 left-0 w-full h-2" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
+                                            )}
+                                            <div className="absolute create-bottom p-8 text-xs text-center w-full text-gray-400">
+                                                <p>Cotización válida por 15 días calendario.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
                         </div>
                     </TabsContent>
 

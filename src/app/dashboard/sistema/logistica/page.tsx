@@ -297,7 +297,8 @@ export default function LogisticaPage() {
                                         )
                                         .map((item) => {
                                             const stockStatus = item.cantidad <= item.stockMinimo ? 'BAJO' : 'OK';
-                                            const precioProveedor = item.costoMateriales || Math.round(item.valorUnitario * 0.7);
+                                            // const precioProveedor = item.costoMateriales || Math.round(item.valorUnitario * 0.7);
+                                            const precioProveedor = item.precioProveedor || item.costoMateriales || 0;
                                             const proveedorInfo = proveedores.find(p => p.id === item.proveedorId);
                                             return (
                                                 <TableRow

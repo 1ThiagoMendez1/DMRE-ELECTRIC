@@ -8,7 +8,7 @@ export function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid md:grid-cols-3 gap-8">
           <div className="flex flex-col">
-             <Link href="/" className="flex items-center gap-2 text-2xl font-bold font-headline text-glow-primary mb-4">
+            <Link href="/" className="flex items-center gap-2 text-2xl font-bold font-headline text-glow-primary mb-4">
               <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" width={64} height={64} className="h-16 w-16" />
               <span>D.M.R.E</span>
             </Link>

@@ -55,7 +55,8 @@ export interface InventarioItem {
     tipo: 'SIMPLE' | 'COMPUESTO';
     materiales?: Material[]; // Si es compuesto
     // Financials
-    costoMateriales: number;
+    costoMateriales: number; // Deprecated: Use precioProveedor instead
+    precioProveedor: number; // New explicit column
     margenUtilidad: number;
     valorTotal: number; // Precio Venta Sugerido
     proveedorId?: string; // Link to primary supplier
@@ -139,6 +140,21 @@ export interface Cotizacion {
     costoReal?: number;
     responsableId?: string;
     progreso?: number; // New: Percentage 0-100
+    notas?: string; // New: General notes for the quotation/job
+    historial?: HistorialCotizacion[]; // New: Persistent history
+}
+
+export interface HistorialCotizacion {
+    id: string;
+    cotizacionId: string;
+    fecha: Date;
+    usuarioId?: string;
+    usuarioNombre?: string;
+    tipo: 'CREACION' | 'ESTADO' | 'PROGRESO' | 'EDICION' | 'NOTA' | 'ITEM_AGREGADO' | 'ITEM_OCULTO' | 'ITEM_ELIMINADO' | 'UBICACION' | 'FOTO' | 'VIDEO';
+    descripcion: string;
+    valorAnterior?: string;
+    valorNuevo?: string;
+    metadata?: Record<string, any>; // For location {lat, lng}, photos {url, type}, etc.
 }
 
 export interface Ubicacion {

@@ -11,7 +11,7 @@ import {
 // Import Server Actions
 import { getClientsAction, createClientAction, updateClientAction, deleteClientAction } from "@/app/dashboard/sistema/clientes/actions";
 import { getProveedoresAction, createProveedorAction, updateProveedorAction, deleteProveedorAction } from "@/app/dashboard/sistema/suministro/actions";
-import { getInventarioAction, createInventarioAction, updateInventarioAction, deleteInventarioAction } from "@/app/dashboard/sistema/inventario/actions";
+import { getInventarioAction, createInventarioAction, updateInventarioAction, deleteInventarioAction, deductInventoryAction } from "@/app/dashboard/sistema/inventario/actions";
 import { getCodigosTrabajoAction, createCodigoTrabajoAction, updateCodigoTrabajoAction, deleteCodigoTrabajoAction } from "@/app/dashboard/sistema/codigos-trabajo/actions";
 import { getVehiculosAction, createVehiculoAction, updateVehiculoAction, getGastosVehiculosAction, createGastoVehiculoAction } from "@/app/dashboard/sistema/activos/actions";
 import { getCotizacionesAction, createCotizacionAction, updateCotizacionAction, deleteCotizacionAction } from "@/app/dashboard/sistema/cotizacion/actions";
@@ -73,6 +73,7 @@ interface ErpContextType {
     updateInventarioItem: (updated: InventarioItem) => void;
     addInventarioItem: (item: InventarioItem) => void;
     deleteInventarioItem: (id: string) => void;
+    deductInventoryItem: (id: string, cantidad: number) => Promise<boolean>;
 
     // Proveedor Actions
     updateProveedor: (updated: Proveedor) => void;
@@ -326,6 +327,19 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const deductInventoryItem = async (id: string, cantidad: number): Promise<boolean> => {
+        try {
+            await deductInventoryAction(id, cantidad);
+            setInventario(prev => prev.map(i =>
+                i.id === id ? { ...i, cantidad: Math.max(0, i.cantidad - cantidad) } : i
+            ));
+            return true;
+        } catch (error) {
+            console.error("Failed to deduct inventory:", error);
+            return false;
+        }
+    };
+
     // =============================================
     // PROVEEDOR ACTIONS
     // =============================================
@@ -567,7 +581,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addCotizacion, updateCotizacion, deleteCotizacion,
             addCliente, updateCliente, deleteCliente,
             updateUserPermissions, setCurrentUser,
-            updateInventarioItem, addInventarioItem, deleteInventarioItem,
+            updateInventarioItem, addInventarioItem, deleteInventarioItem, deductInventoryItem,
             updateProveedor, addProveedor, deleteProveedor,
             updateVehiculo, addVehiculo,
             updateDotacionItem, addEntregaDotacion,

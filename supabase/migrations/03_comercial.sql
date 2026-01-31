@@ -297,3 +297,54 @@ UPDATE cotizaciones SET
   total = COALESCE(total, 0);
 UPDATE cotizacion_items SET
   valor_unitario = COALESCE(valor_unitario, 0);
+
+
+
+    -- =============================================
+-- Atualizacion tablas cotizaciones schema repair precision
+-- =============================================
+-- Add missing columns to 'cotizaciones' table
+
+ALTER TABLE cotizaciones 
+ADD COLUMN IF NOT EXISTS progreso NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS cotizacion_estado TEXT,
+ADD COLUMN IF NOT EXISTS notas TEXT;
+-- Migración de datos existentes (opcional)
+UPDATE cotizaciones SET cotizacion_estado = estado WHERE cotizacion_estado IS NULL;
+
+
+
+
+-- =============================================
+-- FIX STORAGE RLS POLICIES FOR EVIDENCE
+-- =============================================
+-- 1. Ensure buckets exist and are public
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('imagenes', 'imagenes', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('videos', 'videos', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+-- 2. Drop existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Public Access" ON storage.objects;
+DROP POLICY IF EXISTS "Allow Public Upload" ON storage.objects;
+DROP POLICY IF EXISTS "Allow Public Delete" ON storage.objects;
+-- 3. Create permissive policies for 'imagenes' bucket
+CREATE POLICY "Public Read Imagenes"
+ON storage.objects FOR SELECT
+USING ( bucket_id = 'imagenes' );
+CREATE POLICY "Public Insert Imagenes"
+ON storage.objects FOR INSERT
+WITH CHECK ( bucket_id = 'imagenes' );
+-- 4. Create permissive policies for 'videos' bucket
+CREATE POLICY "Public Read Videos"
+ON storage.objects FOR SELECT
+USING ( bucket_id = 'videos' );
+CREATE POLICY "Public Insert Videos"
+ON storage.objects FOR INSERT
+WITH CHECK ( bucket_id = 'videos' );
+-- 5. Global Policy (Optional, if you want full public access for everything in these buckets)
+-- CREATE POLICY "Public All"
+-- ON storage.objects FOR ALL
+-- USING ( bucket_id IN ('imagenes', 'videos') )
+-- WITH CHECK ( bucket_id IN ('imagenes', 'videos') );

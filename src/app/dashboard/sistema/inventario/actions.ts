@@ -19,7 +19,8 @@ function mapToUI(db: any): InventarioUI {
         valorUnitario: Number(db.valor_unitario) || 0,
         fechaCreacion: new Date(db.created_at),
         tipo: "SIMPLE",
-        costoMateriales: 0,
+        costoMateriales: Number(db.precio_proveedor) || 0, // Fallback for old UI usage
+        precioProveedor: Number(db.precio_proveedor) || 0,
         margenUtilidad: 0,
         valorTotal: Number(db.valor_total) || 0,
         proveedorId: db.proveedor_id,
@@ -48,6 +49,7 @@ function mapToDB(ui: Partial<InventarioUI>) {
         cantidad: ui.cantidad,
         stock_minimo: ui.stockMinimo,
         valor_unitario: ui.valorUnitario,
+        precio_proveedor: ui.precioProveedor || ui.costoMateriales || 0,
         proveedor_id: ui.proveedorId,
         marca: ui.marca,
         modelo: ui.modelo,
@@ -146,6 +148,42 @@ export async function deleteInventarioAction(id: string): Promise<boolean> {
     if (error) {
         console.error("Error deleting inventario item:", error);
         throw new Error("Failed to delete inventario item");
+    }
+
+    revalidatePath("/dashboard/sistema/inventario");
+    revalidatePath("/dashboard/sistema/logistica");
+    return true;
+}
+
+/**
+ * Deduct quantity from an inventory item.
+ * Used when materials are marked as "used" in a job.
+ */
+export async function deductInventoryAction(id: string, cantidad: number): Promise<boolean> {
+    const supabase = await createClient();
+
+    // First, get current quantity
+    const { data: current, error: fetchError } = await supabase
+        .from("inventario")
+        .select("cantidad")
+        .eq("id", id)
+        .single();
+
+    if (fetchError || !current) {
+        console.error("Error fetching inventario item for deduction:", fetchError);
+        throw new Error("Failed to fetch inventario item");
+    }
+
+    const newCantidad = Math.max(0, Number(current.cantidad) - cantidad);
+
+    const { error: updateError } = await supabase
+        .from("inventario")
+        .update({ cantidad: newCantidad })
+        .eq("id", id);
+
+    if (updateError) {
+        console.error("Error deducting inventario item:", updateError);
+        throw new Error("Failed to deduct from inventario");
     }
 
     revalidatePath("/dashboard/sistema/inventario");
