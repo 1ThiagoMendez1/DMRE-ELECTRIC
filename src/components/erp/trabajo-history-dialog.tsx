@@ -113,6 +113,106 @@ interface TrabajoHistoryDialogProps {
     defaultTab?: 'detalles' | 'items' | 'preview' | 'historial';
 }
 
+// --- FINANCIAL SUB-COMPONENT ---
+function FinancialTabContent({ trabajoId, totalTrabajo }: { trabajoId: string, totalTrabajo: number }) {
+    const { facturas } = useErp();
+
+    const jobInvoices = useMemo(() => {
+        return facturas.filter(f => f.cotizacionId === trabajoId || f.trabajoId === trabajoId);
+    }, [facturas, trabajoId]);
+
+    const stats = useMemo(() => {
+        const billed = jobInvoices.reduce((sum, f) => sum + (f.estado !== 'PAGADA' && f.estado !== 'PENDIENTE' && f.estado !== 'PARCIAL' ? 0 : f.valorFacturado), 0);
+        // Note: Counting ALL valid invoices.
+
+        const paid = jobInvoices.reduce((sum, f) => sum + (f.valorPagado || (f.valorFacturado - f.saldoPendiente)), 0);
+
+        return {
+            billed,
+            paid,
+            pendingBill: Math.max(0, totalTrabajo - billed),
+            pendingPay: billed - paid
+        };
+    }, [jobInvoices, totalTrabajo]);
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-4 gap-4">
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Total Trabajo</CardTitle></CardHeader>
+                    <CardContent><div className="text-2xl font-bold">{formatCurrency(totalTrabajo)}</div></CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Facturado</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-blue-600">{formatCurrency(stats.billed)}</div>
+                        <Progress value={(stats.billed / totalTrabajo) * 100} className="h-2 mt-2" />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Recaudado (Pagado)</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.paid)}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {stats.billed > 0 ? Math.round((stats.paid / stats.billed) * 100) : 0}% de lo facturado
+                        </p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Por Facturar</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-orange-600">{formatCurrency(stats.pendingBill)}</div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Historial de Facturación</CardTitle>
+                    <CardDescription>Facturas emitidas asociadas a este trabajo</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {jobInvoices.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            No hay facturas registradas para este trabajo.
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>N° Factura</TableHead>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Estado</TableHead>
+                                    <TableHead>Total</TableHead>
+                                    <TableHead>Pagado</TableHead>
+                                    <TableHead>Saldo</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {jobInvoices.map(f => (
+                                    <TableRow key={f.id}>
+                                        <TableCell className="font-mono font-medium">{f.numero || f.id}</TableCell>
+                                        <TableCell>{format(new Date(f.fechaEmision), "dd/MM/yyyy")}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={f.estado === 'PAGADA' ? 'default' : f.estado === 'PARCIAL' ? 'secondary' : 'outline'}
+                                                className={f.estado === 'PAGADA' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}>
+                                                {f.estado}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>{formatCurrency(f.valorFacturado)}</TableCell>
+                                        <TableCell className="text-green-600 font-medium">{formatCurrency(f.valorPagado || (f.valorFacturado - f.saldoPendiente))}</TableCell>
+                                        <TableCell className="text-red-500">{formatCurrency(f.saldoPendiente)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 const getStatusColor = (estado: EstadoCotizacion): string => {
     switch (estado) {
         case 'BORRADOR': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';

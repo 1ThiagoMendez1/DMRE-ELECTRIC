@@ -183,24 +183,21 @@ export async function payNominaAction(empleadoId: string, periodo: string, valor
             tipo: 'EGRESO',
             categoria: 'NOMINA',
             descripcion: `Pago Nómina ${periodo}`,
-            monto: valor,
+            valor: valor,
             cuenta_id: cuentaBancariaId,
             referencia: `EMP-${empleadoId}`
         });
 
     if (movError) {
         console.error("Error creating nomina movement:", movError);
-        throw new Error("Failed to create financial movement");
+        throw new Error("Failed to create financial movement: " + movError.message);
     }
 
     // 2. Update Bank Balance
-    const { data: bank } = await supabase.from('cuentas_bancarias').select('saldo').eq('id', cuentaBancariaId).single();
-    if (bank) {
-        await supabase
-            .from('cuentas_bancarias')
-            .update({ saldo: (Number(bank.saldo) || 0) - valor })
-            .eq('id', cuentaBancariaId);
-    }
+    await supabase.rpc("update_cuenta_saldo", {
+        cuenta_uuid: cuentaBancariaId,
+        delta_valor: -valor
+    });
 
     revalidatePath("/dashboard/sistema/talento-humano");
     revalidatePath("/dashboard/sistema/financiera");

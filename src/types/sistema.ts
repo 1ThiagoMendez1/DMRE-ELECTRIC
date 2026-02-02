@@ -186,7 +186,7 @@ export interface ComentarioCotizacion {
 // --- NEW ERP MODULES TYPES ---
 
 // 1. FACTURACION
-export type EstadoFactura = 'PENDIENTE' | 'PARCIAL' | 'CANCELADA';
+export type EstadoFactura = 'BORRADOR' | 'PENDIENTE' | 'PARCIAL' | 'PAGADA' | 'VENCIDA' | 'ANULADA';
 
 export interface Factura {
     id: string; // Consecutivo DIAN opcional o interno
@@ -218,14 +218,15 @@ export interface CuentaBancaria {
     id: string;
     nombre: string;
     tipo: TipoCuenta;
-    saldoActual: number;
-    numeroCuenta?: string;
     banco?: string;
-    // Extended DB fields (aliases)
-    saldo?: number; // alias for saldoActual
-    moneda?: string;
-    estado?: string;
+    numeroCuenta?: string;
+    tipoCuenta?: string; // AHORROS, CORRIENTE
     titular?: string;
+    saldoInicial?: number;
+    saldoActual: number;
+    activa?: boolean;
+    principal?: boolean;
+    notas?: string;
 }
 
 export type TipoMovimiento = 'INGRESO' | 'EGRESO';
@@ -236,30 +237,44 @@ export interface MovimientoFinanciero {
     fecha: Date;
     tipo: TipoMovimiento;
     cuentaId: string;
-    cuenta?: CuentaBancaria; // Relación
+    cuenta?: Partial<CuentaBancaria>; // Relation
     categoria: CategoriaMovimiento;
-    tercero?: string; // Beneficiario o Pagador
-    concepto?: string; // or descripcion
-    valor?: number; // or monto
-    ofertaId?: string; // Trazabilidad opcional
-    // Extended DB fields
+    tercero?: string;
+    concepto?: string;
     descripcion?: string;
-    monto?: number;
-    referencia?: string;
+    valor: number;
+    // Foreign Keys
+    facturaId?: string;
+    trabajoId?: string;
+    cuentaPorPagarId?: string;
+    // Documents
+    numeroDocumento?: string;
     comprobanteUrl?: string;
-    usuarioId?: string;
-    conciliado?: boolean;
+    // Audit
+    registradoPor?: string;
+    aprobado?: boolean;
+    aprobadoPor?: string;
 }
+
+export type TipoObligacion = 'PRESTAMO' | 'LEASING' | 'TARJETA_CREDITO' | 'OTRO';
+export type EstadoObligacion = 'ACTIVO' | 'PAGADO' | 'MORA' | 'CANCELADO';
 
 export interface ObligacionFinanciera {
     id: string;
+    tipo?: TipoObligacion;
     entidad: string;
+    descripcion?: string;
     montoPrestado: number;
-    tasaInteres: number; // % E.A. o M.V.
+    tasaInteres: number;
     plazoMeses: number;
-    saldoCapital: number;
-    valorCuota: number;
     fechaInicio: Date;
+    fechaFin?: Date;
+    valorCuota: number;
+    cuotasPagadas?: number;
+    saldoCapital: number;
+    estado?: EstadoObligacion;
+    cuentaId?: string;
+    observaciones?: string;
     pagos?: PagoObligacion[];
 }
 
@@ -271,6 +286,7 @@ export interface PagoObligacion {
     capital?: number;
     saldoRestante: number;
 }
+
 
 // 3. OPERACIONES (Inventario Movements extended)
 export type TipoMovimientoInventario = 'ENTRADA' | 'SALIDA';

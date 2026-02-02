@@ -194,9 +194,11 @@ export async function getGastosVehiculosAction(): Promise<GastoVehiculo[]> {
     return data.map(mapGastoToUI);
 }
 
-export async function createGastoVehiculoAction(gasto: Omit<GastoVehiculo, "id">): Promise<GastoVehiculo> {
+export async function createGastoVehiculoAction(gasto: Omit<GastoVehiculo, "id">, cuentaId?: string): Promise<GastoVehiculo> {
     const supabase = await createClient();
     const dbData = mapGastoToDB(gasto);
+
+    const { data: vehiculo } = await supabase.from('vehiculos').select('placa').eq('id', gasto.vehiculoId).single();
 
     const { data, error } = await supabase
         .from("gastos_vehiculos")
@@ -206,10 +208,36 @@ export async function createGastoVehiculoAction(gasto: Omit<GastoVehiculo, "id">
 
     if (error) {
         console.error("Error creating gasto_vehiculo:", error);
-        throw new Error("Failed to create gasto_vehiculo");
+        throw new Error("Failed to create gasto_vehiculo: " + error.message);
+    }
+
+    // If a bank account is provided, create a financial movement
+    if (cuentaId) {
+        const { error: movError } = await supabase
+            .from("movimientos_financieros")
+            .insert({
+                tipo: 'EGRESO',
+                categoria: 'OTROS', // Or add a VEHICULO category
+                concepto: `Gasto Vehículo ${vehiculo?.placa || ''}`,
+                descripcion: `${gasto.tipo}: ${gasto.descripcion || ''} - ${gasto.proveedor}`,
+                valor: gasto.valor,
+                fecha: gasto.fecha,
+                cuenta_id: cuentaId
+            });
+
+        if (movError) {
+            console.error("Error creating financial movement for vehicle expense:", movError);
+        } else {
+            // Update bank balance
+            await supabase.rpc("update_cuenta_saldo", {
+                cuenta_uuid: cuentaId,
+                delta_valor: -gasto.valor
+            });
+        }
     }
 
     revalidatePath("/dashboard/sistema/activos");
+    revalidatePath("/dashboard/sistema/financiera");
     return mapGastoToUI(data);
 }
 

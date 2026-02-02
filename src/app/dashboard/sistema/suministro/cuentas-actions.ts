@@ -150,21 +150,18 @@ export async function payCuentaPorPagarAction(id: string, cuentaBancariaId: stri
             tipo: 'EGRESO',
             categoria: 'PROVEEDORES',
             descripcion: `Pago Factura Proveedor ${cxp.numero_factura || ''}`,
-            monto: valor,
+            valor: valor,
             cuenta_id: cuentaBancariaId,
             referencia: cxp.numero_factura
         });
 
-    if (movError) throw new Error("Failed to create financial movement");
+    if (movError) throw new Error("Failed to create financial movement: " + movError.message);
 
     // 4. Update Bank Balance
-    const { data: bank } = await supabase.from('cuentas_bancarias').select('saldo').eq('id', cuentaBancariaId).single();
-    if (bank) {
-        await supabase
-            .from('cuentas_bancarias')
-            .update({ saldo: (Number(bank.saldo) || 0) - valor })
-            .eq('id', cuentaBancariaId);
-    }
+    await supabase.rpc("update_cuenta_saldo", {
+        cuenta_uuid: cuentaBancariaId,
+        delta_valor: -valor
+    });
 
     revalidatePath("/dashboard/sistema/suministro");
     revalidatePath("/dashboard/sistema/financiera");
