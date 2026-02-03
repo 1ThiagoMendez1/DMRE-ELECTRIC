@@ -43,6 +43,9 @@ const itemSchema = z.object({
     precioProveedor: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
     valorUnitario: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
     proveedorId: z.string().min(1, "Proveedor requerido"),
+    marca: z.string().optional(),
+    modelo: z.string().optional(),
+    notas: z.string().optional(),
 });
 
 interface EditInventoryDialogProps {
@@ -68,7 +71,10 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
             stockMinimo: articulo.stockMinimo?.toString() || "10",
             precioProveedor: (articulo.precioProveedor || articulo.costoMateriales || 0).toString(),
             valorUnitario: articulo.valorUnitario?.toString() || "0",
-            proveedorId: articulo.proveedorId || ""
+            proveedorId: articulo.proveedorId || "",
+            marca: articulo.marca || "",
+            modelo: articulo.modelo || "",
+            notas: articulo.notas || ""
         },
     });
 
@@ -85,7 +91,10 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
                 stockMinimo: articulo.stockMinimo?.toString() || "10",
                 precioProveedor: (articulo.precioProveedor || articulo.costoMateriales || 0).toString(),
                 valorUnitario: articulo.valorUnitario?.toString() || "0",
-                proveedorId: articulo.proveedorId || ""
+                proveedorId: articulo.proveedorId || "",
+                marca: articulo.marca || "",
+                modelo: articulo.modelo || "",
+                notas: articulo.notas || ""
             });
         }
     }, [articulo, open, form]);
@@ -106,7 +115,10 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
             costoMateriales: Number(values.precioProveedor), // Keep for compat
             valorUnitario: Number(values.valorUnitario),
             valorTotal: Number(values.cantidad) * Number(values.valorUnitario),
-            proveedorId: values.proveedorId
+            proveedorId: values.proveedorId,
+            marca: values.marca || "",
+            modelo: values.modelo || "",
+            notas: values.notas || ""
         };
 
         onItemUpdated(updated);
@@ -167,6 +179,35 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
                                                 <SelectItem value="EPP">EPP</SelectItem>
                                             </SelectContent>
                                         </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="marca"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Marca</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="E.g. Schneider, 3M" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="modelo"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Modelo / Referencia</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="E.g. iC60N" {...field} />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}

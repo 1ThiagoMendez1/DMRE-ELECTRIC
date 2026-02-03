@@ -16,16 +16,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
 import { useErp } from "@/components/providers/erp-provider";
-import { BarChart as BarIcon, Package, FileText, TrendingUp, History, DollarSign } from "lucide-react";
+import { BarChart as BarIcon, Package, FileText, TrendingUp, History, DollarSign, Pencil, Save, X, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
     ResponsiveContainer,
 } from "recharts";
+
+const supplierSchema = z.object({
+    nombre: z.string().min(3, "Nombre requerido"),
+    nit: z.string().min(5, "NIT requerido"),
+    correo: z.string().email("Correo inválido"),
+    telefono: z.string().optional(),
+    categoria: z.string().min(1, "Categoría requerida"),
+    datosBancarios: z.string().optional(),
+    notas: z.string().optional(),
+});
 
 interface SupplierDetailDialogProps {
     open: boolean;
@@ -34,13 +45,40 @@ interface SupplierDetailDialogProps {
 }
 
 export function SupplierDetailDialog({ open, onOpenChange, proveedor }: SupplierDetailDialogProps) {
-    const { ordenesCompra, cuentasPorPagar, inventario } = useErp();
+    const { ordenesCompra, cuentasPorPagar, inventario, updateProveedor } = useErp();
+    const { toast } = useToast();
     const [selectedProduct, setSelectedProduct] = useState<string>("default");
+    const [isEditing, setIsEditing] = useState(false);
 
-    // Reset selection when provider changes
+    const form = useForm<z.infer<typeof supplierSchema>>({
+        resolver: zodResolver(supplierSchema),
+        defaultValues: {
+            nombre: "",
+            nit: "",
+            correo: "",
+            telefono: "",
+            categoria: "",
+            datosBancarios: "",
+            notas: "",
+        },
+    });
+
+    // Sync form with proveedor
     useEffect(() => {
-        if (open) setSelectedProduct("default");
-    }, [open, proveedor]);
+        if (open && proveedor) {
+            form.reset({
+                nombre: proveedor.nombre || "",
+                nit: proveedor.nit || "",
+                correo: proveedor.correo || "",
+                telefono: proveedor.telefono || "",
+                categoria: proveedor.categoria || "",
+                datosBancarios: proveedor.datosBancarios || "",
+                notas: proveedor.notas || "",
+            });
+            setSelectedProduct("default");
+            setIsEditing(false);
+        }
+    }, [open, proveedor, form]);
 
     const stats = useMemo(() => {
         if (!proveedor || !ordenesCompra) return null;
@@ -109,20 +147,51 @@ export function SupplierDetailDialog({ open, onOpenChange, proveedor }: Supplier
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                 <DialogHeader>
-                    {/* ... (Header remains same) */}
                     <div className="flex justify-between items-start">
-                        <div>
-                            <DialogTitle className="text-2xl flex items-center gap-2">
-                                {proveedor.nombre}
-                                <Badge variant="outline">{proveedor.categoria}</Badge>
-                            </DialogTitle>
-                            <DialogDescription>
-                                NIT: {proveedor.nit} • {proveedor.correo}
-                            </DialogDescription>
+                        <div className="flex-1">
+                            {isEditing ? (
+                                <DialogTitle className="text-2xl">Editar Proveedor</DialogTitle>
+                            ) : (
+                                <>
+                                    <DialogTitle className="text-2xl flex items-center gap-2">
+                                        {proveedor.nombre}
+                                        <Badge variant="outline">{proveedor.categoria}</Badge>
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        NIT: {proveedor.nit} • {proveedor.correo}
+                                    </DialogDescription>
+                                </>
+                            )}
                         </div>
-                        <div className="text-right">
-                            <p className="text-sm font-medium text-muted-foreground">Total Comprado</p>
-                            <p className="text-xl font-bold text-primary">{formatCurrency(stats?.totalPurchased || 0)}</p>
+                        <div className="flex gap-2">
+                            {!isEditing ? (
+                                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
+                                    <Pencil className="h-4 w-4" /> Editar
+                                </Button>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} className="gap-2">
+                                        <X className="h-4 w-4" /> Cancelar
+                                    </Button>
+                                    <Button variant="default" size="sm" onClick={form.handleSubmit(async (values) => {
+                                        try {
+                                            const updated = { ...proveedor, ...values };
+                                            await updateProveedor(updated);
+                                            toast({ title: "Proveedor Actualizado", description: "Los cambios se guardaron correctamente." });
+                                            setIsEditing(false);
+                                        } catch (error) {
+                                            toast({ title: "Error", description: "No se pudo actualizar el proveedor.", variant: "destructive" });
+                                        }
+                                    })} className="gap-2" disabled={form.formState.isSubmitting}>
+                                        {form.formState.isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                        Guardar
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="text-right ml-4">
+                                <p className="text-sm font-medium text-muted-foreground">Total Comprado</p>
+                                <p className="text-xl font-bold text-primary">{formatCurrency(stats?.totalPurchased || 0)}</p>
+                            </div>
                         </div>
                     </div>
                 </DialogHeader>
@@ -137,41 +206,77 @@ export function SupplierDetailDialog({ open, onOpenChange, proveedor }: Supplier
 
                     <div className="flex-1 overflow-y-auto mt-2 p-1">
                         <TabsContent value="overview" className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium">Pedidos Totales</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold">{stats?.orderCount}</div>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium">Saldo Pendiente</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold text-red-600">{formatCurrency(stats?.totalPending || 0)}</div>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium">Top Material</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-sm font-bold truncate" title={stats?.topItemName}>{stats?.topItemName}</div>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                            {isEditing ? (
+                                <Form {...form}>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <FormField control={form.control} name="nombre" render={({ field }) => (
+                                            <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name="nit" render={({ field }) => (
+                                            <FormItem><FormLabel>NIT</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name="correo" render={({ field }) => (
+                                            <FormItem><FormLabel>Correo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name="categoria" render={({ field }) => (
+                                            <FormItem><FormLabel>Categoría</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name="datosBancarios" render={({ field }) => (
+                                            <FormItem className="col-span-2"><FormLabel>Datos Bancarios</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name="notas" render={({ field }) => (
+                                            <FormItem className="col-span-2"><FormLabel>Notas / Proyecto</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                    </div>
+                                </Form>
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-medium">Pedidos Totales</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-2xl font-bold">{stats?.orderCount}</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-medium">Saldo Pendiente</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-2xl font-bold text-red-600">{formatCurrency(stats?.totalPending || 0)}</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-medium">Top Material</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-sm font-bold truncate" title={stats?.topItemName}>{stats?.topItemName}</div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Datos Bancarios</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-muted-foreground">{proveedor.datosBancarios || "No registrado"}</p>
-                                </CardContent>
-                            </Card>
+                                    <Card>
+                                        <CardHeader className="flex flex-row items-center justify-between py-2">
+                                            <CardTitle className="text-base">Datos Bancarios</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <p className="text-sm text-muted-foreground">{proveedor.datosBancarios || "No registrado"}</p>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card>
+                                        <CardHeader className="flex flex-row items-center justify-between py-2">
+                                            <CardTitle className="text-base">Notas / Proyecto</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <p className="text-sm text-muted-foreground">{proveedor.notas || "Sin notas registradas"}</p>
+                                        </CardContent>
+                                    </Card>
+                                </>
+                            )}
                         </TabsContent>
 
                         <TabsContent value="history">

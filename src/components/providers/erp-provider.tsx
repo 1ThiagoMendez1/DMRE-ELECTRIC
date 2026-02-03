@@ -17,12 +17,13 @@ import { getCodigosTrabajoAction, createCodigoTrabajoAction, updateCodigoTrabajo
 import { getVehiculosAction, createVehiculoAction, updateVehiculoAction, getGastosVehiculosAction, createGastoVehiculoAction } from "@/app/dashboard/sistema/activos/actions";
 import { getCotizacionesAction, createCotizacionAction, updateCotizacionAction, deleteCotizacionAction } from "@/app/dashboard/sistema/cotizacion/actions";
 import { getFacturasAction, createFacturaAction, updateFacturaAction } from "@/app/dashboard/sistema/financiera/actions";
-import { getDotacionItemsAction, getEntregasDotacionAction, createEntregaDotacionAction, updateDotacionItemAction } from "@/app/dashboard/sistema/dotacion/actions";
+import { getDotacionItemsAction, getEntregasDotacionAction, createEntregaDotacionAction, updateDotacionItemAction, updateEntregaDotacionAction } from "@/app/dashboard/sistema/dotacion/actions";
 import { getCuentasPorPagarAction, updateCuentaPorPagarAction, payCuentaPorPagarAction } from "@/app/dashboard/sistema/suministro/cuentas-actions";
 import { getCuentasBancariasAction, createCuentaBancariaAction, updateCuentaBancariaAction, getMovimientosFinancierosAction, createMovimientoFinancieroAction, updateMovimientoFinancieroAction } from "@/app/dashboard/sistema/financiera/bancos-actions";
 import { getObligacionesFinancierasAction, createObligacionFinancieraAction, updateObligacionFinancieraAction, deleteObligacionFinancieraAction } from "@/app/dashboard/sistema/financiera/obligaciones-actions";
 import { getNovedadesNominaAction, createNovedadNominaAction, updateNovedadNominaAction, deleteNovedadNominaAction } from "@/app/dashboard/sistema/talento-humano/novedades-actions";
 import { getEmpleadosAction, createEmpleadoAction, updateEmpleadoAction, deleteEmpleadoAction, payNominaAction } from "@/app/dashboard/sistema/talento-humano/actions";
+import { getOrdenesCompraAction, createOrdenCompraAction, updateOrdenCompraAction } from "@/app/dashboard/sistema/suministro/ordenes-actions";
 
 // Fallback mock data for users (until profiles table is connected)
 const initialUsers: User[] = [
@@ -89,10 +90,11 @@ interface ErpContextType {
 
     // Dotacion Actions
     updateDotacionItem: (item: DotacionItem) => void;
+    updateEntregaDotacion: (id: string, updates: Partial<EntregaDotacion>) => void;
     addEntregaDotacion: (entrega: EntregaDotacion) => void;
 
     // Gastos Vehiculo Actions
-    addGastoVehiculo: (gasto: GastoVehiculo) => void;
+    addGastoVehiculo: (gasto: GastoVehiculo, cuentaId?: string) => void;
 
     // Cuentas por Pagar Actions
     updateCuentaPorPagar: (updated: CuentaPorPagar) => void;
@@ -122,6 +124,10 @@ interface ErpContextType {
     // Payment Actions
     payCuentaPorPagar: (id: string, cuentaBancariaId: string, valor: number, fecha: Date) => Promise<void>;
     payNomina: (empleadoId: string, periodo: string, valor: number, cuentaBancariaId: string, fecha: Date) => Promise<void>;
+
+    // Orden Compra Actions
+    addOrdenCompra: (oc: any) => Promise<void>;
+    updateOrdenCompra: (id: string, oc: any) => Promise<void>;
 
     // Refresh function
     refreshData: () => Promise<void>;
@@ -177,6 +183,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 obligacionesData,
                 novedadesData,
                 empleadosData,
+                ordenesData,
             ] = await Promise.all([
                 getClientsAction().catch(() => []),
                 getProveedoresAction().catch(() => []),
@@ -194,6 +201,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 getObligacionesFinancierasAction().catch(() => []),
                 getNovedadesNominaAction().catch(() => []),
                 getEmpleadosAction().catch(() => []),
+                getOrdenesCompraAction().catch(() => []),
             ]);
 
             setClientes(clientesData);
@@ -212,6 +220,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setObligacionesFinancieras(obligacionesData || []);
             setNovedadesNomina(novedadesData || []);
             setEmpleados(empleadosData || []);
+            setOrdenesCompra(ordenesData || []);
         } catch (error) {
             console.error("Error loading data:", error);
         } finally {
@@ -426,6 +435,15 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const updateEntregaDotacion = async (id: string, updates: Partial<EntregaDotacion>) => {
+        try {
+            const saved = await updateEntregaDotacionAction(id, updates);
+            setEntregasDotacion(prev => prev.map(e => e.id === saved.id ? saved : e));
+        } catch (error) {
+            console.error("Failed to update entrega dotacion:", error);
+        }
+    };
+
     // =============================================
     // GASTOS VEHICULO ACTIONS
     // =============================================
@@ -607,6 +625,20 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const addOrdenCompra = async (oc: any) => {
+        try {
+            const saved = await createOrdenCompraAction(oc);
+            setOrdenesCompra(prev => [saved, ...prev]);
+        } catch (error) { console.error("Error adding OC:", error); }
+    };
+
+    const updateOrdenCompra = async (id: string, oc: any) => {
+        try {
+            const saved = await updateOrdenCompraAction(id, oc);
+            setOrdenesCompra(prev => prev.map(o => o.id === saved.id ? saved : o));
+        } catch (error) { console.error("Error updating OC:", error); }
+    };
+
     return (
         <ErpContext.Provider value={{
             // Data
@@ -628,6 +660,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             updateProveedor, addProveedor, deleteProveedor,
             updateVehiculo, addVehiculo,
             updateDotacionItem, addEntregaDotacion,
+            updateEntregaDotacion,
             addGastoVehiculo,
             updateCuentaPorPagar: updateCuentaPorPagarHandler,
             addCodigoTrabajo, updateCodigoTrabajo, deleteCodigoTrabajo,
@@ -638,6 +671,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addNovedadNomina, updateNovedadNomina, deleteNovedadNomina,
             addEmpleado, updateEmpleado, deleteEmpleado,
             payCuentaPorPagar, payNomina,
+
+            addOrdenCompra, updateOrdenCompra,
 
             // Refresh
             refreshData: loadAllData,

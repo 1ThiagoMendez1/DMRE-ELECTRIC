@@ -38,6 +38,7 @@ const formSchema = z.object({
     categoria: z.enum(["MATERIALES", "SERVICIOS", "MIXTO"] as const),
     correo: z.string().email("Correo electrónico inválido"),
     datosBancarios: z.string().min(5, "Datos bancarios requeridos"),
+    notas: z.string().optional(),
 });
 
 interface CreateSupplierDialogProps {
@@ -54,7 +55,8 @@ export function CreateSupplierDialog({ onSupplierCreated }: CreateSupplierDialog
             nit: "",
             categoria: "MATERIALES",
             correo: "",
-            datosBancarios: ""
+            datosBancarios: "",
+            notas: ""
         },
     });
 
@@ -156,6 +158,19 @@ export function CreateSupplierDialog({ onSupplierCreated }: CreateSupplierDialog
                                     <FormLabel>Datos Bancarios</FormLabel>
                                     <FormControl>
                                         <Input placeholder="Ej: Bancolombia Ahorros 123..." {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="notas"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Notas / Observaciones</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Ej: No atiende los lunes..." {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

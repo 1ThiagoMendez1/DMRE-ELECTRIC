@@ -67,6 +67,7 @@ export interface InventarioItem {
     nombre?: string;
     marca?: string;
     modelo?: string;
+    notas?: string;
     imagenUrl?: string;
     activo?: boolean;
 }
@@ -346,6 +347,7 @@ export type EstadoOrdenCompra = 'PENDIENTE' | 'ENVIADA' | 'PARCIAL' | 'RECIBIDA'
 
 export interface DetalleCompra {
     id: string;
+    ordenCompraId: string;
     inventarioId: string;
     descripcion: string;
     cantidad: number;
@@ -614,6 +616,7 @@ export interface Role {
 export interface MaterialAsociado {
     id: string;
     inventarioId?: string; // Reference to InventarioItem
+    subCodigoId?: string; // Reference to another CodigoTrabajo (Nested APU)
     nombre: string;
     cantidad: number;
     valorUnitario: number;

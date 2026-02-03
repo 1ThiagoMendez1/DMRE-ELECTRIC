@@ -117,6 +117,18 @@ export function InventoryItemDetailDialog({ open, onOpenChange, item, onItemUpda
                             </div>
                         </div>
                     </div>
+
+                    {item.notas && (
+                        <>
+                            <Separator />
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium">Notas / Proyecto</p>
+                                <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg border italic">
+                                    "{item.notas}"
+                                </p>
+                            </div>
+                        </>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>

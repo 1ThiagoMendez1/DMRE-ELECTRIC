@@ -5,7 +5,7 @@
 -- =============================================
 -- TABLA: profiles (vinculada a auth.users)
 -- =============================================
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     email TEXT,
     full_name TEXT,
@@ -18,6 +18,7 @@ CREATE TABLE public.profiles (
 );
 
 -- Trigger para updated_at
+DROP TRIGGER IF EXISTS update_profiles_modtime ON public.profiles;
 CREATE TRIGGER update_profiles_modtime
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION update_modified_column();
@@ -25,16 +26,19 @@ CREATE TRIGGER update_profiles_modtime
 -- RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON public.profiles;
 CREATE POLICY "Profiles are viewable by authenticated users"
     ON public.profiles FOR SELECT
     TO authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile"
     ON public.profiles FOR UPDATE
     TO authenticated
     USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admin can manage all profiles" ON public.profiles;
 CREATE POLICY "Admin can manage all profiles"
     ON public.profiles FOR ALL
     TO authenticated
@@ -60,6 +64,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger para nuevos usuarios
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -67,7 +72,7 @@ CREATE TRIGGER on_auth_user_created
 -- =============================================
 -- TABLA: roles (roles personalizados)
 -- =============================================
-CREATE TABLE public.roles (
+CREATE TABLE IF NOT EXISTS public.roles (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     description TEXT,
@@ -76,6 +81,7 @@ CREATE TABLE public.roles (
     updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
+DROP TRIGGER IF EXISTS update_roles_modtime ON public.roles;
 CREATE TRIGGER update_roles_modtime
     BEFORE UPDATE ON public.roles
     FOR EACH ROW EXECUTE FUNCTION update_modified_column();
