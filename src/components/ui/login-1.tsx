@@ -63,9 +63,39 @@ const AppInput = (props: InputProps) => {
     )
 }
 
+import { createClient } from '@/utils/supabase/client';
+import { useRouter } from 'next/navigation';
+
+// ... (InputProps and AppInput remain unchanged)
+
 const StartLoginOne = () => {
     const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isHovering, setIsHovering] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
+    const supabase = createClient();
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (error) {
+            setError(error.message);
+            setLoading(false);
+        } else {
+            router.push('/dashboard');
+            router.refresh();
+        }
+    };
 
     const electricalImages = [
         "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e", // Power lines
@@ -118,7 +148,7 @@ const StartLoginOne = () => {
                         }}
                     />
                     <div className="form-container sign-in-container h-full z-10 relative">
-                        <form className='text-center py-6 grid gap-2 h-full content-center' onSubmit={(e) => { e.preventDefault(); }}>
+                        <form className='text-center py-6 grid gap-2 h-full content-center' onSubmit={handleLogin}>
                             <div className='grid gap-4 md:gap-6 mb-2 justify-items-center'>
                                 <div className="relative h-32 w-32">
                                     <Image
@@ -137,18 +167,35 @@ const StartLoginOne = () => {
                                 <span className='text-sm text-[var(--color-text-secondary)]'>Usa tus credenciales para ingresar</span>
                             </div>
                             <div className='grid gap-4 items-center max-w-sm mx-auto w-full'>
-                                <AppInput placeholder="Email" type="email" />
-                                <AppInput placeholder="Password" type="password" />
+                                <AppInput
+                                    placeholder="Email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    disabled={loading}
+                                />
+                                <AppInput
+                                    placeholder="Password"
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    disabled={loading}
+                                />
                             </div>
+                            {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                             <a href="#" className='font-light text-sm md:text-md text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors mt-4 block'>¿Olvidaste tu contraseña?</a>
                             <div className='flex gap-4 justify-center items-center mt-6'>
                                 <button
-                                    className="group/button relative inline-flex justify-center items-center overflow-hidden rounded-md bg-[var(--color-border)] px-4 py-1.5 text-xs font-normal text-white transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-lg hover:shadow-[var(--color-text-primary)] cursor-pointer"
+                                    type="submit"
+                                    disabled={loading}
+                                    className="group/button relative inline-flex justify-center items-center overflow-hidden rounded-md bg-[var(--color-border)] px-4 py-1.5 text-xs font-normal text-white transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-lg hover:shadow-[var(--color-text-primary)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <span className="text-sm px-6 py-2">Iniciar Sesión</span>
-                                    <div className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-13deg)_translateX(-100%)] group-hover/button:duration-1000 group-hover/button:[transform:skew(-13deg)_translateX(100%)]">
-                                        <div className="relative h-full w-8 bg-white/20" />
-                                    </div>
+                                    <span className="text-sm px-6 py-2">{loading ? 'Ingresando...' : 'Iniciar Sesión'}</span>
+                                    {!loading && (
+                                        <div className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-13deg)_translateX(-100%)] group-hover/button:duration-1000 group-hover/button:[transform:skew(-13deg)_translateX(100%)]">
+                                            <div className="relative h-full w-8 bg-white/20" />
+                                        </div>
+                                    )}
                                 </button>
                             </div>
                         </form>

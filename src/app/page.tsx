@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { services, projects } from '@/lib/data';
+import { services } from '@/lib/data';
 import { getPlaceholderImage } from '@/lib/placeholder-images';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,8 +16,26 @@ import { AnimatedBackground } from '@/components/animated-background';
 import { LogIn, MoveRight } from 'lucide-react';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
+import { CircularGallery, type GalleryItem } from '@/components/ui/circular-gallery';
+import { getProjects, createContactRequest } from '@/actions/landing-actions';
 
-export default function Home() {
+// This is now a Server Component
+export default async function Home() {
+  const projectsData = await getProjects();
+
+  // Transform DB projects to gallery items
+  const galleryItems: GalleryItem[] = projectsData
+    ? projectsData.filter((p: any) => p.is_active).map((p: any) => ({
+      common: p.title,
+      binomial: p.category,
+      photo: {
+        url: p.image_url || 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&q=80&w=600',
+        text: p.description,
+        by: 'DMRE',
+      }
+    }))
+    : [];
+
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
       <Header />
@@ -92,32 +110,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Sección de Proyectos */}
-      <section id="projects" className="py-20 lg:py-32">
-        <div className="container mx-auto px-4">
+      {/* Sección Galería */}
+      <section id="gallery" className="py-20 lg:py-32 bg-background overflow-hidden relative">
+        <div className="container mx-auto px-4 text-center h-[600px] relative">
           <h2 className="text-4xl font-bold text-primary mb-2 font-headline">Vitrina de Proyectos</h2>
-          <p className="text-lg text-foreground/80 mb-12 max-w-2xl">
-            Un vistazo a nuestra cartera de proyectos de próxima generación ejecutados con éxito.
+          <p className="text-lg text-foreground/80 mb-12 max-w-2xl mx-auto">
+            Explora nuestros proyectos más recientes y destacados.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <Card key={project.id} className="group relative overflow-hidden rounded-lg border-border/50 bg-card/50">
-                <Image
-                  src={getPlaceholderImage(project.imageId)?.imageUrl || ''}
-                  alt={project.title}
-                  width={600}
-                  height={400}
-                  className="object-cover w-full h-60 transform transition-transform duration-500 group-hover:scale-110"
-                  data-ai-hint={getPlaceholderImage(project.imageId)?.imageHint}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                <div className="absolute bottom-0 left-0 p-6 text-white">
-                  <h3 className="text-xl font-bold text-primary-foreground mb-1 font-headline">{project.title}</h3>
-                  <p className="text-sm text-foreground/80">{project.description}</p>
-                </div>
-              </Card>
-            ))}
-          </div>
+          {galleryItems.length > 0 ? (
+            <CircularGallery items={galleryItems} />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">Pronto mostraremos nuestros proyectos aquí.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -130,19 +136,34 @@ export default function Home() {
               <p className="text-lg text-foreground/80 mb-8">
                 ¿Tienes un proyecto en mente o necesitas una consulta de expertos? Contáctanos y construyamos el futuro juntos.
               </p>
-              <form className="space-y-6">
+              <form action={async (formData) => {
+                'use server';
+                await createContactRequest(null, formData);
+              }} className="space-y-6">
                 <Input
+                  name="name"
                   type="text"
                   placeholder="Tu Nombre"
+                  required
                   className="bg-background/50 text-lg p-6 focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
                 />
                 <Input
+                  name="email"
                   type="email"
                   placeholder="Tu Email"
+                  required
+                  className="bg-background/50 text-lg p-6 focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
+                />
+                <Input
+                  name="phone"
+                  type="tel"
+                  placeholder="Tu Teléfono"
                   className="bg-background/50 text-lg p-6 focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
                 />
                 <Textarea
+                  name="message"
                   placeholder="Tu Mensaje"
+                  required
                   className="bg-background/50 text-lg p-6 min-h-[150px] focus-visible:ring-offset-background focus-visible:shadow-[0_0_15px_hsl(var(--ring)/0.5)] transition-shadow"
                 />
                 <Button type="submit" size="lg" className="w-full electric-button font-bold text-lg p-6">
@@ -151,7 +172,7 @@ export default function Home() {
               </form>
             </div>
             <div className="relative h-96 md:h-full w-full mt-8 md:mt-0">
-               <Image
+              <Image
                 src={getPlaceholderImage('contact-map')?.imageUrl || ''}
                 alt="Mapa estilizado"
                 fill

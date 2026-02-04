@@ -45,7 +45,7 @@ import { systemNavItems } from "@/lib/data";
 
 export default function UsuariosPage() {
     const { toast } = useToast();
-    const { users, updateUserPermissions, setCurrentUser, currentUser } = useErp();
+    const { users, updateUserPermissions, setCurrentUser, currentUser, deleteUser } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
 
     // No longer needing local state for users as it comes from context
@@ -55,6 +55,13 @@ export default function UsuariosPage() {
         // Implement add user in provider if needed, for now just a toast demo or we should add 'addUser' to context
         // For this task, we focus on permissions of existing users.
         toast({ title: "Información", description: "Creación de usuarios simulada (falta implementar en provider addUser)" });
+    };
+
+    const handleDeleteUser = async (userId: string) => {
+        if (confirm("¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.")) {
+            await deleteUser(userId);
+            toast({ title: "Usuario eliminado", description: "El usuario ha sido eliminado correctamente." });
+        }
     };
 
     const getRoleBadge = (role: string) => {
@@ -171,8 +178,8 @@ export default function UsuariosPage() {
                                                     <DropdownMenuItem onClick={() => setCurrentUser(user)}>
                                                         Simular Sesión (Demo)
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem className="text-red-600" onClick={() => toast({ title: "Desactivar", description: "Usuario desactivado temporalmente" })}>
-                                                        Desactivar Acceso
+                                                    <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteUser(user.id)}>
+                                                        Eliminar Usuario
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>

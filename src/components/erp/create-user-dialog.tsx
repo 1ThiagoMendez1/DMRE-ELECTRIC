@@ -43,29 +43,46 @@ interface CreateUserDialogProps {
     onUserCreated: (user: any) => void;
 }
 
+import { createNewUser } from "@/actions/auth-actions";
+import { useErp } from "@/components/providers/erp-provider";
+
+// ... (existing imports)
+
 export function CreateUserDialog({ onUserCreated }: CreateUserDialogProps) {
     const { toast } = useToast();
+    const { refreshUsers } = useErp();
     const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
+        // ... (resolver and defaults match existing)
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: "",
             email: "",
             password: "",
             role: "VIEWER",
-            sidebarAccess: ["dashboard"], // Default access to dashboard
+            sidebarAccess: ["dashboard"],
         },
     });
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        const newUser = {
-            id: `USR-${Math.floor(Math.random() * 1000)}`,
-            ...values,
-            avatar: "",
-        };
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        setLoading(true);
+        const res = await createNewUser(values);
+        setLoading(false);
 
-        onUserCreated(newUser);
+        if (res.error) {
+            toast({
+                title: "Error",
+                description: res.error,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (refreshUsers) await refreshUsers(); // Refresh the list
+
+        onUserCreated(res); // Optional fallback if needed by parent, but we refreshed context
         setOpen(false);
         form.reset();
         toast({

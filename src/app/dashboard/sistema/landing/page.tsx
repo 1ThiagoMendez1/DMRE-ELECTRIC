@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Card,
     CardContent,
@@ -32,26 +32,46 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Globe, Mail, Image as ImageIcon, Briefcase, CheckCircle2, XCircle, Clock } from "lucide-react";
-
-// Mock Data for Proposals
-const initialProposals = [
-    { id: 'PROP-001', name: 'Constructora Bolivar', email: 'proyectos@bolivar.com', phone: '3001234567', message: 'Interesados en cotización para conjunto residencial de 5 torres.', date: '2024-05-15', status: 'PENDIENTE' },
-    { id: 'PROP-002', name: 'Juan Perez', email: 'juan.perez@gmail.com', phone: '3109876543', message: 'Necesito instalación eléctrica para local comercial.', date: '2024-05-14', status: 'CONTACTADO' },
-    { id: 'PROP-003', name: 'Hotel Estelar', email: 'mantenimiento@estelar.com', phone: '3205551234', message: 'Requerimos mantenimiento preventivo de subestación.', date: '2024-05-12', status: 'CERRADO' },
-];
+import { Globe, Mail, Image as ImageIcon, Briefcase, CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { getProjects, createProject, updateProject, deleteProject, getContactRequests, updateContactRequestStatus } from "@/actions/landing-actions";
+import { ProjectImageUpload } from "@/components/project-image-upload";
 
 export default function LandingPageManagement() {
     const { toast } = useToast();
-    const [proposals, setProposals] = useState(initialProposals);
-    const [activeTab, setActiveTab] = useState("propuestas");
+    const [proposals, setProposals] = useState<any[]>([]);
+    const [projects, setProjects] = useState<any[]>([]);
+    const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+    const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
+    const [editingProject, setEditingProject] = useState<any | null>(null);
 
-    const handleStatusChange = (id: string, newStatus: string) => {
-        setProposals(proposals.map(p => p.id === id ? { ...p, status: newStatus } : p));
-        toast({
-            title: "Estado Actualizado",
-            description: `La propuesta ha sido marcada como ${newStatus}.`
-        });
+    useEffect(() => {
+        fetchProjects();
+        fetchProposals();
+    }, []);
+
+    async function fetchProjects() {
+        setIsLoadingProjects(true);
+        const data = await getProjects();
+        setProjects(data || []);
+        setIsLoadingProjects(false);
+    }
+
+    async function fetchProposals() {
+        const data = await getContactRequests();
+        setProposals(data || []);
+    }
+
+    const handleStatusChange = async (id: string, newStatus: string) => {
+        const result = await updateContactRequestStatus(id, newStatus);
+        if (result?.error) {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        } else {
+            setProposals(proposals.map(p => p.id === id ? { ...p, status: newStatus } : p));
+            toast({
+                title: "Estado Actualizado",
+                description: `La propuesta ha sido marcada como ${newStatus}.`
+            });
+        }
     };
 
     const getStatusBadge = (status: string) => {
@@ -63,6 +83,57 @@ export default function LandingPageManagement() {
         }
     };
 
+    const handleCreateProject = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const result = await createProject(null, formData);
+
+        if (result?.error) {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        } else {
+            toast({ title: "Éxito", description: "Proyecto creado correctamente." });
+            setIsProjectDialogOpen(false);
+            fetchProjects();
+        }
+    };
+
+    const handleUpdateProject = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!editingProject) return;
+        const formData = new FormData(e.currentTarget);
+        const result = await updateProject(editingProject.id, null, formData);
+
+        if (result?.error) {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        } else {
+            toast({ title: "Éxito", description: "Proyecto actualizado correctamente." });
+            setEditingProject(null);
+            setIsProjectDialogOpen(false);
+            fetchProjects();
+        }
+    };
+
+    const handleDeleteProject = async (id: string) => {
+        if (!confirm("¿Estás seguro de que deseas eliminar este proyecto?")) return;
+        const result = await deleteProject(id);
+        if (result?.error) {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        } else {
+            toast({ title: "Éxito", description: "Proyecto eliminado correctamente." });
+            fetchProjects();
+        }
+    };
+
+    const openCreateDialog = () => {
+        setEditingProject(null);
+        setIsProjectDialogOpen(true);
+    }
+
+    const openEditDialog = (project: any) => {
+        setEditingProject(project);
+        setIsProjectDialogOpen(true);
+    }
+
     return (
         <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
             {/* Header */}
@@ -71,7 +142,7 @@ export default function LandingPageManagement() {
                 <p className="text-muted-foreground">Administra el contenido de la web y visualiza las solicitudes de contacto.</p>
             </div>
 
-            <Tabs defaultValue="propuestas" className="w-full" onValueChange={setActiveTab}>
+            <Tabs defaultValue="contenido" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
                     <TabsTrigger value="propuestas">Solicitudes Web</TabsTrigger>
                     <TabsTrigger value="contenido">Gestión de Contenido</TabsTrigger>
@@ -137,88 +208,103 @@ export default function LandingPageManagement() {
 
                 {/* Content Management Tab */}
                 <TabsContent value="contenido" className="space-y-6">
-                    <div className="grid gap-6 md:grid-cols-2">
-                        {/* Projects/Gallery Section */}
-                        <Card>
-                            <CardHeader>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
                                 <CardTitle className="flex items-center gap-2">
-                                    <ImageIcon className="h-5 w-5" /> Galería de Proyectos
+                                    <ImageIcon className="h-5 w-5" /> Vitrina de Proyectos
                                 </CardTitle>
-                                <CardDescription>Gestiona las imágenes que aparecen en el carrusel y portafolio.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="relative aspect-video bg-muted rounded-md flex items-center justify-center border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors cursor-pointer group">
-                                        <div className="text-center space-y-2">
-                                            <div className="bg-background rounded-full p-2 inline-flex group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                                <ImageIcon className="h-6 w-6" />
+                                <CardDescription>Gestiona los proyectos que aparecen en la landing page.</CardDescription>
+                            </div>
+                            <Button onClick={openCreateDialog}>
+                                <Plus className="w-4 h-4 mr-2" /> Agregar Proyecto
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                {projects.map((project) => (
+                                    <div key={project.id} className="group relative border rounded-lg overflow-hidden bg-card">
+                                        <div className="relative h-48 w-full bg-muted">
+                                            {project.image_url ? (
+                                                <img src={project.image_url} alt={project.title} className="object-cover w-full h-full" />
+                                            ) : (
+                                                <div className="flex items-center justify-center w-full h-full text-muted-foreground">Sin Imagen</div>
+                                            )}
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => openEditDialog(project)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => handleDeleteProject(project.id)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </div>
-                                            <p className="text-xs text-muted-foreground font-medium">Subir Nueva Imagen</p>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <Badge variant="outline">{project.category}</Badge>
+                                                {project.is_active ? <Eye className="h-4 w-4 text-green-500" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                                            </div>
+                                            <h3 className="font-bold text-lg leading-tight mb-1">{project.title}</h3>
+                                            <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
                                         </div>
                                     </div>
-                                    {/* Mock Existing Images */}
-                                    <div className="relative aspect-video bg-muted rounded-md overflow-hidden group">
-                                        <img src="https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&q=80&w=300&h=200" className="object-cover w-full h-full" alt="Project 1" />
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <Button variant="destructive" size="sm">Eliminar</Button>
-                                        </div>
+                                ))}
+                                {projects.length === 0 && !isLoadingProjects && (
+                                    <div className="col-span-full py-12 text-center text-muted-foreground bg-muted/20 rounded-lg border-dashed border-2">
+                                        No hay proyectos registrados.
                                     </div>
-                                </div>
-                                <Button className="w-full" variant="outline">Ver toda la galería</Button>
-                            </CardContent>
-                        </Card>
-
-                        {/* Projects in Mind / Info */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Briefcase className="h-5 w-5" /> Proyectos Destacados
-                                </CardTitle>
-                                <CardDescription>Configura los proyectos que se resaltan en la página principal.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                                        <div>
-                                            <p className="font-medium">Centro de Datos Cuántico</p>
-                                            <p className="text-xs text-muted-foreground">Industrial • Visible en Home</p>
-                                        </div>
-                                        <Button variant="ghost" size="sm">Editar</Button>
-                                    </div>
-                                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                                        <div>
-                                            <p className="font-medium">Red Inteligente Metrópolis</p>
-                                            <p className="text-xs text-muted-foreground">Grids • Visible en Home</p>
-                                        </div>
-                                        <Button variant="ghost" size="sm">Editar</Button>
-                                    </div>
-                                </div>
-                                <Button className="w-full"> <PlusIcon className="mr-2 h-4 w-4" /> Agregar Proyecto Destacado</Button>
-                            </CardContent>
-                        </Card>
-                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
+
+            <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>{editingProject ? 'Editar Proyecto' : 'Nuevo Proyecto'}</DialogTitle>
+                        <DialogDescription>
+                            {editingProject ? 'Modifica los detalles del proyecto.' : 'Agrega un nuevo proyecto a la vitrina.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={editingProject ? handleUpdateProject : handleCreateProject} className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Imagen del Proyecto</Label>
+                            <ProjectImageUpload
+                                currentImageUrl={editingProject?.image_url}
+                                onImageUploaded={(url) => {
+                                    const input = document.getElementById('image_url_input') as HTMLInputElement;
+                                    if (input) input.value = url;
+                                }}
+                            />
+                            <input type="hidden" name="image_url" id="image_url_input" defaultValue={editingProject?.image_url || ''} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="title">Título</Label>
+                                <Input id="title" name="title" required defaultValue={editingProject?.title} placeholder="Ej: Red Inteligente" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Categoría</Label>
+                                <Input id="category" name="category" required defaultValue={editingProject?.category} placeholder="Ej: Industrial" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="description">Descripción</Label>
+                            <Textarea id="description" name="description" required defaultValue={editingProject?.description} placeholder="Breve descripción del proyecto..." />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <input type="checkbox" id="is_active" name="is_active" defaultChecked={editingProject?.is_active ?? true} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                            <Label htmlFor="is_active">Visible en la Landing</Label>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsProjectDialogOpen(false)}>Cancelar</Button>
+                            <Button type="submit">{editingProject ? 'Guardar Cambios' : 'Crear Proyecto'}</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
-}
-
-function PlusIcon(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
-        </svg>
-    )
 }
