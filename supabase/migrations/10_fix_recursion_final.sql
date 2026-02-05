@@ -1,21 +1,15 @@
 -- =============================================
 -- 10_FIX_RECURSION_FINAL.SQL
--- Fixes infinite recursion in RLS policies by correctly using SECURITY DEFINER
--- Also fixes RLS policies for Roles and Agenda tables
+-- Fixes infinite recursion by using SECURITY DEFINER and CASCADE drop
 -- =============================================
 
--- 1. Drop the problematic policies and function first to ensure clean state
-DROP POLICY IF EXISTS "Admin can manage all profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Users can see own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
-DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON public.profiles;
+-- 1. DROP FUNCTION WITH CASCADE
+-- This is necessary because some policies (on agenda/roles) depend on this function.
+-- CASCADE will automatically remove those dependent policies so we can recreate them clean.
+DROP FUNCTION IF EXISTS public.get_current_user_role() CASCADE;
 
-DROP FUNCTION IF EXISTS public.get_current_user_role();
-
--- 2. Recreate the helper function with stricter settings
+-- 2. RECREATE THE HELPER FUNCTION
 -- SECURITY DEFINER: Runs with permissions of the creator (usually postgres/admin), bypassing RLS
--- SET search_path: Prevents search_path hijacking
 CREATE OR REPLACE FUNCTION public.get_current_user_role()
 RETURNS text
 LANGUAGE plpgsql
@@ -36,11 +30,22 @@ BEGIN
 END;
 $$;
 
--- 3. Re-apply policies on Profiles
--- IMPORTANT: Split into "Own Profile" (no function call) and "Admin Access" (function call)
--- This breaks the recursion for standard users accessing their own data.
+-- 3. RECREATE/UPDATE POLICIES
 
--- A) Users can see their own profile matches their ID
+-- We must manually cleanup any potential remaining policies that CASCADE didn't catch 
+-- (mostly just to be sure we don't have duplicates if names differed),
+-- then we recreate everything consistently.
+
+-- ==========================
+-- A) PROFILES POLICIES
+-- ==========================
+-- Drop old variations just in case
+DROP POLICY IF EXISTS "Admin can manage all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users can see own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON public.profiles;
+
 CREATE POLICY "Users can see own profile"
     ON public.profiles FOR SELECT
     TO authenticated
@@ -49,7 +54,6 @@ CREATE POLICY "Users can see own profile"
         OR get_current_user_role() = 'ADMIN'
     );
 
--- B) Users can update their own profile
 CREATE POLICY "Users can update own profile"
     ON public.profiles FOR UPDATE
     TO authenticated
@@ -57,8 +61,6 @@ CREATE POLICY "Users can update own profile"
         id = auth.uid()
     );
 
--- C) Admins can manage ALL profiles
--- This uses the function, but since the function is SECURITY DEFINER, it won't check this policy again inside.
 CREATE POLICY "Admin can manage all profiles"
     ON public.profiles FOR ALL
     TO authenticated
@@ -67,19 +69,18 @@ CREATE POLICY "Admin can manage all profiles"
     );
 
 
--- 4. ROLES Table Policies
--- Previously causing RLS violation because "Only admin can manage roles" used a recursive check.
-
+-- ==========================
+-- B) ROLES POLICIES
+-- ==========================
+-- Need to drop if they weren't dropped by CASCADE (unlikely if they depended on the function, but good hygiene)
 DROP POLICY IF EXISTS "Roles viewable by authenticated" ON public.roles;
 DROP POLICY IF EXISTS "Only admin can manage roles" ON public.roles;
 
--- Everyone authenticated can view roles (needed for UI to show roles to assign, or at least list them)
 CREATE POLICY "Roles viewable by authenticated"
     ON public.roles FOR SELECT
     TO authenticated
     USING (true);
 
--- Only ADMIN can INSERT/UPDATE/DELETE roles
 CREATE POLICY "Only admin can manage roles"
     ON public.roles FOR ALL
     TO authenticated
@@ -88,10 +89,15 @@ CREATE POLICY "Only admin can manage roles"
     );
 
 
--- 5. UPDATE AGENDA/Other items to ensure they use the new safe function
--- (Re-applying these just to be safe)
-
+-- ==========================
+-- C) AGENDA POLICIES
+-- ==========================
+-- Similarly, drop ensuring clean slate before create
 DROP POLICY IF EXISTS "Users see own tasks or if admin" ON public.agenda;
+DROP POLICY IF EXISTS "Users can update own tasks" ON public.agenda;
+DROP POLICY IF EXISTS "Admin can delete tasks" ON public.agenda;
+DROP POLICY IF EXISTS "Authenticated can create tasks" ON public.agenda;
+
 CREATE POLICY "Users see own tasks or if admin"
     ON public.agenda FOR SELECT
     TO authenticated
@@ -101,7 +107,6 @@ CREATE POLICY "Users see own tasks or if admin"
         OR get_current_user_role() IN ('ADMIN', 'MANAGER')
     );
 
-DROP POLICY IF EXISTS "Users can update own tasks" ON public.agenda;
 CREATE POLICY "Users can update own tasks"
     ON public.agenda FOR UPDATE
     TO authenticated
@@ -111,7 +116,6 @@ CREATE POLICY "Users can update own tasks"
         OR get_current_user_role() IN ('ADMIN', 'MANAGER')
     );
 
-DROP POLICY IF EXISTS "Admin can delete tasks" ON public.agenda;
 CREATE POLICY "Admin can delete tasks"
     ON public.agenda FOR DELETE
     TO authenticated
@@ -120,7 +124,6 @@ CREATE POLICY "Admin can delete tasks"
         OR get_current_user_role() = 'ADMIN'
     );
 
-DROP POLICY IF EXISTS "Authenticated can create tasks" ON public.agenda;
 CREATE POLICY "Authenticated can create tasks"
     ON public.agenda FOR INSERT
     TO authenticated
