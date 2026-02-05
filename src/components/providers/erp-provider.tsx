@@ -23,6 +23,9 @@ import { getCuentasBancariasAction, createCuentaBancariaAction, updateCuentaBanc
 import { getObligacionesFinancierasAction, createObligacionFinancieraAction, updateObligacionFinancieraAction, deleteObligacionFinancieraAction } from "@/app/dashboard/sistema/financiera/obligaciones-actions";
 import { getNovedadesNominaAction, createNovedadNominaAction, updateNovedadNominaAction, deleteNovedadNominaAction } from "@/app/dashboard/sistema/talento-humano/novedades-actions";
 import { getEmpleadosAction, createEmpleadoAction, updateEmpleadoAction, deleteEmpleadoAction, payNominaAction } from "@/app/dashboard/sistema/talento-humano/actions";
+import { getUsers, updateUserPermissionsAction, deleteUserAction } from "@/actions/auth-actions";
+import { getOrdenesCompraAction, createOrdenCompraAction, updateOrdenCompraAction } from "@/app/dashboard/sistema/suministro/ordenes-actions";
+import { createClient } from "@/utils/supabase/client";
 
 // Fallback mock data for users (until profiles table is connected)
 const initialUsers: User[] = [
@@ -182,6 +185,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 obligacionesData,
                 novedadesData,
                 empleadosData,
+                usersData,
+                ordenesData,
             ] = await Promise.all([
                 getClientsAction().catch(() => []),
                 getProveedoresAction().catch(() => []),
@@ -199,6 +204,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 getObligacionesFinancierasAction().catch(() => []),
                 getNovedadesNominaAction().catch(() => []),
                 getEmpleadosAction().catch(() => []),
+                getUsers().catch(() => []),
+                getOrdenesCompraAction().catch(() => []),
             ]);
 
             setClientes(clientesData);
@@ -217,6 +224,16 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setObligacionesFinancieras(obligacionesData || []);
             setNovedadesNomina(novedadesData || []);
             setEmpleados(empleadosData || []);
+            setUsers(usersData || []);
+            setOrdenesCompra(ordenesData || []);
+
+            // Set current user if logged in
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user && usersData) {
+                const found = usersData.find((u: any) => u.id === user.id);
+                if (found) setCurrentUser(found);
+            }
         } catch (error) {
             console.error("Error loading data:", error);
         } finally {
@@ -377,7 +394,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
 
     // GASTOS VEHICULO ACTIONS
     // =============================================
-    const addGastoVehiculo = async (gasto: GastoVehiculo) => {
+    const addGastoVehiculo = async (gasto: GastoVehiculo, cuentaId?: string) => {
         try {
             const { id, vehiculo, ...rest } = gasto;
             const saved = await createGastoVehiculoAction(rest as any, cuentaId);
@@ -434,6 +451,38 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const saved = await createMovimientoFinancieroAction(rest as any);
             setMovimientosFinancieros(prev => [saved, ...prev]);
         } catch (error) { console.error("Error adding movimiento:", error); }
+    };
+
+    const updateMovimientoFinanciero = async (updated: MovimientoFinanciero) => {
+        try {
+            const saved = await updateMovimientoFinancieroAction(updated.id, updated);
+            setMovimientosFinancieros(prev => prev.map(m => m.id === saved.id ? saved : m));
+        } catch (error) { console.error("Error updating movimiento:", error); }
+    };
+
+    // =============================================
+    // OBLIGACIONES FINANCIERAS ACTIONS
+    // =============================================
+    const addObligacionFinanciera = async (obl: ObligacionFinanciera) => {
+        try {
+            const { id, ...rest } = obl;
+            const saved = await createObligacionFinancieraAction(rest as any);
+            setObligacionesFinancieras(prev => [saved, ...prev]);
+        } catch (error) { console.error("Error adding obligacion:", error); }
+    };
+
+    const updateObligacionFinanciera = async (updated: ObligacionFinanciera) => {
+        try {
+            const saved = await updateObligacionFinancieraAction(updated.id, updated);
+            setObligacionesFinancieras(prev => prev.map(o => o.id === saved.id ? saved : o));
+        } catch (error) { console.error("Error updating obligacion:", error); }
+    };
+
+    const deleteObligacionFinanciera = async (id: string) => {
+        try {
+            await deleteObligacionFinancieraAction(id);
+            setObligacionesFinancieras(prev => prev.filter(o => o.id !== id));
+        } catch (error) { console.error("Error deleting obligacion:", error); }
     };
 
     const addNovedadNomina = async (nov: NovedadNomina) => {
@@ -532,7 +581,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             inventario, proveedores, vehiculos, dotacionItems,
             entregasDotacion, cuentasPorPagar, gastosVehiculos,
             codigosTrabajo, ordenesCompra,
-            cuentasBancarias, movimientosFinancieros, novedadesNomina, empleados,
+            cuentasBancarias, movimientosFinancieros, obligacionesFinancieras, novedadesNomina, empleados,
 
             // Loading
             isLoading,
@@ -550,10 +599,13 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addCodigoTrabajo, updateCodigoTrabajo, deleteCodigoTrabajo,
 
             // New Actions
-            addCuentaBancaria, updateCuentaBancaria, addMovimientoFinanciero,
+            addCuentaBancaria, updateCuentaBancaria, addMovimientoFinanciero, updateMovimientoFinanciero,
+            addObligacionFinanciera, updateObligacionFinanciera, deleteObligacionFinanciera,
             addNovedadNomina, updateNovedadNomina, deleteNovedadNomina,
             addEmpleado, updateEmpleado, deleteEmpleado,
             payCuentaPorPagar, payNomina,
+
+            addOrdenCompra, updateOrdenCompra,
 
             // Refresh
             refreshData: loadAllData,

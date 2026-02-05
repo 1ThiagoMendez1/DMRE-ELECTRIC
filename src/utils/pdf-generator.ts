@@ -366,24 +366,39 @@ export const generateQuotePDF = (
     // --- 5. ITEMS TABLE ---
 
     // Prepare Data
-    const tableBody = cotizacion.items
-        .filter(item => {
-            if (item.tipo === 'SERVICIO') return true;
-            if (item.tipo === 'PRODUCTO') return materialVisibilityMode !== 'OCULTAR_TODO';
-            return true;
-        })
-        .map((item, index) => {
-            const isProduct = item.tipo === 'PRODUCTO';
+    const tableBody: any[] = [];
+    cotizacion.items.forEach((item, index) => {
+        const isProduct = item.tipo === 'PRODUCTO';
+        const isService = item.tipo === 'SERVICIO';
+        const showItem = !isProduct || materialVisibilityMode !== 'OCULTAR_TODO';
+
+        if (showItem) {
             const showDetails = !isProduct || materialVisibilityMode === 'MOSTRAR_TODO';
-            return [
+            tableBody.push([
                 index + 1,
                 item.descripcion,
                 showDetails ? item.cantidad : '-',
                 "UND",
                 showDetails ? currencyFmt.format(item.valorUnitario) : '-',
                 showDetails ? currencyFmt.format(item.valorTotal) : '-'
-            ];
-        });
+            ]);
+
+            // Add sub-items for Work Codes (APUs) if they exist and we're not hiding everything
+            if (isService && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO') {
+                item.subItems.forEach((sub) => {
+                    const totalSubQty = (sub.cantidad || 0) * item.cantidad;
+                    tableBody.push([
+                        "", // Empty index for sub-items
+                        `      ↳ ${sub.nombre}`, // Indented with arrow
+                        totalSubQty,
+                        "UND",
+                        "", // Don't show individual costs for sub-items by default
+                        ""  // Total is included in parent item
+                    ]);
+                });
+            }
+        }
+    });
 
     autoTable(doc, {
         startY: currentY,

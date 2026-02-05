@@ -69,7 +69,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem, EvidenciaTrabajo, Ubicacion } from "@/types/sistema";
+import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem, EvidenciaTrabajo, Ubicacion, MaterialAsociado, CodigoTrabajo } from "@/types/sistema";
 import { generateQuotePDF } from "@/utils/pdf-generator";
 import { useErp } from "@/components/providers/erp-provider";
 import { ProductSelectorDialog } from "./product-selector-dialog";
@@ -601,6 +601,53 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
         };
     }, [items, globalDiscountPct, globalIvaPct]);
 
+    // Helper for recursive deduction of Work Codes (APUs)
+    const [isDeducting, setIsDeducting] = useState(false);
+    const deductRecursive = async (item: CotizacionItem, multiplier: number = 1): Promise<number> => {
+        let count = 0;
+
+        // 1. If it has direct sub-items (typical for saved Work Codes)
+        if (item.subItems && item.subItems.length > 0) {
+            for (const mat of item.subItems) {
+                const qty = (mat.cantidad || 0) * multiplier;
+                if (mat.inventarioId) {
+                    await deductInventoryItem(mat.inventarioId, qty);
+                    count++;
+                } else if (mat.subCodigoId) {
+                    const subCode = codigosTrabajo.find((c: any) => c.id === mat.subCodigoId);
+                    if (subCode) {
+                        count += await deductRecursive({
+                            ...item,
+                            subItems: subCode.materiales
+                        }, qty);
+                    }
+                }
+            }
+        }
+        // 2. If it's a SERVICE type and we can find its definition in global Work Codes
+        else if (item.tipo === 'SERVICIO' && item.codigoTrabajoId) {
+            const fullCode = codigosTrabajo.find((c: any) => c.id === item.codigoTrabajoId);
+            if (fullCode && fullCode.materiales) {
+                for (const mat of fullCode.materiales) {
+                    const qty = (mat.cantidad || 0) * multiplier;
+                    if (mat.inventarioId) {
+                        await deductInventoryItem(mat.inventarioId, qty);
+                        count++;
+                    } else if (mat.subCodigoId) {
+                        const subCode = codigosTrabajo.find((c: any) => c.id === mat.subCodigoId);
+                        if (subCode) {
+                            count += await deductRecursive({
+                                ...item,
+                                subItems: subCode.materiales
+                            }, qty);
+                        }
+                    }
+                }
+            }
+        }
+        return count;
+    };
+
     const handleAddNote = () => {
         if (!newNote.trim()) return;
         handleAddEvidence('NOTA', newNote);
@@ -1026,68 +1073,149 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                 <CollapsibleTrigger className="w-full">
                                     <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                                         <CardTitle className="text-base flex items-center gap-2">
-                                            <Package className="h-4 w-4 text-orange-500" /> Materiales del Trabajo
-                                            <Badge variant="outline" className="ml-auto">{items.filter(i => i.tipo === 'PRODUCTO').length} items</Badge>
+                                            <Package className="h-4 w-4 text-orange-500" /> Materiales y Códigos del Trabajo
+                                            <Badge variant="outline" className="ml-auto">
+                                                {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length} grupos
+                                            </Badge>
                                         </CardTitle>
-                                        <CardDescription>Marca como utilizado para descontar del inventario.</CardDescription>
+                                        <CardDescription>Marca como utilizado para descontar del inventario (incluye materiales de códigos).</CardDescription>
                                     </CardHeader>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
-                                    <CardContent className="p-4 space-y-2">
-                                        {items.filter(i => i.tipo === 'PRODUCTO').length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-4">No hay productos en esta cotización.</p>
+                                    <CardContent className="p-4 space-y-4">
+                                        {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-4">No hay materiales ni códigos con materiales en este trabajo.</p>
                                         ) : (
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead className="w-12">Usado</TableHead>
-                                                        <TableHead>Material</TableHead>
-                                                        <TableHead className="text-right">Cant.</TableHead>
-                                                        <TableHead className="text-right">Existencias</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {items.filter(i => i.tipo === 'PRODUCTO').map((item) => {
-                                                        const itemKey = `${trabajo.id}-${item.inventarioId || item.id}`;
-                                                        const inventoryItem = inventario.find(inv => inv.id === item.inventarioId);
-                                                        const isUsed = materialesUsados.has(itemKey);
+                                            <div className="space-y-6">
+                                                {/* Independent Materials */}
+                                                {items.filter(i => i.tipo === 'PRODUCTO').length > 0 && (
+                                                    <div className="space-y-2">
+                                                        <h4 className="text-xs font-bold uppercase text-muted-foreground px-2">Materiales Independientes</h4>
+                                                        <Table>
+                                                            <TableHeader>
+                                                                <TableRow>
+                                                                    <TableHead className="w-12">Usado</TableHead>
+                                                                    <TableHead>Material</TableHead>
+                                                                    <TableHead className="text-right">Cant.</TableHead>
+                                                                    <TableHead className="text-right">Existencias</TableHead>
+                                                                </TableRow>
+                                                            </TableHeader>
+                                                            <TableBody>
+                                                                {items.filter(i => i.tipo === 'PRODUCTO').map((pItem: ItemConVisibilidad) => {
+                                                                    const itemKey = `${trabajo.id}-${pItem.inventarioId || pItem.id}`;
+                                                                    const inventoryItem = inventario.find(inv => inv.id === pItem.inventarioId);
+                                                                    const isUsed = materialesUsados.has(itemKey);
 
-                                                        return (
-                                                            <TableRow key={item.id} className={isUsed ? "bg-green-50 dark:bg-green-950/20" : ""}>
-                                                                <TableCell>
+                                                                    return (
+                                                                        <TableRow key={pItem.id} className={isUsed ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                                                                            <TableCell>
+                                                                                <Checkbox
+                                                                                    checked={isUsed}
+                                                                                    disabled={!pItem.inventarioId || isUsed}
+                                                                                    onCheckedChange={async (checked: boolean) => {
+                                                                                        if (checked && pItem.inventarioId) {
+                                                                                            const success = await deductInventoryItem(pItem.inventarioId, pItem.cantidad);
+                                                                                            if (success) {
+                                                                                                setMaterialesUsados(prev => new Set(prev).add(itemKey));
+                                                                                                toast({
+                                                                                                    title: "Inventario Actualizado",
+                                                                                                    description: `Se descontaron ${pItem.cantidad} unidades de ${pItem.descripcion}.`
+                                                                                                });
+                                                                                            } else {
+                                                                                                toast({
+                                                                                                    title: "Error",
+                                                                                                    description: "No se pudo actualizar el inventario.",
+                                                                                                    variant: "destructive"
+                                                                                                });
+                                                                                            }
+                                                                                        }
+                                                                                    }}
+                                                                                />
+                                                                            </TableCell>
+                                                                            <TableCell className="font-medium">{pItem.descripcion}</TableCell>
+                                                                            <TableCell className="text-right">{pItem.cantidad}</TableCell>
+                                                                            <TableCell className="text-right text-muted-foreground">
+                                                                                {inventoryItem ? inventoryItem.cantidad : 'N/A'}
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    );
+                                                                })}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </div>
+                                                )}
+
+                                                {/* Work Codes (APUs) */}
+                                                {items.filter(i => i.tipo === 'SERVICIO' && i.subItems && i.subItems.length > 0).map((sItem: ItemConVisibilidad) => {
+                                                    const itemKey = `${trabajo.id}-${sItem.id}`;
+                                                    const isUsed = materialesUsados.has(itemKey);
+
+                                                    return (
+                                                        <div key={sItem.id} className="border rounded-lg overflow-hidden">
+                                                            <div className={`p-3 border-b flex justify-between items-center ${isUsed ? "bg-green-50 dark:bg-green-950/20" : "bg-muted/30"}`}>
+                                                                <div className="flex items-center gap-3">
                                                                     <Checkbox
                                                                         checked={isUsed}
-                                                                        disabled={!item.inventarioId || isUsed}
-                                                                        onCheckedChange={async (checked) => {
-                                                                            if (checked && item.inventarioId) {
-                                                                                const success = await deductInventoryItem(item.inventarioId, item.cantidad);
-                                                                                if (success) {
+                                                                        disabled={isUsed || isDeducting}
+                                                                        onCheckedChange={async (checked: boolean) => {
+                                                                            if (checked) {
+                                                                                setIsDeducting(true);
+                                                                                try {
+                                                                                    const totalDeducted = await deductRecursive(sItem, sItem.cantidad);
                                                                                     setMaterialesUsados(prev => new Set(prev).add(itemKey));
                                                                                     toast({
-                                                                                        title: "Inventario Actualizado",
-                                                                                        description: `Se descontaron ${item.cantidad} unidades de ${item.descripcion}.`
+                                                                                        title: "Código Aplicado",
+                                                                                        description: `Se descontaron los materiales para ${sItem.cantidad} unidades de "${sItem.descripcion}".`
                                                                                     });
-                                                                                } else {
+                                                                                } catch (err) {
                                                                                     toast({
                                                                                         title: "Error",
-                                                                                        description: "No se pudo actualizar el inventario.",
+                                                                                        description: "No se pudieron descontar todos los materiales del código.",
                                                                                         variant: "destructive"
                                                                                     });
+                                                                                } finally {
+                                                                                    setIsDeducting(false);
                                                                                 }
                                                                             }
                                                                         }}
                                                                     />
-                                                                </TableCell>
-                                                                <TableCell className="font-medium">{item.descripcion}</TableCell>
-                                                                <TableCell className="text-right">{item.cantidad}</TableCell>
-                                                                <TableCell className="text-right text-muted-foreground">
-                                                                    {inventoryItem ? inventoryItem.cantidad : 'N/A'}
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        );
-                                                    })}
-                                                </TableBody>
-                                            </Table>
+                                                                    <div>
+                                                                        <p className="text-sm font-bold">{sItem.descripcion}</p>
+                                                                        <p className="text-[10px] text-muted-foreground">Código de Trabajo • Cantidad: {sItem.cantidad}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <Badge variant={isUsed ? "default" : "outline"} className={isUsed ? "bg-green-600" : ""}>
+                                                                    {isUsed ? "Consumido" : "Pendiente"}
+                                                                </Badge>
+                                                            </div>
+                                                            <Collapsible>
+                                                                <CollapsibleTrigger className="w-full text-left text-[10px] p-2 hover:bg-muted/50 transition-colors flex items-center gap-2">
+                                                                    Ver materiales incluidos ({sItem.subItems?.length})
+                                                                </CollapsibleTrigger>
+                                                                <CollapsibleContent>
+                                                                    <Table>
+                                                                        <TableBody>
+                                                                            {sItem.subItems?.map((sub: MaterialAsociado, sIdx: number) => (
+                                                                                <TableRow key={sIdx} className="bg-muted/5 border-0">
+                                                                                    <TableCell className="pl-10 py-1 text-xs">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-muted-foreground">↳</span>
+                                                                                            {sub.nombre}
+                                                                                        </div>
+                                                                                    </TableCell>
+                                                                                    <TableCell className="text-right py-1 text-xs text-muted-foreground">
+                                                                                        {(sub.cantidad || 0) * sItem.cantidad} unidades
+                                                                                    </TableCell>
+                                                                                </TableRow>
+                                                                            ))}
+                                                                        </TableBody>
+                                                                    </Table>
+                                                                </CollapsibleContent>
+                                                            </Collapsible>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         )}
                                     </CardContent>
                                 </CollapsibleContent>
@@ -1768,14 +1896,28 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                                                             if (hide) return null;
 
                                                             return (
-                                                                <tr key={item.id} className={`border-b ${currentStyle.components.tableTheme === 'striped' && idx % 2 === 0 ? 'bg-gray-50' : ''}`}>
-                                                                    <td className="p-2 font-mono text-xs">{idx + 1}</td>
-                                                                    <td className="p-2">{item.descripcion}</td>
-                                                                    <td className="p-2 text-center">{showValues ? item.cantidad : '-'}</td>
-                                                                    <td className="p-2 text-center">UND</td>
-                                                                    <td className="p-2 text-right font-mono">{showValues ? formatCurrency(details.unitTotal) : '-'}</td>
-                                                                    <td className="p-2 text-right font-bold font-mono">{showValues ? formatCurrency(details.lineTotal) : '-'}</td>
-                                                                </tr>
+                                                                <React.Fragment key={item.id}>
+                                                                    <tr className={`border-b ${currentStyle.components.tableTheme === 'striped' && idx % 2 === 0 ? 'bg-gray-50' : ''}`}>
+                                                                        <td className="p-2 font-mono text-xs">{idx + 1}</td>
+                                                                        <td className="p-2">{item.descripcion}</td>
+                                                                        <td className="p-2 text-center">{showValues ? item.cantidad : '-'}</td>
+                                                                        <td className="p-2 text-center">UND</td>
+                                                                        <td className="p-2 text-right font-mono">{showValues ? formatCurrency(details.unitTotal) : '-'}</td>
+                                                                        <td className="p-2 text-right font-bold font-mono">{showValues ? formatCurrency(details.lineTotal) : '-'}</td>
+                                                                    </tr>
+                                                                    {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO' &&
+                                                                        item.subItems.map((sub, sIdx) => (
+                                                                            <tr key={`${item.id}-sub-${sIdx}`} className="bg-gray-50/30 text-[10px] text-gray-400 italic">
+                                                                                <td className="p-1"></td>
+                                                                                <td className="p-1 pl-6">↳ {sub.nombre}</td>
+                                                                                <td className="p-1 text-center">{(sub.cantidad || 0) * item.cantidad}</td>
+                                                                                <td className="p-1 text-center">UND</td>
+                                                                                <td className="p-1"></td>
+                                                                                <td className="p-1"></td>
+                                                                            </tr>
+                                                                        ))
+                                                                    }
+                                                                </React.Fragment>
                                                             );
                                                         })}
                                                     </tbody>
