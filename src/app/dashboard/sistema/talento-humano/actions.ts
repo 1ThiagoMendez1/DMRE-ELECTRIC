@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { Empleado } from "@/types/sistema";
+import { Empleado, LiquidacionNomina } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
 
 // DB -> UI mapping
@@ -38,6 +38,7 @@ function mapToUI(db: any): Empleado {
         numeroCuentaBanco: db.numero_cuenta_banco,
         fotoUrl: db.foto_url,
         observaciones: db.observaciones,
+        archivos: db.archivos ? (typeof db.archivos === 'string' ? JSON.parse(db.archivos) : db.archivos) : [],
     };
 }
 
@@ -73,6 +74,7 @@ function mapToDB(ui: Partial<Empleado>) {
         estado: ui.estado || "ACTIVO",
         foto_url: ui.fotoUrl,
         observaciones: ui.observaciones,
+        archivos: ui.archivos ? JSON.stringify(ui.archivos) : '[]',
     };
 }
 
@@ -201,4 +203,88 @@ export async function payNominaAction(empleadoId: string, periodo: string, valor
 
     revalidatePath("/dashboard/sistema/talento-humano");
     revalidatePath("/dashboard/sistema/financiera");
+}
+
+export async function getLiquidacionesAction(): Promise<LiquidacionNomina[]> {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('pagos_nomina')
+        .select(`
+            *,
+            empleado:empleados(*)
+        `)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error("Error fetching liquidaciones (pagos_nomina):", error);
+        return [];
+    }
+
+    return data.map((d: any) => ({
+        id: d.id,
+        periodo: d.periodo,
+        empleadoId: d.empleado_id,
+        empleado: mapToUI(d.empleado),
+        totalDevengado: Number(d.total_devengado),
+        totalDeducido: Number(d.total_deducido),
+        netoPagar: Number(d.neto_pagar),
+        estado: d.estado,
+        detalle: typeof d.detalles === 'string' ? d.detalles : JSON.stringify(d.detalles)
+    }));
+}
+
+export async function createLiquidacionAction(liquidacion: Omit<LiquidacionNomina, "id" | "empleado">): Promise<LiquidacionNomina> {
+    const supabase = await createClient();
+
+    const dbData = {
+        periodo: liquidacion.periodo,
+        empleado_id: liquidacion.empleadoId,
+        total_devengado: liquidacion.totalDevengado,
+        total_deducido: liquidacion.totalDeducido,
+        neto_pagar: liquidacion.netoPagar,
+        estado: liquidacion.estado,
+        detalles: JSON.parse(liquidacion.detalle) // DB expects JSONB
+    };
+
+    const { data, error } = await supabase
+        .from('pagos_nomina')
+        .insert(dbData)
+        .select(`
+            *,
+            empleado:empleados(*)
+        `)
+        .single();
+
+    if (error) {
+        console.error("Error creating liquidacion (pago_nomina):", error);
+        throw new Error("Failed to create liquidacion");
+    }
+
+    revalidatePath("/dashboard/sistema/talento-humano");
+
+    return {
+        id: data.id,
+        periodo: data.periodo,
+        empleadoId: data.empleado_id,
+        empleado: mapToUI(data.empleado),
+        totalDevengado: Number(data.total_devengado),
+        totalDeducido: Number(data.total_deducido),
+        netoPagar: Number(data.neto_pagar),
+        estado: data.estado,
+        detalle: JSON.stringify(data.detalles)
+    };
+}
+
+export async function updateLiquidacionEstadoAction(id: string, estado: 'PENDIENTE' | 'PAGADO'): Promise<void> {
+    const supabase = await createClient();
+    const { error } = await supabase
+        .from('pagos_nomina')
+        .update({ estado })
+        .eq('id', id);
+
+    if (error) {
+        console.error("Error updating liquidacion status:", error);
+        throw new Error("Failed to update status");
+    }
+    revalidatePath("/dashboard/sistema/talento-humano");
 }

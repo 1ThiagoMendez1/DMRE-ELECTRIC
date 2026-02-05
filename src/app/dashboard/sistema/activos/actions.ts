@@ -29,6 +29,7 @@ function mapVehiculoToUI(db: any): Vehiculo {
         conductorId: db.conductor_id,
         vencimientoLicenciaTransito: db.vencimiento_licencia_transito ? new Date(db.vencimiento_licencia_transito) : undefined,
         observaciones: db.observaciones,
+        archivos: db.archivos || [],
     };
 }
 
@@ -58,6 +59,7 @@ function mapVehiculoToDB(ui: Partial<Vehiculo>) {
         kilometraje_actual: ui.kilometrajeActual,
         estado: ui.estado || "ACTIVO",
         observaciones: ui.observaciones,
+        archivos: ui.archivos || [],
     };
 }
 
@@ -156,6 +158,7 @@ function mapGastoToUI(db: any): GastoVehiculo {
         numeroFactura: db.numero_factura,
         responsableId: db.responsable_id,
         observaciones: db.observaciones,
+        soporteUrl: db.comprobante_url,
     };
 }
 
@@ -173,6 +176,7 @@ function mapGastoToDB(ui: Partial<GastoVehiculo>) {
         numero_factura: ui.numeroFactura,
         responsable_id: ui.responsableId,
         observaciones: ui.observaciones,
+        comprobante_url: ui.soporteUrl,
     };
 }
 
@@ -209,6 +213,24 @@ export async function createGastoVehiculoAction(gasto: Omit<GastoVehiculo, "id">
     if (error) {
         console.error("Error creating gasto_vehiculo:", error);
         throw new Error("Failed to create gasto_vehiculo: " + error.message);
+    }
+
+    // Link support file to vehicle archives if present
+    if (gasto.soporteUrl) {
+        const { data: vehData } = await supabase.from('vehiculos').select('archivos').eq('id', gasto.vehiculoId).single();
+        if (vehData) {
+            const currentArchivos = vehData.archivos || [];
+            const fileName = gasto.soporteUrl.split('/').pop() || 'Soporte Gasto';
+            const newArchivo = {
+                name: `Soporte ${gasto.tipo}: ${fileName}`,
+                url: gasto.soporteUrl,
+                category: 'DOCUMENT',
+                date: new Date()
+            };
+            await supabase.from('vehiculos').update({
+                archivos: [...currentArchivos, newArchivo]
+            }).eq('id', gasto.vehiculoId);
+        }
     }
 
     // If a bank account is provided, create a financial movement
@@ -255,4 +277,27 @@ export async function deleteGastoVehiculoAction(id: string): Promise<boolean> {
 
     revalidatePath("/dashboard/sistema/activos");
     return true;
+}
+
+export async function updateGastoVehiculoAction(id: string, gasto: Partial<GastoVehiculo>): Promise<GastoVehiculo> {
+    const supabase = await createClient();
+    const dbData = mapGastoToDB(gasto);
+
+    const { data, error } = await supabase
+        .from("gastos_vehiculos")
+        .update(dbData)
+        .eq("id", id)
+        .select(`
+            *,
+            vehiculos (id, placa, marca, modelo)
+        `)
+        .single();
+
+    if (error) {
+        console.error("Error updating gasto_vehiculo:", error);
+        throw new Error("Failed to update gasto_vehiculo");
+    }
+
+    revalidatePath("/dashboard/sistema/activos");
+    return mapGastoToUI(data);
 }

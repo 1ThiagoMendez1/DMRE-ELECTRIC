@@ -6,7 +6,6 @@ import {
     Search,
     Shield,
     MoreHorizontal,
-    LayoutDashboard as LayoutDashboardIcon,
     UserCircle,
     CheckCircle2,
     XCircle
@@ -44,17 +43,12 @@ import { useErp } from "@/components/providers/erp-provider";
 import { systemNavItems } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
-export default function UsuariosPage() {
+export function UsuariosView() {
     const { toast } = useToast();
     const { users, updateUserPermissions, setCurrentUser, currentUser, deleteUser, toggleUserStatus } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
 
-    // No longer needing local state for users as it comes from context
-    // const [usuarios, setUsuarios] = useState(initialUsers); 
-
     const handleCreateUser = (newUser: any) => {
-        // Implement add user in provider if needed, for now just a toast demo or we should add 'addUser' to context
-        // For this task, we focus on permissions of existing users.
         toast({ title: "Información", description: "Creación de usuarios simulada (falta implementar en provider addUser)" });
     };
 
@@ -80,17 +74,15 @@ export default function UsuariosPage() {
     );
 
     return (
-        <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
+        <div className="flex flex-col space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Gestión de Usuarios</h1>
+                    <h2 className="text-2xl font-bold tracking-tight text-primary">Gestión de Usuarios</h2>
                     <p className="text-muted-foreground">Administración de roles y accesos al sistema.</p>
                 </div>
                 <CreateUserDialog onUserCreated={handleCreateUser} />
             </div>
 
-            {/* Main Content */}
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">
@@ -115,7 +107,7 @@ export default function UsuariosPage() {
                                 <TableHead>Usuario</TableHead>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Rol</TableHead>
-                                <TableHead>Permisos Sidebar</TableHead> {/* New Column */}
+                                <TableHead>Permisos Sidebar</TableHead>
                                 <TableHead>Estado</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
@@ -174,7 +166,6 @@ export default function UsuariosPage() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
-                                            {/* Permission Editor Integration */}
                                             <PermissionDialog
                                                 user={user}
                                                 onSave={updateUserPermissions}

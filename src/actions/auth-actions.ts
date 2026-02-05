@@ -102,7 +102,8 @@ export async function getUsers() {
         email: user.email,
         role: user.role,
         sidebarAccess: user.sidebar_access,
-        avatar: user.avatar_url
+        avatar: user.avatar_url,
+        isActive: user.is_active ?? true
     }));
 }
 
@@ -113,6 +114,21 @@ export async function updateUserPermissionsAction(userId: string, access: string
         .eq('id', userId);
 
     if (error) throw error;
+    revalidatePath('/dashboard/sistema/usuarios');
+    return { success: true };
+}
+
+export async function toggleUserStatusAction(userId: string, isActive: boolean) {
+    const { error } = await supabaseAdmin
+        .from('profiles')
+        .update({ is_active: isActive })
+        .eq('id', userId);
+
+    if (error) {
+        console.error("Error toggling user status:", error);
+        throw error;
+    }
+
     revalidatePath('/dashboard/sistema/usuarios');
     return { success: true };
 }

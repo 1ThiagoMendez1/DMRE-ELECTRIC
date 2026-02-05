@@ -7,6 +7,7 @@ export interface User {
     role: UserRole;
     avatar?: string;
     sidebarAccess?: string[];
+    isActive?: boolean;
 }
 
 // --- SHARED / EXISTING ---
@@ -324,6 +325,17 @@ export interface Proveedor {
     notas?: string;
 }
 
+export interface PagoCuentaPorPagar {
+    id: string;
+    cuentaPorPagarId: string;
+    fecha: Date;
+    valor: number;
+    metodoPago?: string;
+    cuentaBancariaId?: string;
+    nota?: string;
+    referenciaBancaria?: string;
+}
+
 export interface CuentaPorPagar {
     id: string;
     proveedorId: string;
@@ -334,7 +346,7 @@ export interface CuentaPorPagar {
     valorTotal: number;
     valorPagado: number;
     saldoPendiente: number;
-    pagos?: { id: string; fecha: Date; valor: number; nota?: string; }[];
+    pagos?: PagoCuentaPorPagar[];
     ofertaId?: string; // Costeo
     ordenCompraId?: string; // Link to PO
     // Extended DB fields
@@ -394,6 +406,7 @@ export interface Vehiculo {
     conductorId?: string;
     vencimientoLicenciaTransito?: Date;
     observaciones?: string;
+    archivos?: { name: string; url: string; category?: string; date: Date }[];
 }
 
 export type TipoGastoVehiculo = 'COMBUSTIBLE' | 'PEAJE' | 'MANTENIMIENTO' | 'PARQUEADERO' | 'OTROS';
@@ -409,7 +422,7 @@ export interface GastoVehiculo {
     proveedor: string;
     galones?: number;
     precioPorGalon?: number;
-    soporteUrl?: string;
+    soporteUrl?: string; // Receipt URL (already exists in DB as comprobante_url)
     observacion?: string;
     // Extended DB fields
     descripcion?: string;
@@ -453,6 +466,7 @@ export interface Empleado {
     numeroCuentaBanco?: string;
     fotoUrl?: string;
     observaciones?: string;
+    archivos?: { name: string; url: string; date: Date; type: string }[];
 }
 
 export type TipoNovedad = 'HORA_EXTRA_DIURNA' | 'HORA_EXTRA_NOCTURNA' | 'FESTIVA' | 'PRESTAMO' | 'AUSENCIA';
@@ -470,7 +484,8 @@ export interface NovedadNomina {
     // Extended DB fields
     valorTotal?: number;
     estado?: string;
-    observacion?: string;
+    observaciones?: string; // Renamed from observacion to match DB
+    descripcion?: string; // Added as per DB schema
 }
 
 export interface LiquidacionNomina {
@@ -590,6 +605,7 @@ export interface TareaAgenda {
     estado: EstadoTarea;
     // Extended DB fields
     hora?: string;
+    asignadoNombre?: string; // For UI display
     creadoPor?: string;
     etiquetas?: string[];
     recordatorio?: boolean;
@@ -597,19 +613,32 @@ export interface TareaAgenda {
 
 
 // 10. ROLES Y PERMISOS
+// 10. ROLES Y PERMISOS
 export interface Permission {
     id: string;
-    modulo: string; // 'comercial', 'financiera', 'operaciones', etc.
-    accion: 'ver' | 'crear' | 'editar' | 'eliminar' | 'exportar';
+    name: string;
+    module: string;
+    description?: string;
+}
+
+export interface RolePermission {
+    id: string; // Pivot ID
+    roleId?: string; // If using roles table
+    roleName: string; // If using string enum roles
+    permissionId: string;
+    permission: Permission;
+    canView: boolean;
+    canCreate: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
 }
 
 export interface Role {
     id: string;
-    nombre: string;
-    descripcion: string;
-    permisos: Permission[];
-    color: string; // For badge display
-    isSystemRole: boolean; // Cannot be deleted if true
+    name: string;
+    description?: string;
+    permissions: RolePermission[];
+    isActive?: boolean; // New from profile update
 }
 
 // 11. CÓDIGOS DE TRABAJO

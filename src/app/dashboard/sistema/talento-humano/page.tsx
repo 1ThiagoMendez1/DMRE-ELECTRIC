@@ -13,60 +13,31 @@ import {
     Search,
     FileText,
     CheckCircle2,
-    ArrowRight
+    ArrowRight,
+    Edit,
+    Trash2,
+    Plus
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { DynamicChart, DashboardPanel } from "@/components/erp/charts";
 import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-} from "@/components/ui/card";
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-    DialogFooter
-} from "@/components/ui/dialog";
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
 import { useErp } from "@/components/providers/erp-provider";
 import { formatCurrency } from "@/lib/utils";
 import { CreateEmployeeDialog } from "@/components/erp/create-employee-dialog";
-import { RegisterNovedadDialog } from "@/components/erp/register-novedad-dialog";
+import { NovedadDialog } from "@/components/erp/register-novedad-dialog";
 import { Empleado, LiquidacionNomina, NovedadNomina } from "@/types/sistema";
 import { PayrollDetailDialog } from "@/components/erp/payroll-detail-dialog";
 import { EmployeeDetailDialog } from "@/components/erp/employee-detail-dialog";
@@ -79,14 +50,19 @@ export default function TalentoHumanoPage() {
         addEmpleado,
         updateEmpleado,
         addNovedadNomina,
+        updateNovedadNomina,
+        deleteNovedadNomina,
         payNomina,
-        cuentasBancarias
+        cuentasBancarias,
+        liquidacionesNomina: liquidacionesContext,
+        addLiquidacion
     } = useErp();
 
     // const [empleados, setEmpleados] = useState(initialEmpleados); // Replaced by context
     // const [novedades, setNovedades] = useState<NovedadNomina[]>(initialNovedades as any); // Replaced by context in alias
 
-    const [liquidaciones, setLiquidaciones] = useState<LiquidacionNomina[]>([]);
+    // Use context data instead of local state
+    const liquidaciones = liquidacionesContext || [];
 
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -94,8 +70,28 @@ export default function TalentoHumanoPage() {
         addEmpleado(newEmp);
     };
 
-    const handleCreateNovedad = (newNov: any) => {
-        addNovedadNomina(newNov);
+    // --- NOVEDADES LOGIC ---
+    const [selectedNovedad, setSelectedNovedad] = useState<NovedadNomina | null>(null);
+    const [novedadDialogOpen, setNovedadDialogOpen] = useState(false);
+
+    const handleSaveNovedad = async (novedad: any) => {
+        if (selectedNovedad) {
+            await updateNovedadNomina(novedad);
+        } else {
+            await addNovedadNomina(novedad);
+        }
+    };
+
+    const handleEditNovedad = (nov: NovedadNomina) => {
+        setSelectedNovedad(nov);
+        setNovedadDialogOpen(true);
+    };
+
+    const handleDeleteNovedad = async (id: string) => {
+        if (confirm("¿Está seguro de eliminar esta novedad?")) {
+            await deleteNovedadNomina(id);
+            toast({ title: "Novedad eliminada" });
+        }
     };
 
     // --- EMPLOYEE DETAIL ---
@@ -168,7 +164,13 @@ export default function TalentoHumanoPage() {
                 };
             });
 
-        setLiquidaciones(prev => [...newLiquidaciones, ...prev]);
+        // Persist each calculation
+        newLiquidaciones.forEach(liq => {
+            // Remove 'id' and 'empleado' (full object) as createLiquidacionAction expects Omit<LiquidacionNomina, "id" | "empleado">
+            const { id, empleado, ...rest } = liq;
+            addLiquidacion(rest);
+        });
+
         toast({ title: "Nómina Generada", description: `Se han generado ${newLiquidaciones.length} desprendibles para el periodo ${genPeriod}` });
         setIsGenPayrollOpen(false);
     };
@@ -188,6 +190,7 @@ export default function TalentoHumanoPage() {
 
         try {
             await payNomina(
+                selectedLiq.id,
                 selectedLiq.empleadoId,
                 selectedLiq.periodo,
                 selectedLiq.netoPagar,
@@ -195,8 +198,7 @@ export default function TalentoHumanoPage() {
                 new Date()
             );
 
-            // Update local state to reflect payment (since Liquidations are local for now)
-            setLiquidaciones(prev => prev.map(l => l.id === selectedLiq.id ? { ...l, estado: 'PAGADO' as any } : l));
+            // No need to manually update state, context will refresh
 
             toast({ title: "Pago Realizado", description: `Se ha registrado el pago de ${formatCurrency(selectedLiq.netoPagar)} desde la cuenta seleccionada.` });
             setPaymentModalOpen(false);
@@ -310,7 +312,10 @@ export default function TalentoHumanoPage() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Registro de Novedades</CardTitle>
-                            <RegisterNovedadDialog empleados={empleados} onNovedadCreated={handleCreateNovedad} />
+                            <Button onClick={() => { setSelectedNovedad(null); setNovedadDialogOpen(true); }}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Registrar Novedad
+                            </Button>
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -321,6 +326,7 @@ export default function TalentoHumanoPage() {
                                         <TableHead>Tipo</TableHead>
                                         <TableHead>Detalle</TableHead>
                                         <TableHead>Valor</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -337,12 +343,28 @@ export default function TalentoHumanoPage() {
                                             <TableCell className={nov.efecto === 'RESTA' ? "text-red-500" : "text-green-600"}>
                                                 {nov.efecto === 'RESTA' ? '-' : '+'}{formatCurrency(nov.valorCalculado || 0)}
                                             </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button size="sm" variant="ghost" onClick={() => handleEditNovedad(nov)}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="sm" variant="ghost" onClick={() => handleDeleteNovedad(nov.id)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
                         </CardContent>
                     </Card>
+
+                    <NovedadDialog
+                        open={novedadDialogOpen}
+                        onOpenChange={setNovedadDialogOpen}
+                        empleados={empleados}
+                        onNovedadSaved={handleSaveNovedad}
+                        novedadToEdit={selectedNovedad}
+                    />
                 </TabsContent>
 
                 {/* NOMINA TAB (Massive Gen & Pay) */}

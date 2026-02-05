@@ -14,8 +14,8 @@ import { CreateRoleDialog } from "@/components/erp/create-role-dialog";
 import { cn } from "@/lib/utils";
 import { Role, Permission, RolePermission } from "@/types/sistema";
 
-export default function RolesPage() {
-    const { roles, permissions, updateRolePermission, isLoading } = useErp();
+export function RolesView() {
+    const { roles, permissions, updateRolePermission } = useErp();
     const [selectedRole, setSelectedRole] = useState<Role | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -36,21 +36,17 @@ export default function RolesPage() {
         await updateRolePermission(selectedRole.id, permissionId, {
             [action]: !currentValue
         });
-
-        // Optimistic update locally for smoother UI if needed, usually provider handles it
     };
 
     const getPermissionForRole = (permId: string): RolePermission | undefined => {
         return selectedRole?.permissions.find(p => p.permissionId === permId);
     };
 
-    if (isLoading) return <div className="p-8 text-center text-muted-foreground">Cargando roles...</div>;
-
     return (
-        <div className="flex flex-col space-y-6 h-[calc(100vh-100px)]">
+        <div className="flex flex-col space-y-6 h-[calc(100vh-200px)]">
             <div className="flex justify-between items-center shrink-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Roles y Permisos</h1>
+                    <h2 className="text-2xl font-bold tracking-tight text-indigo-600">Roles y Permisos</h2>
                     <p className="text-muted-foreground">Define perfiles de acceso y seguridad granular.</p>
                 </div>
                 <Button onClick={() => setIsCreateOpen(true)}>

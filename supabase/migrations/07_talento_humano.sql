@@ -296,3 +296,30 @@ CREATE POLICY "Entrega items access for authenticated"
     TO authenticated
     USING (true)
     WITH CHECK (true);
+
+
+
+
+
+
+-- FIX: Add 'estado' column to match Frontend Logic
+-- Also ensure 'observaciones' is used correctly.
+
+DO $$
+BEGIN
+    -- 1. Add 'estado' column if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'novedades_nomina' AND column_name = 'estado') THEN
+        ALTER TABLE "novedades_nomina" ADD COLUMN "estado" TEXT DEFAULT 'PENDIENTE';
+        
+        -- Migrate data: aprobada = true -> APROBADA
+        UPDATE "novedades_nomina" SET "estado" = 'APROBADA' WHERE "aprobada" = TRUE;
+        UPDATE "novedades_nomina" SET "estado" = 'PENDIENTE' WHERE "aprobada" = FALSE OR "aprobada" IS NULL;
+    END IF;
+END $$;
+
+-- 2. Notify to refresh cache
+NOTIFY pgrst, 'reload config';
+
+
+
+

@@ -4,7 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { CuentaPorPagar, Proveedor } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
 
-function mapToUI(db: any, proveedor?: any): CuentaPorPagar {
+function mapToUI(db: any, proveedor?: any, pagos: any[] = []): CuentaPorPagar {
     return {
         id: db.id,
         proveedorId: db.proveedor_id,
@@ -15,14 +15,30 @@ function mapToUI(db: any, proveedor?: any): CuentaPorPagar {
             categoria: proveedor.categoria || "MIXTO",
             datosBancarios: "",
             correo: proveedor.correo || "",
-        } : {} as Proveedor,
+        } : {
+            id: db.proveedor_id || "unknown",
+            nombre: "Proveedor Desconocido",
+            nit: "N/A",
+            categoria: "MIXTO",
+            datosBancarios: "",
+            correo: ""
+        } as Proveedor,
         numeroFacturaProveedor: db.numero_factura || "",
         fecha: new Date(db.fecha_factura || db.created_at),
         concepto: db.concepto || "",
         valorTotal: Number(db.valor_total) || 0,
         valorPagado: Number(db.valor_pagado) || 0,
         saldoPendiente: Number(db.saldo_pendiente) || 0,
-        pagos: [], // Would load from separate table if needed
+        pagos: pagos.map(p => ({
+            id: p.id,
+            cuentaPorPagarId: p.cuenta_por_pagar_id,
+            fecha: new Date(p.fecha),
+            valor: Number(p.valor),
+            metodoPago: p.metodo_pago,
+            cuentaBancariaId: p.cuenta_bancaria_id,
+            nota: p.nota,
+            referenciaBancaria: p.referencia_bancaria
+        })),
         ofertaId: db.trabajo_id,
         // Extended
         fechaVencimiento: db.fecha_vencimiento ? new Date(db.fecha_vencimiento) : undefined,
@@ -46,23 +62,25 @@ function mapToDB(ui: Partial<CuentaPorPagar>) {
     };
 }
 
-export async function getCuentasPorPagarAction(): Promise<CuentaPorPagar[]> {
+export async function getCuentasPorPagarAction(limit: number = 100): Promise<CuentaPorPagar[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
         .from("cuentas_por_pagar")
         .select(`
             *,
-            proveedores (id, nombre, nit, categoria, correo)
+            proveedores (id, nombre, nit, categoria, correo),
+            pagos_cxp (*)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
     if (error) {
         console.error("Error fetching cuentas_por_pagar:", error);
         throw new Error("Failed to fetch cuentas_por_pagar");
     }
 
-    return data.map((c: any) => mapToUI(c, c.proveedores));
+    return data.map((c: any) => mapToUI(c, c.proveedores, c.pagos_cxp));
 }
 
 export async function createCuentaPorPagarAction(cuenta: Omit<CuentaPorPagar, "id">): Promise<CuentaPorPagar> {
@@ -120,7 +138,7 @@ export async function deleteCuentaPorPagarAction(id: string): Promise<boolean> {
     return true;
 }
 
-export async function payCuentaPorPagarAction(id: string, cuentaBancariaId: string, valor: number, fecha: Date): Promise<void> {
+export async function payCuentaPorPagarAction(id: string, cuentaBancariaId: string, valor: number, fecha: Date, nota?: string): Promise<void> {
     const supabase = await createClient();
 
     // 1. Get current CXP
@@ -128,36 +146,51 @@ export async function payCuentaPorPagarAction(id: string, cuentaBancariaId: stri
     if (fetchError || !cxp) throw new Error("CXP not found");
 
     // 2. Update CXP
-    const nuevoSaldo = Math.max(0, (Number(cxp.saldo_pendiente) || 0) - valor);
     const nuevoPago = (Number(cxp.valor_pagado) || 0) + valor;
+    const nuevoSaldo = Math.max(0, (Number(cxp.valor_total) || 0) - nuevoPago);
 
     const { error: cxpError } = await supabase
         .from('cuentas_por_pagar')
         .update({
             valor_pagado: nuevoPago,
-            saldo_pendiente: nuevoSaldo,
-            estado: nuevoSaldo <= 0 ? 'PAGADO' : 'PENDIENTE'
+            estado: nuevoSaldo <= 0 ? 'PAGADA' : (nuevoPago > 0 ? 'PARCIAL' : 'PENDIENTE')
         })
         .eq('id', id);
 
     if (cxpError) throw new Error("Failed to update CXP");
 
-    // 3. Register Movement
+    // 3. Register Payment Historial
+    const { error: pagoError } = await supabase
+        .from('pagos_cxp')
+        .insert({
+            cuenta_por_pagar_id: id,
+            fecha: fecha,
+            valor: valor,
+            metodo_pago: 'TRANSFERENCIA',
+            cuenta_bancaria_id: cuentaBancariaId,
+            nota: nota || `Abono a factura ${cxp.numero_factura || ''}`
+        });
+
+    if (pagoError) throw new Error("Failed to register payment history: " + pagoError.message);
+
+    // 4. Register Movement
     const { error: movError } = await supabase
         .from('movimientos_financieros')
         .insert({
             fecha: fecha,
             tipo: 'EGRESO',
             categoria: 'PROVEEDORES',
+            concepto: 'Pago Proveedor',
             descripcion: `Pago Factura Proveedor ${cxp.numero_factura || ''}`,
             valor: valor,
             cuenta_id: cuentaBancariaId,
-            referencia: cxp.numero_factura
+            numero_documento: cxp.numero_factura,
+            cuenta_por_pagar_id: id
         });
 
     if (movError) throw new Error("Failed to create financial movement: " + movError.message);
 
-    // 4. Update Bank Balance
+    // 5. Update Bank Balance
     await supabase.rpc("update_cuenta_saldo", {
         cuenta_uuid: cuentaBancariaId,
         delta_valor: -valor

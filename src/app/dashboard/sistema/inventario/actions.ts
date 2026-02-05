@@ -79,12 +79,13 @@ async function getNextCode(supabase: any) {
     return `INV-${nextNum.toString().padStart(4, "0")}`;
 }
 
-export async function getInventarioAction(): Promise<InventarioUI[]> {
+export async function getInventarioAction(limit: number = 200): Promise<InventarioUI[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("inventario")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
     if (error) {
         console.error("Error fetching inventario:", error);

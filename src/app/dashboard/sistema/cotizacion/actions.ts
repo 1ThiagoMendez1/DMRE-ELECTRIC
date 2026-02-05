@@ -158,7 +158,7 @@ async function getNextNumero(supabase: any) {
     return `${prefix}${nextNum.toString().padStart(4, "0")}`;
 }
 
-export async function getCotizacionesAction(): Promise<Cotizacion[]> {
+export async function getCotizacionesAction(limit: number = 100): Promise<Cotizacion[]> {
     const supabase = await createClient();
 
     const { data: cotizaciones, error } = await supabase
@@ -167,14 +167,17 @@ export async function getCotizacionesAction(): Promise<Cotizacion[]> {
             *,
             clientes (id, nombre, documento, direccion, correo, telefono, contacto_principal, created_at)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
     if (error) {
         console.error("Error fetching cotizaciones:", error);
         throw new Error("Failed to fetch cotizaciones");
     }
 
-    // Get items for all cotizaciones
+    if (cotizaciones.length === 0) return [];
+
+    // Get items ONLY for these cotizaciones
     const cotIds = cotizaciones.map((c: any) => c.id);
     const { data: allItems } = await supabase
         .from("cotizacion_items")

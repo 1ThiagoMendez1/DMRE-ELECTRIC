@@ -133,9 +133,11 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                                 <FileText className="h-6 w-6 text-primary" />
                                 {code.descripcion || code.nombre}
                             </DialogTitle>
-                            <DialogDescription className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline">{code.codigo}</Badge>
-                                <span>Costo Base: {formatCurrency(totalCost)}</span>
+                            <DialogDescription asChild className="flex items-center gap-2 mt-1">
+                                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                    <Badge variant="outline">{code.codigo}</Badge>
+                                    <span>Costo Base: {formatCurrency(totalCost)}</span>
+                                </div>
                             </DialogDescription>
                         </div>
                         <div className="flex gap-2">

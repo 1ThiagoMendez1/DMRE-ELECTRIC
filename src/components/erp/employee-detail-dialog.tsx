@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { User, Banknote, FileText, Edit, History, Save, X } from "lucide-react";
+import { User, Banknote, FileText, Edit, History, Save, X, Upload, Loader2, Trash2 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Empleado, LiquidacionNomina, NovedadNomina } from "@/types/sistema";
+import { createClient } from "@/utils/supabase/client";
 
 interface EmployeeDetailDialogProps {
     open: boolean;
@@ -37,6 +38,8 @@ export function EmployeeDetailDialog({
 }: EmployeeDetailDialogProps) {
     const { toast } = useToast();
     const [isEditing, setIsEditing] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const supabase = createClient();
 
     // Editable fields
     const [editCargo, setEditCargo] = useState(empleado?.cargo || "");
@@ -62,6 +65,60 @@ export function EmployeeDetailDialog({
         onUpdate(updated as Empleado);
         toast({ title: "Datos Actualizados", description: "La información del empleado ha sido guardada." });
         setIsEditing(false);
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !e.target.files[0] || !empleado) return;
+
+        setIsUploading(true);
+        const file = e.target.files[0];
+        try {
+            const fileExt = file.name.split('.').pop();
+            const path = `empleados/${empleado.cedula}/${Date.now()}.${fileExt}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('Doc Empleados')
+                .upload(path, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('Doc Empleados')
+                .getPublicUrl(path);
+
+            const newFile = {
+                name: file.name,
+                url: publicUrl,
+                date: new Date(),
+                type: file.type
+            };
+
+            const updatedArchivos = [...(empleado.archivos || []), newFile];
+
+            // Create a temporary updated object for processing state
+            const updatedEmpleado = { ...empleado, archivos: updatedArchivos };
+
+            // Call parent update
+            onUpdate(updatedEmpleado);
+
+            toast({ title: "Documento cargado", description: "El archivo se ha guardado en el historial." });
+        } catch (error: any) {
+            console.error(error);
+            toast({ title: "Error", description: error.message || "No se pudo cargar el archivo", variant: "destructive" });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleDeleteFile = async (index: number) => {
+        if (!empleado || !empleado.archivos) return;
+
+        const updatedArchivos = [...empleado.archivos];
+        updatedArchivos.splice(index, 1);
+
+        const updatedEmpleado = { ...empleado, archivos: updatedArchivos };
+        onUpdate(updatedEmpleado);
+        toast({ title: "Documento eliminado", description: "El archivo se ha removido del historial." });
     };
 
     return (
@@ -186,7 +243,7 @@ export function EmployeeDetailDialog({
                             </Card>
                             <Card className="bg-green-500/5">
                                 <CardContent className="pt-4 text-center">
-                                    <p className="text-2xl font-bold text-green-600">{formatCurrency(empLiquidaciones.reduce((a, l) => a + l.netoPagar, 0))}</p>
+                                    <p className="text-2xl font-bold text-green-600">{formatCurrency(empLiquidaciones.reduce((a: number, l) => a + (l.netoPagar || 0), 0))}</p>
                                     <p className="text-xs text-muted-foreground">Total Pagado</p>
                                 </CardContent>
                             </Card>
@@ -279,11 +336,54 @@ export function EmployeeDetailDialog({
                     <TabsContent value="documentos" className="flex-1 overflow-auto py-4">
                         <Card>
                             <CardHeader><CardTitle className="text-sm">Documentos del Empleado</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-center py-8 text-muted-foreground">
-                                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                    <p>Funcionalidad de carga de documentos próximamente.</p>
-                                    <p className="text-xs">(Contratos, Certificados, Hojas de Vida, etc.)</p>
+                            <CardContent className="space-y-6">
+                                {/* Upload Section */}
+                                <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center bg-muted/20">
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                            onChange={handleFileUpload}
+                                            disabled={isUploading}
+                                        />
+                                        <Button variant="outline" disabled={isUploading}>
+                                            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                            Subir Documento
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-2">PDF, Imágenes (Max 5MB)</p>
+                                </div>
+
+                                {/* Files List */}
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-medium">Historial de Archivos</h4>
+                                    {!empleado.archivos || empleado.archivos.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground italic">No hay documentos registrados.</p>
+                                    ) : (
+                                        <div className="grid gap-2">
+                                            {empleado.archivos.map((file, idx) => (
+                                                <div key={idx} className="flex items-center justify-between p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <FileText className="h-8 w-8 text-primary/80 shrink-0" />
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-medium truncate">{file.name}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {file.date ? format(new Date(file.date), "PPP p", { locale: es }) : "Fecha desconocida"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2 shrink-0">
+                                                        <Button variant="ghost" size="sm" asChild>
+                                                            <a href={file.url} target="_blank" rel="noopener noreferrer">Ver</a>
+                                                        </Button>
+                                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteFile(idx)}>
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

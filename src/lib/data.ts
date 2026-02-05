@@ -125,7 +125,7 @@ export const systemNavItems = [
     },
     {
         id: 'control',
-        label: 'Control',
+        label: 'Control y Sistema',
         href: '/dashboard/sistema/control',
         icon: ClipboardList,
     },

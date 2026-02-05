@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
-    ResponsiveContainer,
+    ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip
 } from "recharts";
 
 const supplierSchema = z.object({

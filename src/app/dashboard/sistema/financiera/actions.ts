@@ -100,7 +100,7 @@ async function getNextNumero(supabase: any) {
     return `${prefix}${nextNum.toString().padStart(4, "0")}`;
 }
 
-export async function getFacturasAction(): Promise<Factura[]> {
+export async function getFacturasAction(limit: number = 100): Promise<Factura[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -112,7 +112,8 @@ export async function getFacturasAction(): Promise<Factura[]> {
                 clientes (id, nombre, documento, telefono, direccion)
             )
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
     if (error) {
         console.error("Error fetching facturas:", error);
