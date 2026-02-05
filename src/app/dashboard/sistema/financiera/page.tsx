@@ -78,24 +78,21 @@ export default function FinancieraPage() {
     const {
         cuentasBancarias: cuentas,
         movimientosFinancieros: movementsRaw,
+        obligacionesFinancieras: obligaciones,
         addCuentaBancaria,
         updateCuentaBancaria,
-        addMovimientoFinanciero
+        addMovimientoFinanciero,
+        addObligacionFinanciera,
+        updateObligacionFinanciera
     } = useErp();
 
     // Map movements to ensure it has valor/concepto if DB uses monto/descripcion
     const movimientos = movementsRaw.map(m => ({
         ...m,
-        valor: m.valor || m.monto || 0,
+        valor: m.valor || 0,
         concepto: m.concepto || m.descripcion || "Sin concepto",
         cuenta: m.cuenta || cuentas.find(c => c.id === m.cuentaId) || { nombre: "Cuenta Desconocida" }
     })) as any[];
-
-    // Keep obligations as mock for now as we don't have DB table yet
-    const [obligaciones, setObligaciones] = useState<ObligacionFinanciera[]>([]);
-    // Ideally fetch from context or empty if not implemented
-
-    // const [invoiceSearch, setInvoiceSearch] = useState(""); // Moved
 
     // --- LOGIC MOVED TO BILLING MODULE ---
     // nextInvoiceId, filteredFacturas, handlers, useEffect
@@ -163,11 +160,13 @@ export default function FinancieraPage() {
     };
 
     const handleCreateObligacion = (newObligacion: ObligacionFinanciera) => {
-        setObligaciones([...obligaciones, newObligacion]);
+        addObligacionFinanciera(newObligacion);
+        toast({ title: "Obligación registrada", description: "El crédito ha sido guardado exitosamente." });
     };
 
     const handleUpdateObligacion = (updatedObl: ObligacionFinanciera) => {
-        setObligaciones(obligaciones.map(o => o.id === updatedObl.id ? updatedObl : o));
+        updateObligacionFinanciera(updatedObl);
+        toast({ title: "Obligación actualizada", description: "Los cambios han sido guardados." });
     };
 
     return (

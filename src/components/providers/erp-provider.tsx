@@ -5,7 +5,8 @@ import {
     Factura, Cotizacion, Cliente, User, InventarioItem, Proveedor,
     Vehiculo, DotacionItem, EntregaDotacion, CuentaPorPagar,
     GastoVehiculo, CodigoTrabajo, OrdenCompra,
-    CuentaBancaria, MovimientoFinanciero, NovedadNomina, Empleado
+    CuentaBancaria, MovimientoFinanciero, NovedadNomina, Empleado,
+    ObligacionFinanciera
 } from "@/types/sistema";
 
 // Import Server Actions
@@ -16,13 +17,17 @@ import { getCodigosTrabajoAction, createCodigoTrabajoAction, updateCodigoTrabajo
 import { getVehiculosAction, createVehiculoAction, updateVehiculoAction, getGastosVehiculosAction, createGastoVehiculoAction } from "@/app/dashboard/sistema/activos/actions";
 import { getCotizacionesAction, createCotizacionAction, updateCotizacionAction, deleteCotizacionAction } from "@/app/dashboard/sistema/cotizacion/actions";
 import { getFacturasAction, createFacturaAction, updateFacturaAction } from "@/app/dashboard/sistema/financiera/actions";
-import { getDotacionItemsAction, getEntregasDotacionAction, createEntregaDotacionAction, updateDotacionItemAction } from "@/app/dashboard/sistema/dotacion/actions";
+import { getDotacionItemsAction, getEntregasDotacionAction, createEntregaDotacionAction, updateDotacionItemAction, updateEntregaDotacionAction } from "@/app/dashboard/sistema/dotacion/actions";
 import { getCuentasPorPagarAction, updateCuentaPorPagarAction, payCuentaPorPagarAction } from "@/app/dashboard/sistema/suministro/cuentas-actions";
-import { getCuentasBancariasAction, createCuentaBancariaAction, updateCuentaBancariaAction, getMovimientosFinancierosAction, createMovimientoFinancieroAction } from "@/app/dashboard/sistema/financiera/bancos-actions";
+import { getCuentasBancariasAction, createCuentaBancariaAction, updateCuentaBancariaAction, getMovimientosFinancierosAction, createMovimientoFinancieroAction, updateMovimientoFinancieroAction } from "@/app/dashboard/sistema/financiera/bancos-actions";
+import { getObligacionesFinancierasAction, createObligacionFinancieraAction, updateObligacionFinancieraAction, deleteObligacionFinancieraAction } from "@/app/dashboard/sistema/financiera/obligaciones-actions";
 import { getNovedadesNominaAction, createNovedadNominaAction, updateNovedadNominaAction, deleteNovedadNominaAction } from "@/app/dashboard/sistema/talento-humano/novedades-actions";
 import { getEmpleadosAction, createEmpleadoAction, updateEmpleadoAction, deleteEmpleadoAction, payNominaAction } from "@/app/dashboard/sistema/talento-humano/actions";
-import { getUsers, updateUserPermissionsAction, deleteUserAction } from "@/actions/auth-actions";
-import { createClient } from "@/utils/supabase/client";
+
+// Fallback mock data for users (until profiles table is connected)
+const initialUsers: User[] = [
+    { id: "1", name: "Admin", email: "admin@dmre.com", role: "ADMIN", sidebarAccess: ["*"] },
+];
 
 interface ErpContextType {
     // Data
@@ -42,6 +47,7 @@ interface ErpContextType {
     ordenesCompra: OrdenCompra[];
     cuentasBancarias: CuentaBancaria[];
     movimientosFinancieros: MovimientoFinanciero[];
+    obligacionesFinancieras: ObligacionFinanciera[];
     novedadesNomina: NovedadNomina[];
     empleados: Empleado[];
 
@@ -85,10 +91,11 @@ interface ErpContextType {
 
     // Dotacion Actions
     updateDotacionItem: (item: DotacionItem) => void;
+    updateEntregaDotacion: (id: string, updates: Partial<EntregaDotacion>) => void;
     addEntregaDotacion: (entrega: EntregaDotacion) => void;
 
     // Gastos Vehiculo Actions
-    addGastoVehiculo: (gasto: GastoVehiculo) => void;
+    addGastoVehiculo: (gasto: GastoVehiculo, cuentaId?: string) => void;
 
     // Cuentas por Pagar Actions
     updateCuentaPorPagar: (updated: CuentaPorPagar) => void;
@@ -102,6 +109,10 @@ interface ErpContextType {
     addCuentaBancaria: (cta: CuentaBancaria) => void;
     updateCuentaBancaria: (updated: CuentaBancaria) => void;
     addMovimientoFinanciero: (mov: MovimientoFinanciero) => void;
+    updateMovimientoFinanciero: (updated: MovimientoFinanciero) => void;
+    addObligacionFinanciera: (obl: ObligacionFinanciera) => void;
+    updateObligacionFinanciera: (updated: ObligacionFinanciera) => void;
+    deleteObligacionFinanciera: (id: string) => void;
     addNovedadNomina: (nov: NovedadNomina) => void;
     updateNovedadNomina: (updated: NovedadNomina) => void;
     deleteNovedadNomina: (id: string) => void;
@@ -114,6 +125,10 @@ interface ErpContextType {
     // Payment Actions
     payCuentaPorPagar: (id: string, cuentaBancariaId: string, valor: number, fecha: Date) => Promise<void>;
     payNomina: (empleadoId: string, periodo: string, valor: number, cuentaBancariaId: string, fecha: Date) => Promise<void>;
+
+    // Orden Compra Actions
+    addOrdenCompra: (oc: any) => Promise<void>;
+    updateOrdenCompra: (id: string, oc: any) => Promise<void>;
 
     // Refresh function
     refreshData: () => Promise<void>;
@@ -142,6 +157,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([]);
     const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
     const [movimientosFinancieros, setMovimientosFinancieros] = useState<MovimientoFinanciero[]>([]);
+    const [obligacionesFinancieras, setObligacionesFinancieras] = useState<ObligacionFinanciera[]>([]);
     const [novedadesNomina, setNovedadesNomina] = useState<NovedadNomina[]>([]);
     const [empleados, setEmpleados] = useState<Empleado[]>([]);
 
@@ -163,9 +179,9 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 cuentasData,
                 bancosData,
                 movimientosData,
+                obligacionesData,
                 novedadesData,
                 empleadosData,
-                usersData,
             ] = await Promise.all([
                 getClientsAction().catch(() => []),
                 getProveedoresAction().catch(() => []),
@@ -180,9 +196,9 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 getCuentasPorPagarAction().catch(() => []),
                 getCuentasBancariasAction().catch(() => []),
                 getMovimientosFinancierosAction().catch(() => []),
+                getObligacionesFinancierasAction().catch(() => []),
                 getNovedadesNominaAction().catch(() => []),
                 getEmpleadosAction().catch(() => []),
-                getUsers().catch(() => []),
             ]);
 
             setClientes(clientesData);
@@ -198,18 +214,9 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setCuentasPorPagar(cuentasData);
             setCuentasBancarias(bancosData || []);
             setMovimientosFinancieros(movimientosData || []);
+            setObligacionesFinancieras(obligacionesData || []);
             setNovedadesNomina(novedadesData || []);
             setEmpleados(empleadosData || []);
-            setUsers(usersData || []);
-
-            // Set current user if logged in
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user && usersData) {
-                const found = usersData.find((u: any) => u.id === user.id);
-                if (found) setCurrentUser(found);
-            }
-
         } catch (error) {
             console.error("Error loading data:", error);
         } finally {
@@ -359,11 +366,21 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         } catch (error) { console.error("Failed to add entrega dotacion:", error); }
     };
 
+    const updateEntregaDotacion = async (id: string, updates: Partial<EntregaDotacion>) => {
+        try {
+            const saved = await updateEntregaDotacionAction(id, updates);
+            setEntregasDotacion(prev => prev.map(e => e.id === saved.id ? saved : e));
+        } catch (error) {
+            console.error("Failed to update entrega dotacion:", error);
+        }
+    };
+
     // GASTOS VEHICULO ACTIONS
+    // =============================================
     const addGastoVehiculo = async (gasto: GastoVehiculo) => {
         try {
-            const { id, ...rest } = gasto;
-            const saved = await createGastoVehiculoAction(rest);
+            const { id, vehiculo, ...rest } = gasto;
+            const saved = await createGastoVehiculoAction(rest as any, cuentaId);
             setGastosVehiculos(prev => [saved, ...prev]);
         } catch (error) { console.error("Failed to add gasto vehiculo:", error); }
     };
@@ -418,6 +435,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setMovimientosFinancieros(prev => [saved, ...prev]);
         } catch (error) { console.error("Error adding movimiento:", error); }
     };
+
     const addNovedadNomina = async (nov: NovedadNomina) => {
         try {
             const { id, ...rest } = nov;
@@ -494,6 +512,20 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         setUsers(u);
     };
 
+    const addOrdenCompra = async (oc: any) => {
+        try {
+            const saved = await createOrdenCompraAction(oc);
+            setOrdenesCompra(prev => [saved, ...prev]);
+        } catch (error) { console.error("Error adding OC:", error); }
+    };
+
+    const updateOrdenCompra = async (id: string, oc: any) => {
+        try {
+            const saved = await updateOrdenCompraAction(id, oc);
+            setOrdenesCompra(prev => prev.map(o => o.id === saved.id ? saved : o));
+        } catch (error) { console.error("Error updating OC:", error); }
+    };
+
     return (
         <ErpContext.Provider value={{
             facturas, cotizaciones, clientes, users, currentUser,
@@ -501,6 +533,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             entregasDotacion, cuentasPorPagar, gastosVehiculos,
             codigosTrabajo, ordenesCompra,
             cuentasBancarias, movimientosFinancieros, novedadesNomina, empleados,
+
+            // Loading
             isLoading,
             addFactura, updateFactura,
             addCotizacion, updateCotizacion, deleteCotizacion,
@@ -510,13 +544,18 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             updateProveedor, addProveedor, deleteProveedor,
             updateVehiculo, addVehiculo,
             updateDotacionItem, addEntregaDotacion,
+            updateEntregaDotacion,
             addGastoVehiculo,
             updateCuentaPorPagar: updateCuentaPorPagarHandler,
             addCodigoTrabajo, updateCodigoTrabajo, deleteCodigoTrabajo,
+
+            // New Actions
             addCuentaBancaria, updateCuentaBancaria, addMovimientoFinanciero,
             addNovedadNomina, updateNovedadNomina, deleteNovedadNomina,
             addEmpleado, updateEmpleado, deleteEmpleado,
             payCuentaPorPagar, payNomina,
+
+            // Refresh
             refreshData: loadAllData,
         }}>
             {children}

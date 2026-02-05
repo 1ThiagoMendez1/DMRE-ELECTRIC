@@ -66,6 +66,13 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
     const handleSelect = (item: any) => {
         const isService = item.sourceType === 'SERVICIO';
 
+        // Robust calculation for services that might have been saved with cost 0
+        let servicePrice = isService ? (item.costoTotal || 0) : 0;
+        if (isService && servicePrice === 0) {
+            const materialsPrice = (item.materiales || []).reduce((acc: number, m: any) => acc + (Number(m.valorUnitario || 0) * Number(m.cantidad || 0)), 0);
+            servicePrice = materialsPrice + Number(item.valorManoObra || item.manoDeObra || 0);
+        }
+
         const newItem: CotizacionItem = {
             id: crypto.randomUUID(), // Temp ID for the quote item
             inventarioId: isService ? undefined : item.id,
@@ -73,13 +80,13 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             tipo: isService ? 'SERVICIO' : 'PRODUCTO',
             descripcion: isService ? item.nombre : item.descripcion,
             cantidad: 1,
-            valorUnitario: isService ? item.costoTotal : (item.valorUnitario || 0),
-            valorTotal: isService ? item.costoTotal : (item.valorUnitario || 0),
+            valorUnitario: isService ? servicePrice : (item.valorUnitario || 0),
+            valorTotal: isService ? servicePrice : (item.valorUnitario || 0),
             descuentoValor: 0,
             descuentoPorcentaje: 0,
             impuesto: 19, // Default IVA
             ocultarDetalles: false,
-            costoUnitario: isService ? item.costoTotal : (item.precio_proveedor || item.precioProveedor || item.costoMateriales || 0),
+            costoUnitario: isService ? servicePrice : (item.precio_proveedor || item.precioProveedor || item.costoMateriales || 0),
             // If it's a service (Code), include subitems
             subItems: isService ? item.materiales : undefined
         };

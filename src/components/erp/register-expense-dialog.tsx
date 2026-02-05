@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea"; // Assuming you have this or will use Input
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 // Schema
 const expenseSchema = z.object({
@@ -56,14 +56,16 @@ const expenseSchema = z.object({
     proveedor: z.string().min(2, "El proveedor es requerido"),
     kilometraje: z.string().optional(),
     notas: z.string().optional(),
+    cuentaId: z.string().optional(),
 });
 
 interface RegisterExpenseDialogProps {
     vehiculos: any[];
-    onExpenseCreated: (expense: any) => void;
+    cuentas: any[];
+    onExpenseCreated: (expense: any, cuentaId?: string) => void;
 }
 
-export function RegisterExpenseDialog({ vehiculos, onExpenseCreated }: RegisterExpenseDialogProps) {
+export function RegisterExpenseDialog({ vehiculos, cuentas, onExpenseCreated }: RegisterExpenseDialogProps) {
     const [open, setOpen] = useState(false);
     const { toast } = useToast();
 
@@ -75,6 +77,7 @@ export function RegisterExpenseDialog({ vehiculos, onExpenseCreated }: RegisterE
             proveedor: "",
             kilometraje: "",
             notas: "",
+            cuentaId: "",
         },
     });
 
@@ -97,7 +100,7 @@ export function RegisterExpenseDialog({ vehiculos, onExpenseCreated }: RegisterE
             kilometraje: values.kilometraje ? Number(values.kilometraje) : undefined,
         };
 
-        onExpenseCreated(newExpense);
+        onExpenseCreated(newExpense, values.cuentaId);
         toast({
             title: "Gasto registrado",
             description: `Se ha registrado el gasto de ${newExpense.vehiculo.placa} por $${newExpense.valor}`,
@@ -263,7 +266,50 @@ export function RegisterExpenseDialog({ vehiculos, onExpenseCreated }: RegisterE
                                     </FormItem>
                                 )}
                             />
+                            <FormField
+                                control={form.control}
+                                name="cuentaId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Pagar desde (Opcional)</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Seleccione cuenta" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="NO_CASH">Solo registro (Sin movimiento)</SelectItem>
+                                                {cuentas.map((c) => (
+                                                    <SelectItem key={c.id} value={c.id}>
+                                                        {c.nombre} ({formatCurrency(c.saldoActual)})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
+
+                        <FormField
+                            control={form.control}
+                            name="notas"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Notas / Observaciones</FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder="Detalles adicionales del gasto..."
+                                            className="resize-none"
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

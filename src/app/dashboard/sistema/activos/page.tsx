@@ -22,6 +22,7 @@ import { DynamicChart, DashboardPanel } from "@/components/erp/charts";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
+import { useErp } from "@/components/providers/erp-provider";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,22 +47,29 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { initialVehiculos, initialGastosVehiculos } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
 import { CreateVehicleDialog } from "@/components/erp/create-vehicle-dialog";
 import { RegisterExpenseDialog } from "@/components/erp/register-expense-dialog";
+import { GastoVehiculo, Vehiculo } from "@/types/sistema";
 
 export default function ActivosPage() {
-    const [vehiculos, setVehiculos] = useState(initialVehiculos);
-    const [gastos, setGastos] = useState(initialGastosVehiculos);
+    const {
+        vehiculos,
+        gastosVehiculos: gastos,
+        cuentasBancarias: cuentas,
+        addVehiculo,
+        addGastoVehiculo
+    } = useErp();
+
     const { toast } = useToast();
 
     const handleCreateVehicle = (newVeh: any) => {
-        setVehiculos([newVeh, ...vehiculos]);
+        addVehiculo(newVeh);
+        toast({ title: "Vehículo registrado", description: "El vehículo ha sido añadido a la flota." });
     };
 
-    const handleCreateExpense = (newExpense: any) => {
-        setGastos([newExpense, ...gastos]);
+    const handleCreateExpense = (newExpense: any, cuentaId?: string) => {
+        addGastoVehiculo(newExpense, cuentaId);
     };
 
     // --- DASHBOARD STATE ---
@@ -83,13 +91,13 @@ export default function ActivosPage() {
         return true;
     };
 
-    const dashboardFilteredExpenses = gastos.filter(g => filterData(g.fecha));
+    const dashboardFilteredExpenses = gastos.filter((g: GastoVehiculo) => filterData(g.fecha));
 
     // Derived Data
     // 1. Expenses Trend
     const expenseTrendData = useMemo(() => {
         const agg: Record<string, number> = {};
-        dashboardFilteredExpenses.forEach(g => {
+        dashboardFilteredExpenses.forEach((g: GastoVehiculo) => {
             const dateStr = new Date(g.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
             agg[dateStr] = (agg[dateStr] || 0) + g.valor;
         });
@@ -99,7 +107,7 @@ export default function ActivosPage() {
     // 2. Expenses by Vehicle
     const expensesByVehicleData = useMemo(() => {
         const agg: Record<string, number> = {};
-        dashboardFilteredExpenses.forEach(g => {
+        dashboardFilteredExpenses.forEach((g: GastoVehiculo) => {
             agg[g.vehiculo.placa] = (agg[g.vehiculo.placa] || 0) + g.valor;
         });
         return Object.keys(agg).map(k => ({ name: k, value: agg[k] })).sort((a, b) => b.value - a.value);
@@ -108,15 +116,15 @@ export default function ActivosPage() {
     // 3. Maintenance Type Distribution
     const maintenanceDistData = useMemo(() => {
         const agg: Record<string, number> = {};
-        dashboardFilteredExpenses.forEach(g => {
+        dashboardFilteredExpenses.forEach((g: GastoVehiculo) => {
             agg[g.tipo] = (agg[g.tipo] || 0) + g.valor;
         });
         return Object.keys(agg).map(k => ({ name: k, value: agg[k] })).sort((a, b) => b.value - a.value);
     }, [dashboardFilteredExpenses]);
 
-    const kpiTotalExpenses = dashboardFilteredExpenses.reduce((acc, g) => acc + g.valor, 0);
-    const kpiTotalFuel = dashboardFilteredExpenses.filter(g => g.tipo === 'COMBUSTIBLE').reduce((acc, g) => acc + g.valor, 0);
-    const kpiTotalMaintenace = dashboardFilteredExpenses.filter(g => g.tipo !== 'COMBUSTIBLE').reduce((acc, g) => acc + g.valor, 0);
+    const kpiTotalExpenses = dashboardFilteredExpenses.reduce((acc: number, g: GastoVehiculo) => acc + g.valor, 0);
+    const kpiTotalFuel = dashboardFilteredExpenses.filter((g: GastoVehiculo) => g.tipo === 'COMBUSTIBLE').reduce((acc: number, g: GastoVehiculo) => acc + g.valor, 0);
+    const kpiTotalMaintenace = dashboardFilteredExpenses.filter((g: GastoVehiculo) => g.tipo !== 'COMBUSTIBLE').reduce((acc: number, g: GastoVehiculo) => acc + g.valor, 0);
 
 
 
@@ -167,7 +175,7 @@ export default function ActivosPage() {
                                 <Car className="h-4 w-4 text-primary" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{initialVehiculos.length}</div>
+                                <div className="text-2xl font-bold">{vehiculos.length}</div>
                                 <p className="text-xs text-muted-foreground">Vehículos registrados</p>
                             </CardContent>
                         </Card>
@@ -262,7 +270,7 @@ export default function ActivosPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="sm" onClick={() => toast({ title: `Historial: ${veh.placa}`, description: `Gastos registrados: ${gastos.filter(g => g.vehiculo.id === veh.id).length}. Revise la pestaña 'Bitácora de Gastos'.` })}>Historial</Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => toast({ title: `Historial: ${veh.placa}`, description: `Gastos registrados: ${gastos.filter((g: GastoVehiculo) => g.vehiculo.id === veh.id).length}. Revise la pestaña 'Bitácora de Gastos'.` })}>Historial</Button>
                                                 </TableCell>
                                             </TableRow>
                                         )
@@ -279,7 +287,11 @@ export default function ActivosPage() {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Historial de Gastos Operativos</CardTitle>
-                                <RegisterExpenseDialog vehiculos={vehiculos} onExpenseCreated={handleCreateExpense} />
+                                <RegisterExpenseDialog
+                                    vehiculos={vehiculos}
+                                    cuentas={cuentas}
+                                    onExpenseCreated={handleCreateExpense}
+                                />
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -295,7 +307,7 @@ export default function ActivosPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {gastos.map((gasto) => (
+                                    {gastos.map((gasto: GastoVehiculo) => (
                                         <TableRow key={gasto.id}>
                                             <TableCell>{format(gasto.fecha, "dd/MM/yyyy")}</TableCell>
                                             <TableCell className="font-mono text-xs">{gasto.vehiculo.placa}</TableCell>

@@ -89,7 +89,9 @@ export default function LogisticaPage() {
         updateDotacionItem,
         addInventarioItem,
         updateInventarioItem,
-        ordenesCompra // New
+        updateEntregaDotacion,
+        ordenesCompra,
+        cuentasBancarias // Correct property name
     } = useErp();
 
     // Sub-tabs for Suministro
@@ -122,7 +124,7 @@ export default function LogisticaPage() {
     // Actions Wrapper (Connecting Dialogs to Context)
     const handleCreateSupplier = (newProv: any) => addProveedor(newProv);
     const handleCreateVehicle = (newVeh: any) => addVehiculo(newVeh);
-    const handleCreateExpense = (newExpense: any) => addGastoVehiculo(newExpense);
+    const handleCreateExpense = (newExpense: any, cuentaId?: string) => addGastoVehiculo(newExpense, cuentaId);
 
     // Custom Logic for Payment (Context has universal update, we need specific logic)
     // Custom Logic for Payment (Context has universal update, we need specific logic)
@@ -279,6 +281,8 @@ export default function LogisticaPage() {
                                     <TableRow>
                                         <TableHead>SKU</TableHead>
                                         <TableHead>Descripción</TableHead>
+                                        <TableHead>Marca</TableHead>
+                                        <TableHead>Modelo</TableHead>
                                         <TableHead>Proveedor</TableHead>
                                         <TableHead>Categoría</TableHead>
                                         <TableHead>Ubicación</TableHead>
@@ -308,6 +312,8 @@ export default function LogisticaPage() {
                                                 >
                                                     <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                                                     <TableCell className="font-medium">{item.descripcion}</TableCell>
+                                                    <TableCell className="text-xs">{item.marca || '-'}</TableCell>
+                                                    <TableCell className="text-xs">{item.modelo || '-'}</TableCell>
                                                     <TableCell>
                                                         {proveedorInfo ? (
                                                             <span className="text-xs text-muted-foreground">{proveedorInfo.nombre}</span>
@@ -614,7 +620,7 @@ export default function LogisticaPage() {
                                                                         className="h-6 text-[10px] px-2"
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            // Here we would call updateEntregaDotacion if available
+                                                                            updateEntregaDotacion(entrega.id, { estado: 'ENTREGADO' });
                                                                             toast({
                                                                                 title: "Entrega Confirmada",
                                                                                 description: "Se ha registrado la entrega física."
@@ -631,6 +637,7 @@ export default function LogisticaPage() {
                                                                         className="h-6 text-[10px] px-2"
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
+                                                                            updateEntregaDotacion(entrega.id, { estado: 'ACEPTADO' });
                                                                             toast({
                                                                                 title: "Recepción Confirmada",
                                                                                 description: "El empleado ha aceptado la dotación."
@@ -807,7 +814,11 @@ export default function LogisticaPage() {
                                 <CardHeader>
                                     <div className="flex justify-between items-center">
                                         <CardTitle>Bitácora de Gastos</CardTitle>
-                                        <RegisterExpenseDialog vehiculos={vehiculos} onExpenseCreated={handleCreateExpense} />
+                                        <RegisterExpenseDialog
+                                            vehiculos={vehiculos}
+                                            cuentas={cuentasBancarias}
+                                            onExpenseCreated={handleCreateExpense}
+                                        />
                                     </div>
                                 </CardHeader>
                                 <CardContent>
