@@ -21,7 +21,7 @@ import { getCuentasPorPagarAction, updateCuentaPorPagarAction, payCuentaPorPagar
 import { getCuentasBancariasAction, createCuentaBancariaAction, updateCuentaBancariaAction, getMovimientosFinancierosAction, createMovimientoFinancieroAction } from "@/app/dashboard/sistema/financiera/bancos-actions";
 import { getNovedadesNominaAction, createNovedadNominaAction, updateNovedadNominaAction, deleteNovedadNominaAction } from "@/app/dashboard/sistema/talento-humano/novedades-actions";
 import { getEmpleadosAction, createEmpleadoAction, updateEmpleadoAction, deleteEmpleadoAction, payNominaAction } from "@/app/dashboard/sistema/talento-humano/actions";
-import { getUsers, updateUserPermissionsAction, deleteUserAction } from "@/actions/auth-actions";
+import { getUsers, updateUserPermissionsAction, deleteUserAction, getUserProfile } from "@/actions/auth-actions";
 import { createClient } from "@/utils/supabase/client";
 
 interface ErpContextType {
@@ -121,7 +121,7 @@ interface ErpContextType {
 
 const ErpContext = createContext<ErpContextType | undefined>(undefined);
 
-export function ErpProvider({ children }: { children: ReactNode }) {
+export function ErpProvider({ children, initialUser }: { children: ReactNode, initialUser?: User }) {
     // Loading state
     const [isLoading, setIsLoading] = useState(true);
 
@@ -130,7 +130,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
     const [clientes, setClientes] = useState<Cliente[]>([]);
     const [users, setUsers] = useState<User[]>([]);
-    const [currentUser, setCurrentUser] = useState<User | undefined>(undefined);
+    const [currentUser, setCurrentUser] = useState<User | undefined>(initialUser);
     const [inventario, setInventario] = useState<InventarioItem[]>([]);
     const [proveedores, setProveedores] = useState<Proveedor[]>([]);
     const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
@@ -149,66 +149,76 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const loadAllData = async () => {
         setIsLoading(true);
         try {
-            const [
-                clientesData,
-                proveedoresData,
-                inventarioData,
-                codigosData,
-                vehiculosData,
-                gastosData,
-                cotizacionesData,
-                facturasData,
-                dotacionData,
-                entregasData,
-                cuentasData,
-                bancosData,
-                movimientosData,
-                novedadesData,
-                empleadosData,
-                usersData,
-            ] = await Promise.all([
-                getClientsAction().catch(() => []),
-                getProveedoresAction().catch(() => []),
-                getInventarioAction().catch(() => []),
-                getCodigosTrabajoAction().catch(() => []),
-                getVehiculosAction().catch(() => []),
-                getGastosVehiculosAction().catch(() => []),
-                getCotizacionesAction().catch(() => []),
-                getFacturasAction().catch(() => []),
-                getDotacionItemsAction().catch(() => []),
-                getEntregasDotacionAction().catch(() => []),
-                getCuentasPorPagarAction().catch(() => []),
-                getCuentasBancariasAction().catch(() => []),
-                getMovimientosFinancierosAction().catch(() => []),
-                getNovedadesNominaAction().catch(() => []),
-                getEmpleadosAction().catch(() => []),
-                getUsers().catch(() => []),
-            ]);
+            // 1. Load User Session Parallelly (Fast Path for Sidebar)
+            const userPromise = (async () => {
+                if (!initialUser) {
+                    const supabase = createClient();
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                        const profile = await getUserProfile(user.id);
+                        if (profile) setCurrentUser(profile as User);
+                    }
+                }
+            })();
 
-            setClientes(clientesData);
-            setProveedores(proveedoresData);
-            setInventario(inventarioData);
-            setCodigosTrabajo(codigosData);
-            setVehiculos(vehiculosData);
-            setGastosVehiculos(gastosData);
-            setCotizaciones(cotizacionesData);
-            setFacturas(facturasData);
-            setDotacionItems(dotacionData);
-            setEntregasDotacion(entregasData);
-            setCuentasPorPagar(cuentasData);
-            setCuentasBancarias(bancosData || []);
-            setMovimientosFinancieros(movimientosData || []);
-            setNovedadesNomina(novedadesData || []);
-            setEmpleados(empleadosData || []);
-            setUsers(usersData || []);
+            // 2. Load Business Data (Heavy Path)
+            const businessPromise = (async () => {
+                const [
+                    clientesData,
+                    proveedoresData,
+                    // inventarioData,
+                    codigosData,
+                    vehiculosData,
+                    gastosData,
+                    // cotizacionesData,
+                    // facturasData,
+                    dotacionData,
+                    entregasData,
+                    cuentasData,
+                    // bancosData,
+                    // movimientosData,
+                    novedadesData,
+                    empleadosData,
+                    usersData,
+                ] = await Promise.all([
+                    getClientsAction().catch(() => []),
+                    getProveedoresAction().catch(() => []),
+                    // getInventarioAction().catch(() => []),
+                    getCodigosTrabajoAction().catch(() => []),
+                    getVehiculosAction().catch(() => []),
+                    getGastosVehiculosAction().catch(() => []),
+                    // getCotizacionesAction().catch(() => []),
+                    // getFacturasAction().catch(() => []),
+                    getDotacionItemsAction().catch(() => []),
+                    getEntregasDotacionAction().catch(() => []),
+                    getCuentasPorPagarAction().catch(() => []),
+                    // getCuentasBancariasAction().catch(() => []),
+                    // getMovimientosFinancierosAction().catch(() => []),
+                    getNovedadesNominaAction().catch(() => []),
+                    getEmpleadosAction().catch(() => []),
+                    getUsers().catch(() => []),
+                ]);
 
-            // Set current user if logged in
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user && usersData) {
-                const found = usersData.find((u: any) => u.id === user.id);
-                if (found) setCurrentUser(found);
-            }
+                setClientes(clientesData);
+                setProveedores(proveedoresData);
+                // setInventario(inventarioData);
+                setCodigosTrabajo(codigosData);
+                setVehiculos(vehiculosData);
+                setGastosVehiculos(gastosData);
+                // setCotizaciones(cotizacionesData);
+                // setFacturas(facturasData);
+                setDotacionItems(dotacionData);
+                setEntregasDotacion(entregasData);
+                setCuentasPorPagar(cuentasData);
+                // setCuentasBancarias(bancosData || []);
+                // setMovimientosFinancieros(movimientosData || []);
+                setNovedadesNomina(novedadesData || []);
+                setEmpleados(empleadosData || []);
+                setUsers(usersData || []);
+            })();
+
+            // Wait for both, but state updates inside userPromise will trigger early re-renders
+            await Promise.all([userPromise, businessPromise]);
 
         } catch (error) {
             console.error("Error loading data:", error);

@@ -116,3 +116,22 @@ export async function updateUserPermissionsAction(userId: string, access: string
     revalidatePath('/dashboard/sistema/usuarios');
     return { success: true };
 }
+
+export async function getUserProfile(userId: string) {
+    const { data: profile, error } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+    if (error || !profile) return null;
+
+    return {
+        id: profile.id,
+        name: profile.full_name,
+        email: profile.email,
+        role: profile.role,
+        sidebarAccess: profile.sidebar_access,
+        avatar: profile.avatar_url
+    };
+}

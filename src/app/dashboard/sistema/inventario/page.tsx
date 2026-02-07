@@ -1,10 +1,12 @@
-"use client";
-
 import { InventoryTable } from "./inventory-table";
-import { useErp } from "@/components/providers/erp-provider";
+import { getInventarioAction } from "./actions";
+import { getCotizacionesAction } from "../cotizacion/actions";
 
-export default function InventarioPage() {
-    const { inventario } = useErp();
+export default async function InventarioPage() {
+    const [inventario, cotizaciones] = await Promise.all([
+        getInventarioAction(),
+        getCotizacionesAction()
+    ]);
 
     return (
         <div className="space-y-6">
@@ -12,7 +14,7 @@ export default function InventarioPage() {
                 <h1 className="text-3xl font-bold text-primary font-headline tracking-tight">Inventario de Materiales</h1>
                 <p className="text-muted-foreground">Gestiona tus productos, precios y existencias.</p>
             </div>
-            <InventoryTable data={inventario} />
+            <InventoryTable data={inventario} cotizaciones={cotizaciones} />
         </div>
     );
 }
