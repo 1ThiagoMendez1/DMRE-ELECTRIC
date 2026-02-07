@@ -162,6 +162,7 @@ interface ErpContextType {
     addRole: (role: Omit<Role, "id" | "permissions">) => Promise<void>;
     updateRolePermission: (roleId: string, permissionId: string, actions: any) => Promise<void>;
     toggleUserStatus: (userId: string, isActive: boolean) => Promise<void>;
+    logout: () => Promise<void>;
 }
 
 const ErpContext = createContext<ErpContextType | undefined>(undefined);
@@ -756,6 +757,27 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         } catch (error) { console.error("Error updating OC:", error); }
     };
 
+    const logout = async () => {
+        const supabase = createClient();
+        try {
+            await supabase.auth.signOut();
+            setCurrentUser(undefined);
+
+            // Clear ERP related cache
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('erp_cache_')) {
+                    localStorage.removeItem(key);
+                }
+            });
+
+            // Force redirect to login
+            window.location.href = '/login';
+        } catch (error) {
+            console.error("Error during logout:", error);
+            window.location.href = '/login'; // Fallback redirect
+        }
+    };
+
     return (
         <ErpContext.Provider value={{
             facturas, cotizaciones, clientes, users, currentUser,
@@ -800,6 +822,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
 
             // Refresh
             refreshData: loadAllData,
+            logout,
         }}>
             {children}
         </ErpContext.Provider>

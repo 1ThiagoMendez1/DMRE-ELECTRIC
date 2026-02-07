@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { format } from "date-fns";
@@ -38,7 +39,12 @@ import { useErp } from "@/components/providers/erp-provider";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentUser } = useErp();
+  const { currentUser, logout } = useErp();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <SidebarProvider>
@@ -84,7 +90,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-
         </SidebarContent>
         <SidebarFooter>
           <div className="flex items-center gap-3 p-2 rounded-md bg-secondary/50 mx-2 group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:bg-transparent">
@@ -97,12 +102,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <span className="text-xs text-muted-foreground truncate">admin@dmre.co</span>
             </div>
           </div>
-          <Button variant="ghost" asChild className="w-full justify-start gap-2 mt-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-            <Link href="/">
+          {mounted ? (
+            <Button
+              variant="ghost"
+              onClick={logout}
+              className="w-full justify-start gap-2 mt-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+            >
               <LogOut className="h-4 w-4" />
               <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <div className="h-10 w-full" /> // Placeholder to keep layout stable
+          )}
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
@@ -116,7 +127,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="hidden md:inline-block text-sm text-muted-foreground mr-2 capitalize font-medium">
+            <span
+              className="hidden md:inline-block text-sm text-muted-foreground mr-2 capitalize font-medium"
+              suppressHydrationWarning
+            >
               {format(new Date(), "EEEE, dd 'de' MMM yyyy", { locale: es })}
             </span>
             <NotificationCenter />
