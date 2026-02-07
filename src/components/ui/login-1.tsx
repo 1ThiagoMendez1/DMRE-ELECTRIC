@@ -125,6 +125,7 @@ const StartLoginOne = () => {
                                         src="https://i.ibb.co/MFtSVtR/dmreLogo.png"
                                         alt="D.M.R.E Logo"
                                         fill
+                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                         className="object-contain"
                                     />
                                 </div>
@@ -159,7 +160,6 @@ const StartLoginOne = () => {
                         <Image
                             key={src}
                             src={src}
-                            loader={({ src }) => src}
                             fill
                             priority={index === 0}
                             alt={`Electrical theme ${index + 1}`}
