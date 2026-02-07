@@ -239,11 +239,13 @@ export function VehicleDetailDialog({ open, onOpenChange, vehiculo, gastos }: Ve
                                 <Car className="h-5 w-5" />
                                 {vehiculo.placa} - {vehiculo.marcaModelo}
                             </DialogTitle>
-                            <DialogDescription className="flex items-center gap-2">
-                                <Badge variant={vehiculo.estado === 'OPERATIVO' ? 'default' : vehiculo.estado === 'MANTENIMIENTO' ? 'secondary' : 'outline'}>
-                                    {vehiculo.estado}
-                                </Badge>
-                                <span>{vehiculo.color} • {vehiculo.ano}</span>
+                            <DialogDescription asChild>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Badge variant={vehiculo.estado === 'OPERATIVO' ? 'default' : vehiculo.estado === 'MANTENIMIENTO' ? 'secondary' : 'outline'}>
+                                        {vehiculo.estado}
+                                    </Badge>
+                                    <span>{vehiculo.color} • {vehiculo.ano}</span>
+                                </div>
                             </DialogDescription>
                         </div>
                         <Button
@@ -518,7 +520,7 @@ export function VehicleDetailDialog({ open, onOpenChange, vehiculo, gastos }: Ve
                                     <Card>
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-xs text-muted-foreground flex items-center gap-2">
-                                                <Calendar className="h-4 w-4" /> Promedio Mensual
+                                                <CalendarIcon className="h-4 w-4" /> Promedio Mensual
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent>
