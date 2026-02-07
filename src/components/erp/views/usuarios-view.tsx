@@ -1,0 +1,208 @@
+"use client";
+
+import { useState } from "react";
+import {
+    Users,
+    Search,
+    Shield,
+    MoreHorizontal,
+    UserCircle,
+    CheckCircle2,
+    XCircle
+} from "lucide-react";
+
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import { PermissionDialog } from "@/components/erp/permission-dialog";
+import { CreateUserDialog } from "@/components/erp/create-user-dialog";
+import { useErp } from "@/components/providers/erp-provider";
+import { systemNavItems } from "@/lib/data";
+import { cn } from "@/lib/utils";
+
+export function UsuariosView() {
+    const { toast } = useToast();
+    const { users, updateUserPermissions, setCurrentUser, currentUser, deleteUser, toggleUserStatus } = useErp();
+    const [searchTerm, setSearchTerm] = useState("");
+
+    const handleCreateUser = (newUser: any) => {
+        toast({ title: "Información", description: "Creación de usuarios simulada (falta implementar en provider addUser)" });
+    };
+
+    const handleDeleteUser = async (userId: string) => {
+        if (confirm("¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.")) {
+            await deleteUser(userId);
+            toast({ title: "Usuario eliminado", description: "El usuario ha sido eliminado correctamente." });
+        }
+    };
+
+    const getRoleBadge = (role: string) => {
+        switch (role) {
+            case 'ADMIN': return <Badge variant="default" className="bg-primary">Administrador</Badge>;
+            case 'ENGINEER': return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Ingeniero</Badge>;
+            case 'CLIENT': return <Badge variant="outline" className="border-green-500 text-green-600">Cliente</Badge>;
+            default: return <Badge variant="outline">Visualizador</Badge>;
+        }
+    };
+
+    const filteredUsers = users.filter(u =>
+        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+        <div className="flex flex-col space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold tracking-tight text-primary">Gestión de Usuarios</h2>
+                    <p className="text-muted-foreground">Administración de roles y accesos al sistema.</p>
+                </div>
+                <CreateUserDialog onUserCreated={handleCreateUser} />
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="flex items-center gap-2">
+                            <Users className="h-5 w-5" /> Directorio de Usuarios
+                        </CardTitle>
+                        <div className="relative w-64">
+                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar usuario..."
+                                className="pl-8"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Usuario</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Rol</TableHead>
+                                <TableHead>Permisos Sidebar</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredUsers.map((user) => (
+                                <TableRow key={user.id}>
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                {user.avatar ? <img src={user.avatar} className="rounded-full" /> : <UserCircle className="h-5 w-5" />}
+                                            </div>
+                                            {user.name}
+                                            {currentUser?.id === user.id && <Badge variant="outline" className="ml-2 text-[10px]">Tú</Badge>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1 max-w-[300px]">
+                                            {user.sidebarAccess && user.sidebarAccess.length > 0 ? (
+                                                user.sidebarAccess.map((accessId) => {
+                                                    const item = systemNavItems.find(i => i.id === accessId);
+                                                    return (
+                                                        <Badge key={accessId} variant="outline" className="text-[10px] px-2 py-0.5 h-auto font-normal bg-secondary/20 border-secondary/30">
+                                                            {item ? item.label : accessId}
+                                                        </Badge>
+                                                    );
+                                                })
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs italic">Sin permisos específicos</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                "gap-1 pl-1 cursor-pointer select-none transition-colors",
+                                                user.isActive
+                                                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40"
+                                                    : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                            )}
+                                            onClick={() => toggleUserStatus(user.id, !user.isActive)}
+                                        >
+                                            {user.isActive ? (
+                                                <>
+                                                    <CheckCircle2 className="h-3 w-3" /> Activo
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <XCircle className="h-3 w-3" /> Inactivo
+                                                </>
+                                            )}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <PermissionDialog
+                                                user={user}
+                                                onSave={updateUserPermissions}
+                                                trigger={
+                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Editar Permisos">
+                                                        <Shield className="h-4 w-4" />
+                                                    </Button>
+                                                }
+                                            />
+
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => setCurrentUser(user)}>
+                                                        Simular Sesión (Demo)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => toggleUserStatus(user.id, !user.isActive)}>
+                                                        {user.isActive ? "Desactivar Acceso" : "Activar Acceso"}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteUser(user.id)}>
+                                                        Eliminar Usuario
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}

@@ -1,64 +1,62 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { TareaAgenda } from "@/types/sistema";
+import { TareaAgenda, PrioridadTarea, EstadoTarea } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
 
-function mapToUI(db: any): TareaAgenda {
-    return {
-        id: db.id,
-        titulo: db.titulo,
-        descripcion: db.descripcion || "",
-        fechaVencimiento: new Date(db.fecha_vencimiento || db.created_at),
-        asignadoA: db.asignado_a,
-        prioridad: db.prioridad || "MEDIA",
-        estado: db.estado || "PENDIENTE",
-        // Extended
-        hora: db.hora,
-        creadoPor: db.creado_por,
-        etiquetas: db.etiquetas,
-        recordatorio: db.recordatorio,
-    };
-}
-
-function mapToDB(ui: Partial<TareaAgenda>) {
-    return {
-        titulo: ui.titulo,
-        descripcion: ui.descripcion,
-        fecha_vencimiento: ui.fechaVencimiento,
-        hora: ui.hora,
-        asignado_a: ui.asignadoA,
-        creado_por: ui.creadoPor,
-        prioridad: ui.prioridad,
-        estado: ui.estado,
-        etiquetas: ui.etiquetas,
-        recordatorio: ui.recordatorio,
-    };
-}
-
-export async function getTareasAction(): Promise<TareaAgenda[]> {
+export async function getTareasAction(limit: number = 100): Promise<TareaAgenda[]> {
     const supabase = await createClient();
+
     const { data, error } = await supabase
         .from("agenda")
-        .select("*")
-        .order("fecha_vencimiento", { ascending: true });
+        .select(`
+            *,
+            asignado:profiles!asignado_a (full_name)
+        `)
+        .order("fecha_vencimiento", { ascending: true })
+        .limit(limit);
 
     if (error) {
-        console.error("Error fetching tareas:", error);
-        throw new Error("Failed to fetch tareas");
+        console.error("Error fetching agenda:", error);
+        return [];
     }
 
-    return data.map(mapToUI);
+    return data.map((t: any) => ({
+        id: t.id,
+        titulo: t.titulo,
+        descripcion: t.descripcion || "",
+        fechaVencimiento: new Date(t.fecha_vencimiento),
+        asignadoA: t.asignado_a,
+        asignadoNombre: t.asignado?.full_name || "Sin Asignar",
+        prioridad: (t.prioridad as PrioridadTarea) || "MEDIA",
+        estado: (t.estado as EstadoTarea) || "PENDIENTE",
+        hora: t.hora,
+        creadoPor: t.creado_por,
+        etiquetas: t.etiquetas,
+        recordatorio: t.recordatorio
+    }));
 }
 
-export async function createTareaAction(tarea: Omit<TareaAgenda, "id">): Promise<TareaAgenda> {
+export async function createTareaAction(tarea: Omit<TareaAgenda, "id" | "asignadoNombre">): Promise<TareaAgenda> {
     const supabase = await createClient();
-    const dbData = mapToDB(tarea);
 
     const { data, error } = await supabase
         .from("agenda")
-        .insert(dbData)
-        .select()
+        .insert({
+            titulo: tarea.titulo,
+            descripcion: tarea.descripcion,
+            fecha_vencimiento: tarea.fechaVencimiento,
+            asignado_a: tarea.asignadoA,
+            prioridad: tarea.prioridad,
+            estado: tarea.estado || "PENDIENTE",
+            hora: tarea.hora,
+            etiquetas: tarea.etiquetas,
+            recordatorio: tarea.recordatorio
+        })
+        .select(`
+            *,
+            asignado:profiles!asignado_a (full_name)
+        `)
         .single();
 
     if (error) {
@@ -67,18 +65,45 @@ export async function createTareaAction(tarea: Omit<TareaAgenda, "id">): Promise
     }
 
     revalidatePath("/dashboard/sistema/agenda");
-    return mapToUI(data);
+    return {
+        id: data.id,
+        titulo: data.titulo,
+        descripcion: data.descripcion || "",
+        fechaVencimiento: new Date(data.fecha_vencimiento),
+        asignadoA: data.asignado_a,
+        asignadoNombre: data.asignado?.full_name,
+        prioridad: data.prioridad,
+        estado: data.estado,
+        hora: data.hora,
+        etiquetas: data.etiquetas,
+        recordatorio: data.recordatorio
+    };
 }
 
-export async function updateTareaAction(id: string, tarea: Partial<TareaAgenda>): Promise<TareaAgenda> {
+export async function updateTareaAction(id: string, updates: Partial<TareaAgenda>): Promise<TareaAgenda> {
     const supabase = await createClient();
-    const dbData = mapToDB(tarea);
+
+    const dbUpdates: any = {};
+    if (updates.titulo) dbUpdates.titulo = updates.titulo;
+    if (updates.descripcion !== undefined) dbUpdates.descripcion = updates.descripcion;
+    if (updates.fechaVencimiento) dbUpdates.fecha_vencimiento = updates.fechaVencimiento;
+    if (updates.asignadoA) dbUpdates.asignado_a = updates.asignadoA;
+    if (updates.prioridad) dbUpdates.prioridad = updates.prioridad;
+    if (updates.estado) dbUpdates.estado = updates.estado;
+    if (updates.hora) dbUpdates.hora = updates.hora;
+    if (updates.etiquetas) dbUpdates.etiquetas = updates.etiquetas;
+    if (updates.recordatorio !== undefined) dbUpdates.recordatorio = updates.recordatorio;
+
+    dbUpdates.updated_at = new Date();
 
     const { data, error } = await supabase
         .from("agenda")
-        .update(dbData)
+        .update(dbUpdates)
         .eq("id", id)
-        .select()
+        .select(`
+             *,
+            asignado:profiles!asignado_a (full_name)
+        `)
         .single();
 
     if (error) {
@@ -87,21 +112,28 @@ export async function updateTareaAction(id: string, tarea: Partial<TareaAgenda>)
     }
 
     revalidatePath("/dashboard/sistema/agenda");
-    return mapToUI(data);
+    return {
+        id: data.id,
+        titulo: data.titulo,
+        descripcion: data.descripcion || "",
+        fechaVencimiento: new Date(data.fecha_vencimiento),
+        asignadoA: data.asignado_a,
+        asignadoNombre: data.asignado?.full_name,
+        prioridad: data.prioridad,
+        estado: data.estado,
+        hora: data.hora,
+        etiquetas: data.etiquetas,
+        recordatorio: data.recordatorio
+    };
 }
 
 export async function deleteTareaAction(id: string): Promise<boolean> {
     const supabase = await createClient();
-    const { error } = await supabase
-        .from("agenda")
-        .delete()
-        .eq("id", id);
-
+    const { error } = await supabase.from("agenda").delete().eq("id", id);
     if (error) {
         console.error("Error deleting tarea:", error);
-        throw new Error("Failed to delete tarea");
+        return false;
     }
-
     revalidatePath("/dashboard/sistema/agenda");
     return true;
 }

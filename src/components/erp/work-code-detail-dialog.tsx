@@ -11,22 +11,51 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
 import { useErp } from "@/components/providers/erp-provider";
-import { BarChart, Users, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
+import { BarChart, Users, FileText, CheckCircle, Clock, Package, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EditWorkCodeDialog } from "./edit-work-code-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface WorkCodeDetailDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    code: any | null; // CodigoTrabajo typed appropriately
+    code: any | null; // CodigoTrabajo
 }
 
 export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetailDialogProps) {
-    const { cotizaciones } = useErp();
+    const { cotizaciones, deductInventoryItem, codigosTrabajo } = useErp();
+    const { toast } = useToast();
+    const [isDeducting, setIsDeducting] = useState(false);
+
+    // Helper for recursive deduction
+    const deductRecursive = async (currentCode: any, multiplier: number = 1) => {
+        let count = 0;
+
+        // Ensure materials array availability
+        if (!currentCode.materiales) return 0;
+
+        for (const mat of currentCode.materiales) {
+            const qty = mat.cantidad * multiplier;
+
+            if (mat.inventarioId) {
+                // It's a raw material, deduct it
+                await deductInventoryItem(mat.inventarioId, qty);
+                count++;
+            } else if (mat.subCodigoId) {
+                // It's a nested APU, find it and recurse
+                const subCode = codigosTrabajo.find((c: any) => c.id === mat.subCodigoId);
+                if (subCode) {
+                    count += await deductRecursive(subCode, qty);
+                }
+            }
+        }
+        return count;
+    };
 
     const metrics = useMemo(() => {
         if (!code || !cotizaciones) return null;
@@ -39,13 +68,10 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
         const recentQuotes: any[] = [];
 
         cotizaciones.forEach(quote => {
-            // Logic to match Code to Quote Item. 
-            // Matching by Description or dedicated ID if available.
-            // Using Description matching for now as fallback.
             const matchedItems = quote.items.filter((i: any) =>
                 i.descripcion === code.descripcion ||
                 i.descripcion === code.nombre ||
-                (i.codigoTrabajoId === code.id) // Future proofing
+                (i.codigoTrabajoId === code.id)
             );
 
             if (matchedItems.length > 0) {
@@ -59,7 +85,6 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                     totalRevenue += item.valorTotal;
                 });
 
-                // Client Stats
                 if (quote.cliente) {
                     if (!clientUsage[quote.cliente.id]) {
                         clientUsage[quote.cliente.id] = { count: 0, revenue: 0, name: quote.cliente.nombre };
@@ -108,13 +133,42 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                                 <FileText className="h-6 w-6 text-primary" />
                                 {code.descripcion || code.nombre}
                             </DialogTitle>
-                            <DialogDescription className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline">{code.codigo}</Badge>
-                                <span>Costo Base: {formatCurrency(totalCost)}</span>
+                            <DialogDescription asChild className="flex items-center gap-2 mt-1">
+                                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                    <Badge variant="outline">{code.codigo}</Badge>
+                                    <span>Costo Base: {formatCurrency(totalCost)}</span>
+                                </div>
                             </DialogDescription>
                         </div>
-                        {/* Edit Button Wrapper */}
                         <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50"
+                                disabled={isDeducting || !code.materiales?.length}
+                                onClick={async () => {
+                                    setIsDeducting(true);
+                                    try {
+                                        const count = await deductRecursive(code, 1);
+                                        toast({
+                                            title: "Materiales Descontados",
+                                            description: `Se ha actualizado el stock (incluyendo sub-niveles).`
+                                        });
+                                    } catch (error) {
+                                        console.error(error);
+                                        toast({
+                                            title: "Error",
+                                            description: "No se pudieron descontar todos los materiales.",
+                                            variant: "destructive"
+                                        });
+                                    } finally {
+                                        setIsDeducting(false);
+                                    }
+                                }}
+                            >
+                                {isDeducting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
+                                Registrar Uso
+                            </Button>
                             <EditWorkCodeDialog code={code} />
                         </div>
                     </div>
@@ -143,7 +197,7 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
-                                                        <TableHead>Material</TableHead>
+                                                        <TableHead>Material / APU</TableHead>
                                                         <TableHead className="text-right">Cant</TableHead>
                                                         <TableHead className="text-right">Unitario</TableHead>
                                                         <TableHead className="text-right">Total</TableHead>
@@ -152,7 +206,10 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                                                 <TableBody>
                                                     {code.materiales?.map((mat: any, i: number) => (
                                                         <TableRow key={i}>
-                                                            <TableCell className="py-2 text-sm">{mat.nombre || mat.descripcion}</TableCell>
+                                                            <TableCell className="py-2 text-sm">
+                                                                {mat.subCodigoId && <Badge variant="secondary" className="mr-2 text-[10px] h-5 px-1">APU</Badge>}
+                                                                {mat.nombre || mat.descripcion}
+                                                            </TableCell>
                                                             <TableCell className="text-right py-2 text-sm">{mat.cantidad}</TableCell>
                                                             <TableCell className="text-right py-2 text-sm">{formatCurrency(mat.valorUnitario)}</TableCell>
                                                             <TableCell className="text-right py-2 text-sm font-medium">{formatCurrency((mat.valorUnitario || 0) * mat.cantidad)}</TableCell>
@@ -171,7 +228,6 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                         </TabsContent>
 
                         <TabsContent value="metrics" className="space-y-6">
-                            {/* Key Metrics */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <Card>
                                     <CardContent className="p-4 flex flex-col items-center text-center">
@@ -204,7 +260,6 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                             </div>
 
                             <div className="grid md:grid-cols-2 gap-4">
-                                {/* Recent Usage */}
                                 <Card className="h-full">
                                     <CardHeader>
                                         <CardTitle className="text-base flex items-center gap-2">
@@ -244,7 +299,6 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                                     </CardContent>
                                 </Card>
 
-                                {/* Top Clients */}
                                 <Card className="h-full">
                                     <CardHeader>
                                         <CardTitle className="text-base flex items-center gap-2">

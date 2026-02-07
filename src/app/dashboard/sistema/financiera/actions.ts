@@ -100,7 +100,7 @@ async function getNextNumero(supabase: any) {
     return `${prefix}${nextNum.toString().padStart(4, "0")}`;
 }
 
-export async function getFacturasAction(): Promise<Factura[]> {
+export async function getFacturasAction(limit: number = 100): Promise<Factura[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -112,7 +112,8 @@ export async function getFacturasAction(): Promise<Factura[]> {
                 clientes (id, nombre, documento, telefono, direccion)
             )
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
     if (error) {
         console.error("Error fetching facturas:", error);
@@ -190,4 +191,78 @@ export async function deleteFacturaAction(id: string): Promise<boolean> {
     revalidatePath("/dashboard/sistema/financiera");
     revalidatePath("/dashboard/sistema/comercial");
     return true;
+}
+
+// === NEW PAYMENT ACTION ===
+export async function registrarPagoFacturaAction(
+    facturaId: string,
+    monto: number,
+    fecha: Date,
+    cuentaId: string,
+    concepto: string
+): Promise<Factura> {
+    const supabase = await createClient();
+
+    // 1. Get current Invoice
+    const { data: facturaRef, error: fError } = await supabase
+        .from("facturas")
+        .select("valor_total, valor_pagado, saldo_pendiente, numero")
+        .eq("id", facturaId)
+        .single();
+
+    if (fError || !facturaRef) throw new Error("Factura no encontrada");
+
+    // 2. Calculate new values
+    const nuevoPago = (Number(facturaRef.valor_pagado) || 0) + monto;
+    const nuevoSaldo = (Number(facturaRef.valor_total) || 0) - nuevoPago;
+    const nuevoEstado = nuevoSaldo <= 0 ? 'PAGADA' : 'PARCIAL';
+
+    // 3. Create Financial Movement (INGRESO)
+    const { error: movError } = await supabase
+        .from("movimientos_financieros")
+        .insert({
+            tipo: 'INGRESO',
+            categoria: 'VENTAS',
+            concepto: `Pago Factura ${facturaRef.numero}`,
+            descripcion: concepto || `Abono a factura ${facturaRef.numero}`,
+            valor: monto,
+            fecha: fecha,
+            cuenta_id: cuentaId,
+            factura_id: facturaId
+        });
+
+    if (movError) throw new Error("Error creando movimiento financiero: " + movError.message);
+
+    // 4. Update Bank Account Balance (Trigger on movimientos handles this usually, but let's be safe via RPC or Trigger)
+    // Assuming 'update_cuenta_saldo' RPC exists from previous migrations or triggers are set.
+    await supabase.rpc("update_cuenta_saldo", {
+        cuenta_uuid: cuentaId,
+        delta_valor: monto
+    });
+
+    // 5. Update Invoice
+    const { data: updatedFactura, error: upError } = await supabase
+        .from("facturas")
+        .update({
+            valor_pagado: nuevoPago,
+            saldo_pendiente: nuevoSaldo > 0 ? nuevoSaldo : 0,
+            estado: nuevoEstado
+        })
+        .eq("id", facturaId)
+        .select(`
+            *,
+            cotizaciones (
+                id, numero, total, estado, created_at,
+                clientes (id, nombre, documento, telefono, direccion)
+            )
+        `)
+        .single();
+
+    if (upError) {
+        console.error("Error updating factura:", upError);
+        throw new Error(`Error actualizando factura: ${upError.message}`);
+    }
+
+    revalidatePath("/dashboard/sistema/financiera");
+    return mapToUI(updatedFactura, updatedFactura.cotizaciones);
 }

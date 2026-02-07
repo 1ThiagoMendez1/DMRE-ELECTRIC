@@ -347,3 +347,139 @@ ALTER TABLE public.cotizacion_items
 -- =============================================
 ALTER TABLE inventario
 ADD COLUMN IF NOT EXISTS precio_proveedor NUMERIC DEFAULT 0;
+
+
+
+-- INSERTAR DATOS DEMO EN CUENTAS POR PAGAR (VERSION FINAL)
+INSERT INTO public.cuentas_por_pagar (
+    proveedor_id, 
+    numero_factura, 
+    fecha_factura, 
+    fecha_vencimiento, 
+    concepto, 
+    trabajo_id, 
+    valor_total, 
+    valor_pagado, 
+    estado, 
+    observaciones
+) VALUES 
+(
+    (SELECT id FROM proveedores WHERE codigo = 'PROV-003' LIMIT 1), 
+    'FACT-A202', 
+    '2024-05-10', 
+    '2024-06-10', 
+    'Compra de Conductores ELÉCTRICOS THW #12', 
+    (SELECT id FROM trabajos WHERE codigo = 'OBR-2024-001' LIMIT 1), 
+    1250000, 
+    0, 
+    'PENDIENTE', 
+    'Material crítico para el piso 5'
+),
+(
+    (SELECT id FROM proveedores WHERE codigo = 'PROV-001' LIMIT 1), 
+    'INV-9988', 
+    '2024-05-15', 
+    '2024-06-15', 
+    'Tubería EMT y accesorios de conexión', 
+    (SELECT id FROM trabajos WHERE codigo = 'OBR-2024-002' LIMIT 1), 
+    850000, 
+    400000, 
+    'PENDIENTE', 
+    'Abono parcial realizado'
+),
+(
+    (SELECT id FROM proveedores WHERE codigo = 'PROV-002' LIMIT 1), 
+    'FE-1055', 
+    '2024-05-20', 
+    '2024-06-20', 
+    'Tableros de distribución trifásicos', 
+    (SELECT id FROM trabajos WHERE codigo = 'OBR-2024-003' LIMIT 1), 
+    3450000, 
+    3450000, 
+    'PAGADA', 
+    'Factura cancelada en su totalidad'
+),
+(
+    (SELECT id FROM proveedores WHERE codigo = 'PROV-004' LIMIT 1), 
+    'SERV-004', 
+    '2024-05-25', 
+    '2024-06-25', 
+    'Servicio técnico especializado - Pruebas de carga', 
+    (SELECT id FROM trabajos WHERE codigo = 'OBR-2024-001' LIMIT 1), 
+    600000, 
+    0, 
+    'PENDIENTE', 
+    'Pendiente por revisión de interventoría'
+);
+
+
+
+-- =============================================
+-- TABLA: pagos_cxp (Historial de Pagos a Proveedores)
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS public.pagos_cxp (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    cuenta_por_pagar_id UUID NOT NULL REFERENCES public.cuentas_por_pagar(id) ON DELETE CASCADE,
+    fecha TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    valor NUMERIC(15,2) NOT NULL CHECK (valor > 0),
+    metodo_pago TEXT,
+    cuenta_bancaria_id UUID REFERENCES public.cuentas_bancarias(id),
+    nota TEXT,
+    referencia_bancaria TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pagos_cxp_cuenta ON public.pagos_cxp(cuenta_por_pagar_id);
+
+-- Habilitar RLS
+ALTER TABLE public.pagos_cxp ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Pagos CXP access for authenticated"
+    ON public.pagos_cxp FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+-- =============================================
+-- DATOS DE SIMULACIÓN PARA PAGOS RECURRENNTES
+-- =============================================
+
+-- 1. Pago parcial para INV-9988 (PROV-001)
+INSERT INTO public.pagos_cxp (cuenta_por_pagar_id, fecha, valor, metodo_pago, cuenta_bancaria_id, nota)
+SELECT 
+    id, 
+    '2024-05-16', 
+    200000, 
+    'TRANSFERENCIA', 
+    (SELECT id FROM cuentas_bancarias WHERE principal = true LIMIT 1),
+    'Abono inicial 1'
+FROM cuentas_por_pagar 
+WHERE numero_factura = 'INV-9988' 
+LIMIT 1;
+
+INSERT INTO public.pagos_cxp (cuenta_por_pagar_id, fecha, valor, metodo_pago, cuenta_bancaria_id, nota)
+SELECT 
+    id, 
+    '2024-05-18', 
+    200000, 
+    'TRANSFERENCIA', 
+    (SELECT id FROM cuentas_bancarias WHERE principal = true LIMIT 1),
+    'Abono inicial 2'
+FROM cuentas_por_pagar 
+WHERE numero_factura = 'INV-9988' 
+LIMIT 1;
+
+-- 2. Pago total para FE-1055 (PROV-002)
+INSERT INTO public.pagos_cxp (cuenta_por_pagar_id, fecha, valor, metodo_pago, cuenta_bancaria_id, nota)
+SELECT 
+    id, 
+    '2024-05-21', 
+    3450000, 
+    'TRANSFERENCIA', 
+    (SELECT id FROM cuentas_bancarias WHERE principal = true LIMIT 1),
+    'Pago total factura'
+FROM cuentas_por_pagar 
+WHERE numero_factura = 'FE-1055' 
+LIMIT 1;
+

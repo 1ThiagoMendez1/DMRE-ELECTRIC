@@ -33,6 +33,7 @@ function mapToUI(db: any): InventarioUI {
         modelo: db.modelo,
         imagenUrl: db.imagen_url,
         activo: db.activo,
+        notas: db.notas,
     };
 }
 
@@ -50,11 +51,12 @@ function mapToDB(ui: Partial<InventarioUI>) {
         stock_minimo: ui.stockMinimo,
         valor_unitario: ui.valorUnitario,
         precio_proveedor: ui.precioProveedor || ui.costoMateriales || 0,
-        proveedor_id: ui.proveedorId,
+        proveedor_id: ui.proveedorId === "" ? null : ui.proveedorId,
         marca: ui.marca,
         modelo: ui.modelo,
         imagen_url: ui.imagenUrl,
         activo: ui.activo ?? true,
+        notas: ui.notas,
     };
 }
 
@@ -77,12 +79,13 @@ async function getNextCode(supabase: any) {
     return `INV-${nextNum.toString().padStart(4, "0")}`;
 }
 
-export async function getInventarioAction(): Promise<InventarioUI[]> {
+export async function getInventarioAction(limit: number = 200): Promise<InventarioUI[]> {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("inventario")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
     if (error) {
         console.error("Error fetching inventario:", error);
@@ -109,7 +112,10 @@ export async function createInventarioAction(itemInput: Omit<InventarioUI, "id" 
 
     if (error) {
         console.error("Error creating inventario item:", error);
-        throw new Error("Failed to create inventario item");
+        if (error.code === '23505') {
+            throw new Error("Ya existe un item con ese SKU o Código.");
+        }
+        throw new Error("Error al crear item: " + error.message);
     }
 
     revalidatePath("/dashboard/sistema/inventario");
@@ -130,7 +136,10 @@ export async function updateInventarioAction(id: string, item: Partial<Inventari
 
     if (error) {
         console.error("Error updating inventario item:", error);
-        throw new Error("Failed to update inventario item");
+        if (error.code === '23505') {
+            throw new Error("Ya existe un item con ese SKU o Código.");
+        }
+        throw new Error("Error al actualizar item: " + error.message);
     }
 
     revalidatePath("/dashboard/sistema/inventario");

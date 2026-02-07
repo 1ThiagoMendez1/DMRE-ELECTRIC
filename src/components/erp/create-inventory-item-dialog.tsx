@@ -42,7 +42,11 @@ const itemSchema = z.object({
     cantidad: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
     stockMinimo: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, { message: "Inválido" }),
     valorUnitario: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
+    precioProveedor: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
     proveedorId: z.string().min(1, "Proveedor requerido"),
+    marca: z.string().optional(),
+    modelo: z.string().optional(),
+    notas: z.string().optional(),
 });
 
 interface CreateInventoryItemDialogProps {
@@ -66,7 +70,11 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
             cantidad: "0",
             stockMinimo: "10",
             valorUnitario: "0",
-            proveedorId: ""
+            precioProveedor: "0",
+            proveedorId: "",
+            marca: "",
+            modelo: "",
+            notas: ""
         },
     });
 
@@ -85,15 +93,19 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
             cantidad: Number(values.cantidad),
             stockMinimo: Number(values.stockMinimo),
             valorUnitario: Number(values.valorUnitario),
+            precioProveedor: Number(values.precioProveedor),
             fechaCreacion: new Date(),
             tipo: 'SIMPLE',
-            costoMateriales: 0,
+            costoMateriales: Number(values.precioProveedor),
             margenUtilidad: 0,
             valorTotal: Number(values.valorUnitario),
             t1: Number(values.valorUnitario),
             t2: Number(values.valorUnitario),
             t3: Number(values.valorUnitario),
-            proveedorId: values.proveedorId
+            proveedorId: values.proveedorId,
+            marca: values.marca || "",
+            modelo: values.modelo || "",
+            notas: values.notas || ""
         };
 
         onItemCreated(newItem);
@@ -144,6 +156,35 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                                         <FormLabel>Unidad de Medida</FormLabel>
                                         <FormControl>
                                             <Input placeholder="m, und, gal" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="marca"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Marca</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="E.g. Schneider, 3M" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="modelo"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Modelo / Referencia</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="E.g. iC60N" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -264,7 +305,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-4 gap-4">
                             <FormField
                                 control={form.control}
                                 name="cantidad"
@@ -293,10 +334,23 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                             <FormField
                                 control={form.control}
+                                name="precioProveedor"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Precio Compra</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
                                 name="valorUnitario"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Valor Unitario</FormLabel>
+                                        <FormLabel>Precio Venta</FormLabel>
                                         <FormControl>
                                             <Input type="number" {...field} />
                                         </FormControl>

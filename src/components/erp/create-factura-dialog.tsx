@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Factura, Cliente, Cotizacion } from "@/types/sistema";
 import { initialClients } from "@/lib/mock-data";
+import { useErp } from "@/components/providers/erp-provider";
+import { formatCurrency } from "@/lib/utils";
 
 interface CreateFacturaDialogProps {
     onFacturaCreated: (factura: Factura) => void;
@@ -32,13 +34,14 @@ interface CreateFacturaDialogProps {
 
 export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [] }: CreateFacturaDialogProps) {
     const [open, setOpen] = useState(false);
+    const { facturas } = useErp();
     const [clienteId, setClienteId] = useState("");
     const [selectedCotizacionId, setSelectedCotizacionId] = useState("MANUAL");
     const [numero, setNumero] = useState(nextId || "");
     const [fechaEmision, setFechaEmision] = useState("");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [valor, setValor] = useState("");
-    const [estado, setEstado] = useState<"PENDIENTE" | "PARCIAL" | "CANCELADA">("PENDIENTE");
+    const [estado, setEstado] = useState<"PENDIENTE" | "PARCIAL" | "PAGADA">("PENDIENTE");
 
     useEffect(() => {
         if (open && nextId) {
@@ -72,7 +75,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
             fechaEmision: new Date(fechaEmision),
             fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : new Date(fechaEmision),
             valorFacturado: parseFloat(valor),
-            saldoPendiente: estado === "CANCELADA" ? 0 : parseFloat(valor),
+            saldoPendiente: estado === "PAGADA" ? 0 : parseFloat(valor),
             estado: estado,
             cotizacionId: selectedCotizacionId,
             cotizacion: cotizacion ? cotizacion : {
@@ -147,11 +150,23 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="MANUAL">-- Sin Oferta Vinculada --</SelectItem>
-                                    {cotizaciones.filter(c => c.clienteId === clienteId).map(c => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.numero} - {c.descripcionTrabajo} (${c.total.toLocaleString()})
-                                        </SelectItem>
-                                    ))}
+                                    {cotizaciones.filter(c => c.clienteId === clienteId).map(c => {
+                                        const yaFacturado = facturas
+                                            .filter(f => f.cotizacionId === c.id)
+                                            .reduce((sum, f) => sum + f.valorFacturado, 0);
+                                        const pendiente = Math.max(0, c.total - yaFacturado);
+
+                                        return (
+                                            <SelectItem key={c.id} value={c.id}>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-bold">{c.numero} - {c.descripcionTrabajo}</span>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        Total: {formatCurrency(c.total)} | Facturado: {formatCurrency(yaFacturado)} | Queda: <span className="text-orange-600 font-bold">{formatCurrency(pendiente)}</span>
+                                                    </span>
+                                                </div>
+                                            </SelectItem>
+                                        );
+                                    })}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -200,7 +215,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                             <SelectContent>
                                 <SelectItem value="PENDIENTE">Pendiente</SelectItem>
                                 <SelectItem value="PARCIAL">Parcial</SelectItem>
-                                <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                                <SelectItem value="PAGADA">Pagada</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

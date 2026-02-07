@@ -14,7 +14,9 @@ import {
     PieChart as PieChartIcon,
     BarChart3,
     LineChart as LineChartIcon,
-    Activity
+    ExternalLink,
+    Activity,
+    Trash2
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +24,7 @@ import { DynamicChart, DashboardPanel } from "@/components/erp/charts";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
+import { useErp } from "@/components/providers/erp-provider";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +34,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
     Tabs,
     TabsContent,
@@ -46,23 +50,44 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { initialVehiculos, initialGastosVehiculos } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
 import { CreateVehicleDialog } from "@/components/erp/create-vehicle-dialog";
 import { RegisterExpenseDialog } from "@/components/erp/register-expense-dialog";
+import { VehicleDetailDialog } from "@/components/erp/vehicle-detail-dialog";
+import { GastoVehiculo, Vehiculo } from "@/types/sistema";
 
 export default function ActivosPage() {
-    const [vehiculos, setVehiculos] = useState(initialVehiculos);
-    const [gastos, setGastos] = useState(initialGastosVehiculos);
+    const {
+        vehiculos,
+        gastosVehiculos: gastos,
+        cuentasBancarias: cuentas,
+        addVehiculo,
+        addGastoVehiculo,
+        deleteVehiculo,
+        deleteGastoVehiculo,
+        currentUser
+    } = useErp();
+
     const { toast } = useToast();
 
-    const handleCreateVehicle = (newVeh: any) => {
-        setVehiculos([newVeh, ...vehiculos]);
+    const [selectedVehiculo, setSelectedVehiculo] = useState<Vehiculo | null>(null);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+    const handleOpenDetail = (veh: Vehiculo) => {
+        setSelectedVehiculo(veh);
+        setIsDetailOpen(true);
     };
 
-    const handleCreateExpense = (newExpense: any) => {
-        setGastos([newExpense, ...gastos]);
+    const handleCreateVehicle = (newVeh: any) => {
+        addVehiculo(newVeh);
+        toast({ title: "Vehículo registrado", description: "El vehículo ha sido añadido a la flota." });
     };
+
+    const handleCreateExpense = (newExpense: any, cuentaId?: string) => {
+        addGastoVehiculo(newExpense, cuentaId);
+    };
+
+    const isAdmin = currentUser?.role === 'ADMIN';
 
     // --- DASHBOARD STATE ---
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -83,13 +108,13 @@ export default function ActivosPage() {
         return true;
     };
 
-    const dashboardFilteredExpenses = gastos.filter(g => filterData(g.fecha));
+    const dashboardFilteredExpenses = gastos.filter((g: GastoVehiculo) => filterData(g.fecha));
 
     // Derived Data
     // 1. Expenses Trend
     const expenseTrendData = useMemo(() => {
         const agg: Record<string, number> = {};
-        dashboardFilteredExpenses.forEach(g => {
+        dashboardFilteredExpenses.forEach((g: GastoVehiculo) => {
             const dateStr = new Date(g.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
             agg[dateStr] = (agg[dateStr] || 0) + g.valor;
         });
@@ -99,7 +124,7 @@ export default function ActivosPage() {
     // 2. Expenses by Vehicle
     const expensesByVehicleData = useMemo(() => {
         const agg: Record<string, number> = {};
-        dashboardFilteredExpenses.forEach(g => {
+        dashboardFilteredExpenses.forEach((g: GastoVehiculo) => {
             agg[g.vehiculo.placa] = (agg[g.vehiculo.placa] || 0) + g.valor;
         });
         return Object.keys(agg).map(k => ({ name: k, value: agg[k] })).sort((a, b) => b.value - a.value);
@@ -108,15 +133,46 @@ export default function ActivosPage() {
     // 3. Maintenance Type Distribution
     const maintenanceDistData = useMemo(() => {
         const agg: Record<string, number> = {};
-        dashboardFilteredExpenses.forEach(g => {
+        dashboardFilteredExpenses.forEach((g: GastoVehiculo) => {
             agg[g.tipo] = (agg[g.tipo] || 0) + g.valor;
         });
         return Object.keys(agg).map(k => ({ name: k, value: agg[k] })).sort((a, b) => b.value - a.value);
     }, [dashboardFilteredExpenses]);
 
-    const kpiTotalExpenses = dashboardFilteredExpenses.reduce((acc, g) => acc + g.valor, 0);
-    const kpiTotalFuel = dashboardFilteredExpenses.filter(g => g.tipo === 'COMBUSTIBLE').reduce((acc, g) => acc + g.valor, 0);
-    const kpiTotalMaintenace = dashboardFilteredExpenses.filter(g => g.tipo !== 'COMBUSTIBLE').reduce((acc, g) => acc + g.valor, 0);
+    const kpiTotalExpenses = dashboardFilteredExpenses.reduce((acc: number, g: GastoVehiculo) => acc + g.valor, 0);
+    const kpiTotalFuel = dashboardFilteredExpenses.filter((g: GastoVehiculo) => g.tipo === 'COMBUSTIBLE').reduce((acc: number, g: GastoVehiculo) => acc + g.valor, 0);
+    const kpiTotalMaintenance = dashboardFilteredExpenses.filter((g: GastoVehiculo) => g.tipo.includes('MANTENIMIENTO')).reduce((acc: number, g: GastoVehiculo) => acc + g.valor, 0);
+
+    const vehicleStatusCounts = useMemo(() => {
+        return {
+            operativo: vehiculos.filter(v => v.estado === 'OPERATIVO').length,
+            mantenimiento: vehiculos.filter(v => v.estado === 'MANTENIMIENTO').length,
+            fuera: vehiculos.filter(v => v.estado === 'INACTIVO').length,
+        };
+    }, [vehiculos]);
+
+    const upcomingExpirations = useMemo(() => {
+        return vehiculos
+            .map(v => {
+                const soat = checkExpiration(v.vencimientoSoat);
+                const tecno = checkExpiration(v.vencimientoTecnomecanica);
+                const seguro = checkExpiration(v.vencimientoSeguro);
+                return {
+                    vehiculo: v,
+                    soat,
+                    tecno,
+                    seguro,
+                    maxPriority: Math.min(
+                        soat.status === 'VENCIDO' ? 0 : soat.status === 'POR_VENCER' ? 1 : 2,
+                        tecno.status === 'VENCIDO' ? 0 : tecno.status === 'POR_VENCER' ? 1 : 2,
+                        seguro.status === 'VENCIDO' ? 0 : seguro.status === 'POR_VENCER' ? 1 : 2
+                    )
+                };
+            })
+            .filter(e => e.maxPriority < 2)
+            .sort((a, b) => a.maxPriority - b.maxPriority)
+            .slice(0, 5);
+    }, [vehiculos]);
 
 
 
@@ -167,7 +223,7 @@ export default function ActivosPage() {
                                 <Car className="h-4 w-4 text-primary" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{initialVehiculos.length}</div>
+                                <div className="text-2xl font-bold">{vehiculos.length}</div>
                                 <p className="text-xs text-muted-foreground">Vehículos registrados</p>
                             </CardContent>
                         </Card>
@@ -199,8 +255,81 @@ export default function ActivosPage() {
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">OK</div>
-                                <p className="text-xs text-muted-foreground">Operatividad normal</p>
+                                <div className="text-2xl font-bold">{vehicleStatusCounts.operativo} / {vehiculos.length}</div>
+                                <p className="text-xs text-muted-foreground">Vehículos operativos</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Upcoming Expirations */}
+                        <Card className="lg:col-span-1">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-orange-500" /> Vencimientos Próximos
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <Table>
+                                    <TableBody>
+                                        {upcomingExpirations.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell className="text-center py-10 text-muted-foreground">Todo al día</TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            upcomingExpirations.map(exp => (
+                                                <TableRow key={exp.vehiculo.id}>
+                                                    <TableCell className="py-2">
+                                                        <p className="font-bold text-xs">{exp.vehiculo.placa}</p>
+                                                        <div className="flex gap-1 mt-1">
+                                                            {exp.soat.status !== 'OK' && <Badge variant="outline" className={`text-[9px] ${exp.soat.color}`}>SOAT</Badge>}
+                                                            {exp.tecno.status !== 'OK' && <Badge variant="outline" className={`text-[9px] ${exp.tecno.color}`}>TEC</Badge>}
+                                                            {exp.seguro.status !== 'OK' && <Badge variant="outline" className={`text-[9px] ${exp.seguro.color}`}>SEG</Badge>}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right py-2">
+                                                        <Button variant="ghost" size="sm" onClick={() => handleOpenDetail(exp.vehiculo)}>Ver</Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+
+                        {/* Status Distribution */}
+                        <Card className="lg:col-span-1">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-semibold">Distribución de Flota</CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-4">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium">Operativo</span>
+                                    <Badge>{vehicleStatusCounts.operativo}</Badge>
+                                </div>
+                                <Progress value={(vehicleStatusCounts.operativo / (vehiculos.length || 1)) * 100} className="h-2" />
+
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium">Mantenimiento</span>
+                                    <Badge variant="secondary">{vehicleStatusCounts.mantenimiento}</Badge>
+                                </div>
+                                <Progress value={(vehicleStatusCounts.mantenimiento / (vehiculos.length || 1)) * 100} className="h-2 bg-muted flex [&>div]:bg-orange-500" />
+
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium">Fuera de Servicio</span>
+                                    <Badge variant="outline">{vehicleStatusCounts.fuera}</Badge>
+                                </div>
+                                <Progress value={(vehicleStatusCounts.fuera / (vehiculos.length || 1)) * 100} className="h-2 bg-muted flex [&>div]:bg-red-500" />
+                            </CardContent>
+                        </Card>
+
+                        <Card className="lg:col-span-1">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-semibold">Distribución de Costos</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <DynamicChart type="pie" data={maintenanceDistData} dataKey="value" xAxisKey="name" color="#3B82F6" />
                             </CardContent>
                         </Card>
                     </div>
@@ -212,9 +341,6 @@ export default function ActivosPage() {
                         </DashboardPanel>
                         <DashboardPanel title="Gastos por Vehículo" sub="Top vehículos más costosos" typeState={[vehicleExpenseType, setVehicleExpenseType]}>
                             <DynamicChart type={vehicleExpenseType} data={expensesByVehicleData} dataKey="value" xAxisKey="name" color="#EAB308" />
-                        </DashboardPanel>
-                        <DashboardPanel title="Distribución de Costos" sub="Combustible vs Mantenimientos" typeState={[maintenanceType, setMaintenanceType]}>
-                            <DynamicChart type={maintenanceType} data={maintenanceDistData} dataKey="value" xAxisKey="name" color="#3B82F6" />
                         </DashboardPanel>
                     </div>
                 </TabsContent>
@@ -262,7 +388,19 @@ export default function ActivosPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="sm" onClick={() => toast({ title: `Historial: ${veh.placa}`, description: `Gastos registrados: ${gastos.filter(g => g.vehiculo.id === veh.id).length}. Revise la pestaña 'Bitácora de Gastos'.` })}>Historial</Button>
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button variant="ghost" size="sm" onClick={() => handleOpenDetail(veh)}>Ver Detalle</Button>
+                                                        {isAdmin && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="text-destructive"
+                                                                onClick={() => { if (confirm('¿Eliminar vehículo y sus gastos asociados?')) { deleteVehiculo(veh.id) } }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         )
@@ -279,7 +417,11 @@ export default function ActivosPage() {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Historial de Gastos Operativos</CardTitle>
-                                <RegisterExpenseDialog vehiculos={vehiculos} onExpenseCreated={handleCreateExpense} />
+                                <RegisterExpenseDialog
+                                    vehiculos={vehiculos}
+                                    cuentas={cuentas}
+                                    onExpenseCreated={handleCreateExpense}
+                                />
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -292,19 +434,41 @@ export default function ActivosPage() {
                                         <TableHead>Kilometraje</TableHead>
                                         <TableHead>Proveedor</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {gastos.map((gasto) => (
+                                    {gastos.map((gasto: GastoVehiculo) => (
                                         <TableRow key={gasto.id}>
                                             <TableCell>{format(gasto.fecha, "dd/MM/yyyy")}</TableCell>
-                                            <TableCell className="font-mono text-xs">{gasto.vehiculo.placa}</TableCell>
+                                            <TableCell className="font-mono text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    {gasto.vehiculo.placa}
+                                                    {gasto.soporteUrl && (
+                                                        <a href={gasto.soporteUrl} target="_blank" rel="noopener noreferrer">
+                                                            <ExternalLink className="h-3 w-3 text-blue-500 hover:scale-110 transition-transform" />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline">{gasto.tipo}</Badge>
                                             </TableCell>
                                             <TableCell>{gasto.kilometraje?.toLocaleString()} km</TableCell>
                                             <TableCell>{gasto.proveedor}</TableCell>
                                             <TableCell className="text-right font-medium">{formatCurrency(gasto.valor)}</TableCell>
+                                            <TableCell className="text-right">
+                                                {isAdmin && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive"
+                                                        onClick={() => { if (confirm('¿Eliminar registro de gasto?')) { deleteGastoVehiculo(gasto.id) } }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -313,6 +477,13 @@ export default function ActivosPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            <VehicleDetailDialog
+                open={isDetailOpen}
+                onOpenChange={setIsDetailOpen}
+                vehiculo={selectedVehiculo}
+                gastos={gastos}
+            />
         </div>
     );
 }

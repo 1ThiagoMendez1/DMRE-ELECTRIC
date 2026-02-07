@@ -244,3 +244,43 @@ export async function createEntregaDotacionAction(entrega: Omit<EntregaDotacion,
     revalidatePath("/dashboard/sistema/dotacion");
     return mapEntregaToUI(data, undefined, entrega.items || []);
 }
+export async function updateEntregaDotacionAction(id: string, updates: Partial<EntregaDotacion>): Promise<EntregaDotacion> {
+    const supabase = await createClient();
+
+    const dbUpdates: any = {
+        estado: updates.estado,
+        observaciones: updates.observacion,
+    };
+
+    if (updates.estado === 'ACEPTADO') {
+        dbUpdates.fecha_aceptacion = new Date().toISOString();
+    } else if (updates.estado === 'ENTREGADO') {
+        dbUpdates.fecha_entrega = new Date().toISOString();
+    }
+
+    const { data, error } = await supabase
+        .from("entregas_dotacion")
+        .update(dbUpdates)
+        .eq("id", id)
+        .select(`
+            *,
+            empleados (id, nombre_completo, cedula, cargo)
+        `)
+        .single();
+
+    if (error) {
+        console.error("Error updating entrega_dotacion:", error);
+        throw new Error("Failed to update entrega_dotacion");
+    }
+
+    // Get items for the UI mapping
+    const { data: items } = await supabase
+        .from("entrega_dotacion_items")
+        .select("*")
+        .eq("entrega_id", id);
+
+    revalidatePath("/dashboard/sistema/dotacion");
+    revalidatePath("/dashboard/sistema/logistica");
+
+    return mapEntregaToUI(data, data.empleados, items || []);
+}

@@ -102,7 +102,8 @@ export async function getUsers() {
         email: user.email,
         role: user.role,
         sidebarAccess: user.sidebar_access,
-        avatar: user.avatar_url
+        avatar: user.avatar_url,
+        isActive: user.is_active ?? true
     }));
 }
 
@@ -117,6 +118,7 @@ export async function updateUserPermissionsAction(userId: string, access: string
     return { success: true };
 }
 
+<<<<<<< HEAD
 export async function getUserProfile(userId: string) {
     const { data: profile, error } = await supabaseAdmin
         .from('profiles')
@@ -134,4 +136,19 @@ export async function getUserProfile(userId: string) {
         sidebarAccess: profile.sidebar_access,
         avatar: profile.avatar_url
     };
+=======
+export async function toggleUserStatusAction(userId: string, isActive: boolean) {
+    const { error } = await supabaseAdmin
+        .from('profiles')
+        .update({ is_active: isActive })
+        .eq('id', userId);
+
+    if (error) {
+        console.error("Error toggling user status:", error);
+        throw error;
+    }
+
+    revalidatePath('/dashboard/sistema/usuarios');
+    return { success: true };
+>>>>>>> 58f85acb5f4d5d9e776bacbfedc1dae905f83598
 }

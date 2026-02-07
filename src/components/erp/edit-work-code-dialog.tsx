@@ -122,6 +122,9 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
     };
 
     function onSubmit(values: z.infer<typeof formSchema>) {
+        const materialsTotal = selectedMaterials.reduce((acc, curr) => acc + ((curr.itemRef.valorUnitario || 0) * curr.cantidad), 0);
+        const total = materialsTotal + Number(values.valorManoObra);
+
         const updatedCode = {
             ...code,
             codigo: values.codigo,
@@ -129,6 +132,8 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
             nombre: values.descripcion, // Sync nombre for compatibility
             valorManoObra: Number(values.valorManoObra),
             manoDeObra: Number(values.valorManoObra), // Sync for compatibility
+            costoTotalMateriales: materialsTotal,
+            costoTotal: total,
             materiales: selectedMaterials.map(m => ({
                 inventarioId: m.inventarioId,
                 id: m.inventarioId, // Compatibility

@@ -1,287 +1,188 @@
 "use client";
 
-import { useState } from "react";
-import { Shield, Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Shield, Check, X, Lock } from "lucide-react";
+
+import { useErp } from "@/components/providers/erp-provider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Role, Permission } from "@/types/sistema";
-
-// Mock initial roles
-const systemRoles: Role[] = [
-    {
-        id: "ROLE-ADMIN",
-        nombre: "Administrador",
-        descripcion: "Acceso total al sistema",
-        permisos: [
-            { id: "P1", modulo: "comercial", accion: "ver" },
-            { id: "P2", modulo: "comercial", accion: "crear" },
-            { id: "P3", modulo: "comercial", accion: "editar" },
-            { id: "P4", modulo: "comercial", accion: "eliminar" },
-            { id: "P5", modulo: "financiera", accion: "ver" },
-            { id: "P6", modulo: "financiera", accion: "crear" },
-            { id: "P7", modulo: "operaciones", accion: "ver" },
-            { id: "P8", modulo: "operaciones", accion: "crear" },
-        ],
-        color: "bg-red-500",
-        isSystemRole: true
-    },
-    {
-        id: "ROLE-ENGINEER",
-        nombre: "Ingeniero",
-        descripcion: "Gestión de operaciones y proyectos",
-        permisos: [
-            { id: "P9", modulo: "operaciones", accion: "ver" },
-            { id: "P10", modulo: "operaciones", accion: "crear" },
-            { id: "P11", modulo: "operaciones", accion: "editar" },
-            { id: "P12", modulo: "comercial", accion: "ver" },
-        ],
-        color: "bg-blue-500",
-        isSystemRole: true
-    },
-    {
-        id: "ROLE-VIEWER",
-        nombre: "Visualizador",
-        descripcion: "Solo lectura en todos los módulos",
-        permisos: [
-            { id: "P13", modulo: "comercial", accion: "ver" },
-            { id: "P14", modulo: "financiera", accion: "ver" },
-            { id: "P15", modulo: "operaciones", accion: "ver" },
-        ],
-        color: "bg-gray-500",
-        isSystemRole: true
-    }
-];
-
-const allModules = ["comercial", "financiera", "operaciones", "suministro", "activos", "talento", "usuarios"];
-const allActions: Permission["accion"][] = ["ver", "crear", "editar", "eliminar", "exportar"];
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { CreateRoleDialog } from "@/components/erp/create-role-dialog";
+import { cn } from "@/lib/utils";
+import { Role, Permission, RolePermission } from "@/types/sistema";
 
 export default function RolesPage() {
-    const { toast } = useToast();
-    const [roles, setRoles] = useState<Role[]>(systemRoles);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingRole, setEditingRole] = useState<Role | null>(null);
+    const { roles, permissions, updateRolePermission, isLoading } = useErp();
+    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-    // Form State
-    const [formName, setFormName] = useState("");
-    const [formDesc, setFormDesc] = useState("");
-    const [formColor, setFormColor] = useState("bg-purple-500");
-    const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
+    // Group permissions by module
+    const groupedPermissions = useMemo(() => {
+        const groups: Record<string, Permission[]> = {};
+        permissions.forEach(p => {
+            if (!groups[p.module]) groups[p.module] = [];
+            groups[p.module].push(p);
+        });
+        return groups;
+    }, [permissions]);
 
-    const openCreateDialog = () => {
-        setEditingRole(null);
-        setFormName("");
-        setFormDesc("");
-        setFormColor("bg-purple-500");
-        setSelectedPermissions(new Set());
-        setIsDialogOpen(true);
-    };
+    // Handle toggle
+    const handleToggle = async (permissionId: string, action: 'canView' | 'canCreate' | 'canEdit' | 'canDelete', currentValue: boolean) => {
+        if (!selectedRole) return;
 
-    const openEditDialog = (role: Role) => {
-        setEditingRole(role);
-        setFormName(role.nombre);
-        setFormDesc(role.descripcion);
-        setFormColor(role.color);
-        setSelectedPermissions(new Set(role.permisos.map(p => `${p.modulo}-${p.accion}`)));
-        setIsDialogOpen(true);
-    };
-
-    const togglePermission = (key: string) => {
-        const newSet = new Set(selectedPermissions);
-        if (newSet.has(key)) {
-            newSet.delete(key);
-        } else {
-            newSet.add(key);
-        }
-        setSelectedPermissions(newSet);
-    };
-
-    const handleSave = () => {
-        if (!formName.trim()) {
-            toast({ title: "Error", description: "El nombre del rol es requerido", variant: "destructive" });
-            return;
-        }
-
-        const permisos: Permission[] = Array.from(selectedPermissions).map((key, i) => {
-            const [modulo, accion] = key.split("-");
-            return { id: `P-${Date.now()}-${i}`, modulo, accion: accion as Permission["accion"] };
+        await updateRolePermission(selectedRole.id, permissionId, {
+            [action]: !currentValue
         });
 
-        if (editingRole) {
-            setRoles(prev => prev.map(r => r.id === editingRole.id ? { ...r, nombre: formName, descripcion: formDesc, color: formColor, permisos } : r));
-            toast({ title: "Rol Actualizado", description: `El rol "${formName}" ha sido modificado.` });
-        } else {
-            const newRole: Role = {
-                id: `ROLE-${Date.now()}`,
-                nombre: formName,
-                descripcion: formDesc,
-                permisos,
-                color: formColor,
-                isSystemRole: false
-            };
-            setRoles([...roles, newRole]);
-            toast({ title: "Rol Creado", description: `El rol "${formName}" ha sido agregado.` });
-        }
-        setIsDialogOpen(false);
+        // Optimistic update locally for smoother UI if needed, usually provider handles it
     };
 
-    const handleDelete = (roleId: string) => {
-        const role = roles.find(r => r.id === roleId);
-        if (role?.isSystemRole) {
-            toast({ title: "Acción no permitida", description: "Los roles de sistema no pueden eliminarse.", variant: "destructive" });
-            return;
-        }
-        if (confirm(`¿Estás seguro de eliminar el rol "${role?.nombre}"?`)) {
-            setRoles(roles.filter(r => r.id !== roleId));
-            toast({ title: "Rol Eliminado", description: `El rol ha sido eliminado.` });
-        }
+    const getPermissionForRole = (permId: string): RolePermission | undefined => {
+        return selectedRole?.permissions.find(p => p.permissionId === permId);
     };
+
+    if (isLoading) return <div className="p-8 text-center text-muted-foreground">Cargando roles...</div>;
 
     return (
-        <div className="flex flex-col space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="flex flex-col space-y-6 h-[calc(100vh-100px)]">
+            <div className="flex justify-between items-center shrink-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Gestión de Roles</h1>
-                    <p className="text-muted-foreground">Define roles personalizados y asigna permisos por módulo.</p>
+                    <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Roles y Permisos</h1>
+                    <p className="text-muted-foreground">Define perfiles de acceso y seguridad granular.</p>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button onClick={openCreateDialog}>
-                            <Plus className="mr-2 h-4 w-4" /> Crear Rol
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>{editingRole ? "Editar Rol" : "Nuevo Rol"}</DialogTitle>
-                            <DialogDescription>
-                                {editingRole ? "Modifica los permisos de este rol." : "Define un nombre y selecciona los permisos."}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Nombre</Label>
-                                <Input id="name" value={formName} onChange={(e) => setFormName(e.target.value)} className="col-span-3" placeholder="Ej: Contador" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="desc" className="text-right">Descripción</Label>
-                                <Input id="desc" value={formDesc} onChange={(e) => setFormDesc(e.target.value)} className="col-span-3" placeholder="Breve descripción del rol" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Color</Label>
-                                <div className="col-span-3 flex gap-2">
-                                    {["bg-red-500", "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500", "bg-pink-500"].map(c => (
-                                        <button key={c} onClick={() => setFormColor(c)} className={`h-6 w-6 rounded-full ${c} ${formColor === c ? 'ring-2 ring-offset-2 ring-primary' : ''}`} />
-                                    ))}
-                                </div>
-                            </div>
-                            {/* Permissions Grid */}
-                            <div className="mt-4">
-                                <Label className="font-semibold">Permisos por Módulo</Label>
-                                <div className="mt-2 border rounded-md overflow-hidden">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-[120px]">Módulo</TableHead>
-                                                {allActions.map(a => <TableHead key={a} className="text-center text-xs">{a.charAt(0).toUpperCase() + a.slice(1)}</TableHead>)}
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {allModules.map(m => (
-                                                <TableRow key={m}>
-                                                    <TableCell className="font-medium capitalize">{m}</TableCell>
-                                                    {allActions.map(a => {
-                                                        const key = `${m}-${a}`;
-                                                        return (
-                                                            <TableCell key={key} className="text-center">
-                                                                <Checkbox
-                                                                    checked={selectedPermissions.has(key)}
-                                                                    onCheckedChange={() => togglePermission(key)}
-                                                                />
-                                                            </TableCell>
-                                                        );
-                                                    })}
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                            <Button onClick={handleSave}>{editingRole ? "Guardar Cambios" : "Crear Rol"}</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <Button onClick={() => setIsCreateOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" /> Nuevo Rol
+                </Button>
             </div>
 
-            {/* Roles Table */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" /> Roles del Sistema</CardTitle>
-                    <CardDescription>Los roles de sistema están marcados y no pueden eliminarse.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Nombre</TableHead>
-                                <TableHead>Descripción</TableHead>
-                                <TableHead>Permisos</TableHead>
-                                <TableHead>Tipo</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {roles.map((role) => (
-                                <TableRow key={role.id}>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`h-3 w-3 rounded-full ${role.color}`}></span>
-                                            <span className="font-medium">{role.nombre}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground text-sm">{role.descripcion}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="secondary">{role.permisos.length} permisos</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        {role.isSystemRole ? (
-                                            <Badge variant="outline" className="border-amber-500 text-amber-600">Sistema</Badge>
-                                        ) : (
-                                            <Badge variant="outline">Personalizado</Badge>
+            <div className="grid grid-cols-12 gap-6 h-full min-h-0">
+                {/* Left: Roles List */}
+                <Card className="col-span-3 h-full flex flex-col">
+                    <CardHeader>
+                        <CardTitle className="text-lg">Roles</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 p-2 min-h-0">
+                        <ScrollArea className="h-full">
+                            <div className="space-y-1">
+                                {roles.map(role => (
+                                    <button
+                                        key={role.id}
+                                        onClick={() => setSelectedRole(role)}
+                                        className={cn(
+                                            "w-full text-left px-4 py-3 rounded-md text-sm transition-colors flex items-center justify-between",
+                                            selectedRole?.id === role.id
+                                                ? "bg-primary text-primary-foreground font-medium"
+                                                : "hover:bg-muted"
                                         )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(role)}>
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(role.id)} disabled={role.isSystemRole}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                    >
+                                        <div className="flex flex-col">
+                                            <span>{role.name}</span>
+                                            {role.description && (
+                                                <span className={cn("text-xs truncate max-w-[180px]", selectedRole?.id === role.id ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                                                    {role.description}
+                                                </span>
+                                            )}
                                         </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                                        {selectedRole?.id === role.id && <Check className="h-4 w-4" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+
+                {/* Right: Permissions Matrix */}
+                <Card className="col-span-9 h-full flex flex-col">
+                    {selectedRole ? (
+                        <>
+                            <CardHeader className="pb-4 shrink-0">
+                                <CardTitle className="flex items-center gap-2">
+                                    <Shield className="h-5 w-5 text-primary" />
+                                    Permisos: {selectedRole.name}
+                                </CardTitle>
+                                <CardDescription>Configura el acceso para este rol por módulo.</CardDescription>
+                            </CardHeader>
+                            <Separator />
+                            <CardContent className="flex-1 p-0 min-h-0 overflow-hidden">
+                                <ScrollArea className="h-full">
+                                    <div className="p-6 space-y-8">
+                                        {Object.entries(groupedPermissions).map(([module, perms]) => (
+                                            <div key={module} className="space-y-3">
+                                                <h3 className="font-semibold text-lg capitalize flex items-center gap-2">
+                                                    <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800">
+                                                        {module}
+                                                    </Badge>
+                                                </h3>
+                                                <div className="border rounded-lg overflow-hidden">
+                                                    <table className="w-full text-sm">
+                                                        <thead className="bg-muted/50 text-left">
+                                                            <tr>
+                                                                <th className="p-3 font-medium">Recurso</th>
+                                                                <th className="p-3 font-medium text-center w-24">Ver</th>
+                                                                <th className="p-3 font-medium text-center w-24">Crear</th>
+                                                                <th className="p-3 font-medium text-center w-24">Editar</th>
+                                                                <th className="p-3 font-medium text-center w-24">Eliminar</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y">
+                                                            {perms.map((perm) => {
+                                                                const rolePerm = getPermissionForRole(perm.id);
+                                                                return (
+                                                                    <tr key={perm.id} className="hover:bg-muted/30">
+                                                                        <td className="p-3">
+                                                                            <div className="font-medium">{perm.name}</div>
+                                                                            <div className="text-xs text-muted-foreground">{perm.description}</div>
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            <Switch
+                                                                                checked={rolePerm?.canView || false}
+                                                                                onCheckedChange={(checked) => handleToggle(perm.id, 'canView', !checked)}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            <Switch
+                                                                                checked={rolePerm?.canCreate || false}
+                                                                                onCheckedChange={(checked) => handleToggle(perm.id, 'canCreate', !checked)}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            <Switch
+                                                                                checked={rolePerm?.canEdit || false}
+                                                                                onCheckedChange={(checked) => handleToggle(perm.id, 'canEdit', !checked)}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            <Switch
+                                                                                checked={rolePerm?.canDelete || false}
+                                                                                onCheckedChange={(checked) => handleToggle(perm.id, 'canDelete', !checked)}
+                                                                            />
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                            <Lock className="h-12 w-12 mb-4 opacity-50" />
+                            <h3 className="text-lg font-medium">Selecciona un rol</h3>
+                            <p>Elige un rol de la lista para gestionar sus permisos.</p>
+                        </div>
+                    )}
+                </Card>
+            </div>
+
+            <CreateRoleDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
         </div>
     );
 }

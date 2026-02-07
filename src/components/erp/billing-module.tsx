@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Search, AlertTriangle } from "lucide-react";
+import { Search, AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Calendar } from "lucide-react";
 
 import {
     Card,
@@ -27,13 +27,22 @@ import { CreateFacturaDialog } from "@/components/erp/create-factura-dialog";
 import { FacturaHistoryDialog } from "@/components/erp/factura-history-dialog";
 import { useErp } from "@/components/providers/erp-provider";
 import { useToast } from "@/hooks/use-toast";
-import { Factura } from "@/types/sistema";
+import { Factura, CuentaBancaria } from "@/types/sistema";
 import { formatCurrency, cn } from "@/lib/utils";
 
 export function BillingModule() {
-    const { facturas, addFactura, updateFactura, cotizaciones } = useErp();
+    const { facturas, addFactura, updateFactura, cotizaciones, cuentasBancarias } = useErp();
     const { toast } = useToast();
     const [invoiceSearch, setInvoiceSearch] = useState("");
+    const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+        vencidas: false,
+        pendientes: false,
+        pagadas: true // Group paid by default
+    });
+
+    const toggleGroup = (group: string) => {
+        setCollapsedGroups(prev => ({ ...prev, [group]: !prev[group] }));
+    };
 
     // --- LOGIC ---
 
@@ -56,6 +65,26 @@ export function BillingModule() {
         );
     }, [facturas, invoiceSearch]);
 
+    // Grouping Logic
+    const groups = useMemo(() => {
+        const now = new Date();
+        const vencidas: Factura[] = [];
+        const pendientes: Factura[] = [];
+        const pagadas: Factura[] = [];
+
+        filteredFacturas.forEach(f => {
+            if (f.estado === 'PAGADA') {
+                pagadas.push(f);
+            } else if (new Date(f.fechaVencimiento) < now) {
+                vencidas.push(f);
+            } else {
+                pendientes.push(f);
+            }
+        });
+
+        return { vencidas, pendientes, pagadas };
+    }, [filteredFacturas]);
+
     // Handlers
     const handleCreateInvoice = (newInvoice: Factura) => {
         addFactura(newInvoice);
@@ -69,11 +98,8 @@ export function BillingModule() {
 
     // Overdue Check (Run once or when facturas change)
     useEffect(() => {
-        const overdueCount = facturas.filter(f => new Date() > new Date(f.fechaVencimiento) && f.estado !== 'CANCELADA').length;
+        const overdueCount = facturas.filter(f => new Date() > new Date(f.fechaVencimiento) && f.estado !== 'PAGADA').length;
         if (overdueCount > 0) {
-            // Debounce or just show? To avoid spamming on every keypress, we rely on useEffect deps.
-            // But if I type in search, this doesn't trigger. triggers on `facturas` change.
-            // Good.
             toast({
                 variant: "destructive",
                 title: "Atención: Facturas Vencidas",
@@ -81,7 +107,7 @@ export function BillingModule() {
                 duration: 5000
             });
         }
-    }, [facturas]); // Only check when invoicing data changes
+    }, [facturas, toast]); // Only check when invoicing data changes
 
     return (
         <Card>
@@ -107,59 +133,143 @@ export function BillingModule() {
                 </div>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>N° Factura</TableHead>
-                            <TableHead>Cliente</TableHead>
-                            <TableHead>Emisión</TableHead>
-                            <TableHead>Vencimiento</TableHead>
-                            <TableHead>Valor Total</TableHead>
-                            <TableHead>Saldo Pendiente</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {filteredFacturas.map((fac) => {
-                            const isOverdue = new Date() > new Date(fac.fechaVencimiento) && fac.estado !== 'CANCELADA';
-                            return (
-                                <TableRow key={fac.id} className={cn(isOverdue && "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40")}>
-                                    <TableCell className="font-mono font-bold">{fac.id}</TableCell>
-                                    <TableCell>{fac.cotizacion?.cliente?.nombre || "Cliente General"}</TableCell>
-                                    <TableCell>{format(new Date(fac.fechaEmision), "dd MMM yyyy", { locale: es })}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            {format(new Date(fac.fechaVencimiento), "dd MMM yyyy", { locale: es })}
-                                            {isOverdue && <div title="Vencida"><AlertTriangle className="h-3 w-3 text-red-500" /></div>}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{formatCurrency(fac.valorFacturado)}</TableCell>
-                                    <TableCell className={cn("font-bold", fac.saldoPendiente > 0 ? "text-red-500" : "text-green-600")}>
-                                        {formatCurrency(fac.saldoPendiente)}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={fac.estado === 'CANCELADA' ? 'default' : fac.estado === 'PARCIAL' ? 'secondary' : 'destructive'}>
-                                            {fac.estado}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <FacturaHistoryDialog
-                                            factura={fac}
-                                            onFacturaUpdated={handleInvoiceUpdate}
-                                            trigger={
-                                                <Button variant="outline" size="sm" className="text-xs">
-                                                    Gestionar
-                                                </Button>
-                                            }
-                                        />
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
+                <div className="space-y-4">
+                    {/* GROUP: VENCIDAS */}
+                    <div className="border rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => toggleGroup('vencidas')}
+                            className="w-full flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                            <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold">
+                                {collapsedGroups.vencidas ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                <Clock className="h-4 w-4" />
+                                VENCIDAS ({groups.vencidas.length})
+                            </div>
+                        </button>
+                        {!collapsedGroups.vencidas && (
+                            <InvoiceTable
+                                items={groups.vencidas}
+                                onUpdate={handleInvoiceUpdate}
+                                cuentas={cuentasBancarias}
+                                rowClassName="bg-red-50/30 dark:bg-red-900/5"
+                            />
+                        )}
+                    </div>
+
+                    {/* GROUP: PENDIENTES AL DIA */}
+                    <div className="border rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => toggleGroup('pendientes')}
+                            className="w-full flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors"
+                        >
+                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-bold">
+                                {collapsedGroups.pendientes ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                <Calendar className="h-4 w-4" />
+                                PENDIENTES AL DÍA ({groups.pendientes.length})
+                            </div>
+                        </button>
+                        {!collapsedGroups.pendientes && (
+                            <InvoiceTable
+                                items={groups.pendientes}
+                                onUpdate={handleInvoiceUpdate}
+                                cuentas={cuentasBancarias}
+                            />
+                        )}
+                    </div>
+
+                    {/* GROUP: PAGADAS */}
+                    <div className="border rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => toggleGroup('pagadas')}
+                            className="w-full flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors"
+                        >
+                            <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-bold">
+                                {collapsedGroups.pagadas ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                <CheckCircle2 className="h-4 w-4" />
+                                PAGADAS ({groups.pagadas.length})
+                            </div>
+                        </button>
+                        {!collapsedGroups.pagadas && (
+                            <InvoiceTable
+                                items={groups.pagadas}
+                                onUpdate={handleInvoiceUpdate}
+                                cuentas={cuentasBancarias}
+                                rowClassName="opacity-80"
+                            />
+                        )}
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );
 }
+
+// Sub-component for clean rendering
+function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
+    items: Factura[],
+    onUpdate: (f: Factura) => void,
+    cuentas: CuentaBancaria[],
+    rowClassName?: string
+}) {
+    if (items.length === 0) {
+        return <div className="p-8 text-center text-muted-foreground text-sm">No hay facturas en esta categoría.</div>;
+    }
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>N° Factura</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Emisión</TableHead>
+                    <TableHead>Vencimiento</TableHead>
+                    <TableHead>Valor Total</TableHead>
+                    <TableHead>Saldo Pendiente</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {items.map((fac) => {
+                    const isOverdue = new Date() > new Date(fac.fechaVencimiento) && fac.estado !== 'PAGADA';
+                    return (
+                        <TableRow key={fac.id} className={cn(rowClassName, isOverdue && "bg-red-50/50 dark:bg-red-950/10")}>
+                            <TableCell className="font-mono font-bold">{fac.id}</TableCell>
+                            <TableCell>{fac.cotizacion?.cliente?.nombre || "Cliente General"}</TableCell>
+                            <TableCell>{format(new Date(fac.fechaEmision), "dd MMM yyyy", { locale: es })}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2">
+                                    {format(new Date(fac.fechaVencimiento), "dd MMM yyyy", { locale: es })}
+                                    {isOverdue && <div title="Vencida"><AlertTriangle className="h-3 w-3 text-red-500" /></div>}
+                                </div>
+                            </TableCell>
+                            <TableCell>{formatCurrency(fac.valorFacturado)}</TableCell>
+                            <TableCell className={cn("font-bold", fac.saldoPendiente > 0 ? "text-red-500" : "text-green-600")}>
+                                {formatCurrency(fac.saldoPendiente)}
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={fac.estado === 'PAGADA' ? 'default' : fac.estado === 'PARCIAL' ? 'secondary' : 'destructive'}
+                                    className={cn(fac.estado === 'PAGADA' && "bg-green-600 hover:bg-green-700 text-white")}>
+                                    {fac.estado}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <FacturaHistoryDialog
+                                    factura={fac}
+                                    onFacturaUpdated={onUpdate}
+                                    cuentas={cuentas}
+                                    trigger={
+                                        <Button variant="outline" size="sm" className="text-xs">
+                                            Gestionar
+                                        </Button>
+                                    }
+                                />
+                            </TableCell>
+                        </TableRow>
+                    );
+                })}
+            </TableBody>
+        </Table>
+    );
+}
+

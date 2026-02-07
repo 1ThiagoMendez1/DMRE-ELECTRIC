@@ -10,13 +10,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
 import { format, addDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
-import { Search, AlertCircle, Clock, DollarSign } from "lucide-react";
+import { Search, AlertCircle, Clock, DollarSign, Plus } from "lucide-react";
 import { CuentaPorPagar, Proveedor } from "@/types/sistema";
+import { CreateCuentaPorPagarDialog } from "./create-cuenta-por-pagar-dialog";
+import { PaymentRegistrationDialog } from "./payment-registration-dialog";
 
 interface CuentasPorPagarDashboardProps {
     cuentas: CuentaPorPagar[];
     proveedores: Proveedor[];
-    onRegisterPayment: (id: string, amount: number) => void;
+    onRegisterPayment?: (id: string, amount: number) => void; // Optional because we use internal dialog now
 }
 
 export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayment }: CuentasPorPagarDashboardProps) {
@@ -24,6 +26,9 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
     const [statusFilter, setStatusFilter] = useState("all");
     const [supplierFilter, setSupplierFilter] = useState("all");
     const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null); // For Detail Dialog
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+    const [invoiceToPay, setInvoiceToPay] = useState<any | null>(null);
 
     // Process data and calculate derived fields
     const processedCuentas = useMemo(() => {
@@ -37,6 +42,7 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
 
             let status = 'PENDING';
             if (cxp.saldoPendiente === 0) status = 'PAID';
+            else if (cxp.valorPagado > 0) status = 'PARTIAL';
             else if (isOverdue) status = 'OVERDUE';
             else if (isUpcoming) status = 'UPCOMING';
 
@@ -54,9 +60,9 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
     const filteredCuentas = useMemo(() => {
         return processedCuentas.filter(cxp => {
             const matchesSearch =
-                cxp.proveedor.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                cxp.numeroFacturaProveedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                cxp.concepto.toLowerCase().includes(searchTerm.toLowerCase());
+                (cxp.proveedor?.nombre?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+                (cxp.numeroFacturaProveedor?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+                (cxp.concepto?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
             const matchesSupplier = supplierFilter === "all" || cxp.proveedorId === supplierFilter;
 
@@ -177,6 +183,12 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
                         </SelectContent>
                     </Select>
                 </div>
+                <Button
+                    onClick={() => setIsCreateOpen(true)}
+                    className="w-full md:w-auto gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                    <Plus className="h-4 w-4" /> Nueva Cuenta
+                </Button>
             </div>
 
             {/* Main Table */}
@@ -228,6 +240,7 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 {cxp.statusLabel === 'PAID' && <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Pagado</Badge>}
+                                                {cxp.statusLabel === 'PARTIAL' && <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">Parcial</Badge>}
                                                 {cxp.statusLabel === 'PENDING' && <Badge variant="secondary" className="bg-slate-100 text-slate-700">Pendiente</Badge>}
                                                 {cxp.statusLabel === 'UPCOMING' && <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">Próximo</Badge>}
                                                 {cxp.statusLabel === 'OVERDUE' && <Badge variant="destructive">Vencido</Badge>}
@@ -244,7 +257,10 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
                                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                             {cxp.saldoPendiente > 0 && (
                                                 <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs shadow-sm"
-                                                    onClick={() => onRegisterPayment(cxp.id, cxp.saldoPendiente)}
+                                                    onClick={() => {
+                                                        setInvoiceToPay(cxp);
+                                                        setIsPaymentOpen(true);
+                                                    }}
                                                 >
                                                     Pagar
                                                 </Button>
@@ -318,7 +334,8 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
                                 <Button variant="outline" onClick={() => setSelectedInvoice(null)}>Cerrar</Button>
                                 {selectedInvoice.saldoPendiente > 0 && (
                                     <Button onClick={() => {
-                                        onRegisterPayment(selectedInvoice.id, selectedInvoice.saldoPendiente);
+                                        setInvoiceToPay(selectedInvoice);
+                                        setIsPaymentOpen(true);
                                         setSelectedInvoice(null);
                                     }}>Registrar Nuevo Pago</Button>
                                 )}
@@ -327,6 +344,19 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Payment Dialog */}
+            <PaymentRegistrationDialog
+                open={isPaymentOpen}
+                onOpenChange={setIsPaymentOpen}
+                cxp={invoiceToPay}
+            />
+
+            {/* Create Dialog */}
+            <CreateCuentaPorPagarDialog
+                open={isCreateOpen}
+                onOpenChange={setIsCreateOpen}
+            />
         </div>
     );
 }

@@ -42,10 +42,11 @@ import { PermissionDialog } from "@/components/erp/permission-dialog";
 import { CreateUserDialog } from "@/components/erp/create-user-dialog";
 import { useErp } from "@/components/providers/erp-provider";
 import { systemNavItems } from "@/lib/data";
+import { cn } from "@/lib/utils";
 
 export default function UsuariosPage() {
     const { toast } = useToast();
-    const { users, updateUserPermissions, setCurrentUser, currentUser, deleteUser } = useErp();
+    const { users, updateUserPermissions, setCurrentUser, currentUser, deleteUser, toggleUserStatus } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
 
     // No longer needing local state for users as it comes from context
@@ -150,8 +151,25 @@ export default function UsuariosPage() {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className="gap-1 pl-1 bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400">
-                                            <CheckCircle2 className="h-3 w-3" /> Activo
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                "gap-1 pl-1 cursor-pointer select-none transition-colors",
+                                                user.isActive
+                                                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40"
+                                                    : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40"
+                                            )}
+                                            onClick={() => toggleUserStatus(user.id, !user.isActive)}
+                                        >
+                                            {user.isActive ? (
+                                                <>
+                                                    <CheckCircle2 className="h-3 w-3" /> Activo
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <XCircle className="h-3 w-3" /> Inactivo
+                                                </>
+                                            )}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -177,6 +195,9 @@ export default function UsuariosPage() {
                                                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                                     <DropdownMenuItem onClick={() => setCurrentUser(user)}>
                                                         Simular Sesión (Demo)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => toggleUserStatus(user.id, !user.isActive)}>
+                                                        {user.isActive ? "Desactivar Acceso" : "Activar Acceso"}
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteUser(user.id)}>
                                                         Eliminar Usuario

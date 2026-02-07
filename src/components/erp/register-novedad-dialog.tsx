@@ -26,6 +26,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // Added Textarea
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -56,16 +57,20 @@ const novedadSchema = z.object({
         message: "El valor unitario debe ser válido.",
     }),
     observaciones: z.string().optional(),
+    descripcion: z.string().optional(), // Added descripcion
 });
 
-interface RegisterNovedadDialogProps {
+interface NovedadDialogProps {
     empleados: any[];
-    onNovedadCreated: (novedad: any) => void;
+    onNovedadSaved: (novedad: any) => void;
+    novedadToEdit?: any | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
 }
 
-export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterNovedadDialogProps) {
-    const [open, setOpen] = useState(false);
+export function NovedadDialog({ empleados, onNovedadSaved, novedadToEdit, open, onOpenChange }: NovedadDialogProps) {
     const { toast } = useToast();
+    const isEditing = !!novedadToEdit;
 
     const form = useForm<z.infer<typeof novedadSchema>>({
         resolver: zodResolver(novedadSchema),
@@ -74,13 +79,41 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
             cantidad: "1",
             valorUnitario: "0",
             observaciones: "",
+            descripcion: "",
         },
     });
 
-    // Auto-calculate base rate based on employee salary if selected (Mock logic)
+    // Reset when opening/changing selection
+    useEffect(() => {
+        if (open) {
+            if (novedadToEdit) {
+                form.reset({
+                    fecha: new Date(novedadToEdit.fecha),
+                    empleadoId: novedadToEdit.empleadoId,
+                    tipo: novedadToEdit.tipo,
+                    cantidad: String(novedadToEdit.cantidad),
+                    valorUnitario: String(novedadToEdit.valorUnitario),
+                    observaciones: novedadToEdit.observaciones || "", // Correct key
+                    descripcion: novedadToEdit.descripcion || "", // Correct key
+                });
+            } else {
+                form.reset({
+                    fecha: new Date(),
+                    cantidad: "1",
+                    valorUnitario: "0",
+                    observaciones: "",
+                    descripcion: "",
+                    empleadoId: undefined,
+                    tipo: undefined
+                });
+            }
+        }
+    }, [open, novedadToEdit, form]);
+
+    // Auto-calculate base rate based on employee salary if selected
     const selectedEmpleadoId = form.watch("empleadoId");
     useEffect(() => {
-        if (selectedEmpleadoId) {
+        if (!isEditing && selectedEmpleadoId) {
             const emp = empleados.find(e => e.id === selectedEmpleadoId);
             if (emp) {
                 // Assume 240 hours month work (30 days * 8 hours)
@@ -88,12 +121,9 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                 form.setValue("valorUnitario", hourlyRate.toString());
             }
         }
-    }, [selectedEmpleadoId, empleados, form]);
+    }, [selectedEmpleadoId, empleados, form, isEditing]);
 
     const onSubmit = async (values: z.infer<typeof novedadSchema>) => {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
         const rate = Number(values.valorUnitario);
         const qty = Number(values.cantidad);
         let valorCalculado = qty * rate;
@@ -102,48 +132,40 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
         const isDeduction = ['AUSENCIA_INJUS', 'LICENCIA_NO_REM', 'SANCION', 'PRESTAMO'].includes(values.tipo);
         const efecto = isDeduction ? 'RESTA' : 'SUMA';
 
-        // Recargo logic (example: Recargo Nocturno = 35% extra, assuming rate is base)
-        // Check if rate provided is "Extra Value" or "Full Value". Assuming Full Value here for simplicity.
-        // If user inputs the surcharge value directly, we use that.
-
-        const newNovedad = {
-            id: `NOV-${Math.floor(Math.random() * 10000)}`,
+        const novedadData = {
+            id: novedadToEdit?.id,
             fecha: values.fecha,
             empleadoId: values.empleadoId,
             tipo: values.tipo,
             cantidad: qty,
             valorUnitario: rate,
+            valorTotal: valorCalculado,
             valorCalculado: valorCalculado,
             efecto: efecto,
+            observaciones: values.observaciones, // Updated to plural
+            descripcion: values.descripcion, // Added
+            estado: isEditing ? novedadToEdit.estado : 'PENDIENTE' // Maintain or Default
         };
 
-        onNovedadCreated(newNovedad);
-        toast({
-            title: "Novedad registrada",
-            description: `Se ha registrado ${formatCurrency(valorCalculado)} (${efecto}) para el empleado.`,
-        });
-        setOpen(false);
-        form.reset({
-            fecha: new Date(),
-            cantidad: "1",
-            valorUnitario: "0",
-            observaciones: ""
-        });
+        try {
+            await onNovedadSaved(novedadData); // Parent handles async action
+            toast({
+                title: isEditing ? "Novedad actualizada" : "Novedad registrada",
+                description: `Se ha ${isEditing ? 'actualizado' : 'registrado'} ${formatCurrency(valorCalculado)} (${efecto}).`,
+            });
+            onOpenChange(false);
+        } catch (error) {
+            toast({ title: "Error", description: "No se pudo guardar la novedad.", variant: "destructive" });
+        }
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Registrar Novedad
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[700px]">
                 <DialogHeader>
-                    <DialogTitle>Registrar Novedad de Nómina</DialogTitle>
+                    <DialogTitle>{isEditing ? "Editar Novedad" : "Registrar Novedad"}</DialogTitle>
                     <DialogDescription>
-                        Ingrese horas extras, recargos, o deducciones. El valor se calculará automáticamente.
+                        {isEditing ? "Modifique los detalles de la novedad." : "Ingrese horas extras, recargos, o deducciones."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -198,7 +220,7 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Empleado</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isEditing}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Seleccione nombre" />
@@ -277,6 +299,37 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                             />
                         </div>
 
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="descripcion"
+                                render={({ field }) => (
+                                    <FormItem className="col-span-2">
+                                        <FormLabel>Descripción / Concepto</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ej: Trabajo extra proyecto X" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="observaciones"
+                                render={({ field }) => (
+                                    <FormItem className="col-span-2">
+                                        <FormLabel>Observaciones Detalladas</FormLabel>
+                                        <FormControl>
+                                            <Textarea placeholder="Detalles adicionales..." {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+
                         <div className="bg-muted p-3 rounded-md text-sm flex justify-between items-center">
                             <span>Total Estimado:</span>
                             <span className="font-bold text-lg">
@@ -285,12 +338,12 @@ export function RegisterNovedadDialog({ empleados, onNovedadCreated }: RegisterN
                         </div>
 
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                                 Cancelar
                             </Button>
                             <Button type="submit" disabled={form.formState.isSubmitting}>
                                 {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Registrar
+                                {isEditing ? "Guardar Cambios" : "Registrar"}
                             </Button>
                         </DialogFooter>
                     </form>

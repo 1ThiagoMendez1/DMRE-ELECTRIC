@@ -15,10 +15,11 @@ function mapToUI(db: any, materiales: any[] = []): CodigoTrabajo {
         valorManoObra: Number(db.mano_de_obra) || 0,
         materiales: materiales.map(m => ({
             id: m.id,
-            inventarioId: m.inventario_id,
+            inventarioId: m.inventario_id || m.inventarioId,
+            subCodigoId: m.sub_codigo_id,
             nombre: m.nombre || "",
             cantidad: Number(m.cantidad) || 0,
-            valorUnitario: Number(m.valor_unitario) || 0,
+            valorUnitario: Number(m.valor_unitario || m.valorUnitario) || 0,
         })),
         costoTotalMateriales: Number(db.costo_materiales) || 0,
         costoTotal: Number(db.costo_total) || 0,
@@ -28,15 +29,19 @@ function mapToUI(db: any, materiales: any[] = []): CodigoTrabajo {
 
 // UI -> DB mapping
 function mapToDB(ui: Partial<CodigoTrabajo>) {
+    const manoDeObraValue = ui.manoDeObra ?? ui.valorManoObra ?? 0;
+    const materialesValue = ui.costoTotalMateriales ?? 0;
+    const totalValue = ui.costoTotal ?? (Number(manoDeObraValue) + Number(materialesValue));
+
     return {
         codigo: ui.codigo,
         nombre: ui.nombre,
         descripcion: ui.descripcion,
         unidad: "UND",
-        mano_de_obra: ui.manoDeObra || ui.valorManoObra || 0,
-        costo_materiales: ui.costoTotalMateriales || 0,
-        costo_total: ui.costoTotal || 0,
-        precio_venta: ui.costoTotal || 0,
+        mano_de_obra: manoDeObraValue,
+        costo_materiales: materialesValue,
+        costo_total: totalValue,
+        precio_venta: totalValue,
         activo: true,
     };
 }
@@ -114,20 +119,23 @@ export async function createCodigoTrabajoAction(codigoInput: Omit<CodigoTrabajo,
     }
 
     // Insert associated materials if any
+    let savedMaterials: any[] = [];
     if (codigo.materiales && codigo.materiales.length > 0) {
         const materialesData = codigo.materiales.map(m => ({
             codigo_trabajo_id: data.id,
             inventario_id: m.inventarioId,
+            sub_codigo_id: m.subCodigoId,
             nombre: m.nombre,
             cantidad: m.cantidad,
             valor_unitario: m.valorUnitario,
         }));
 
-        await supabase.from("materiales_asociados").insert(materialesData);
+        const { data: inserted } = await supabase.from("materiales_asociados").insert(materialesData).select();
+        savedMaterials = inserted || [];
     }
 
     revalidatePath("/dashboard/sistema/codigos-trabajo");
-    return mapToUI(data, []);
+    return mapToUI(data, savedMaterials);
 }
 
 export async function updateCodigoTrabajoAction(id: string, codigo: Partial<CodigoTrabajo>): Promise<CodigoTrabajo> {
@@ -147,6 +155,7 @@ export async function updateCodigoTrabajoAction(id: string, codigo: Partial<Codi
     }
 
     // Update materials: delete old and insert new
+    let savedMaterials: any[] = [];
     if (codigo.materiales !== undefined) {
         await supabase.from("materiales_asociados").delete().eq("codigo_trabajo_id", id);
 
@@ -154,16 +163,18 @@ export async function updateCodigoTrabajoAction(id: string, codigo: Partial<Codi
             const materialesData = codigo.materiales.map(m => ({
                 codigo_trabajo_id: id,
                 inventario_id: m.inventarioId,
+                sub_codigo_id: m.subCodigoId,
                 nombre: m.nombre,
                 cantidad: m.cantidad,
                 valor_unitario: m.valorUnitario,
             }));
-            await supabase.from("materiales_asociados").insert(materialesData);
+            const { data: inserted } = await supabase.from("materiales_asociados").insert(materialesData).select();
+            savedMaterials = inserted || [];
         }
     }
 
     revalidatePath("/dashboard/sistema/codigos-trabajo");
-    return mapToUI(data, codigo.materiales || []);
+    return mapToUI(data, savedMaterials);
 }
 
 export async function deleteCodigoTrabajoAction(id: string): Promise<boolean> {
