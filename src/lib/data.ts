@@ -129,7 +129,14 @@ export const systemNavItems = [
         href: '/dashboard/sistema/control',
         icon: ClipboardList,
     },
+    {
+        id: 'plans',
+        label: 'DMRE-PLANS',
+        href: '/dashboard/sistema/plans',
+        icon: Network,
+    },
 ]
+
 
 export const mockQuotes = [
     { id: 'COT-001', date: '2024-07-21', client: 'Constructora Alfa', total: 15000000, status: 'Aprobado' },
