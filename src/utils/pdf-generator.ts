@@ -268,6 +268,22 @@ export const generateQuotePDF = (
         doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd MMMM yyyy", { locale: es })}`, pageWidth / 2, currentY + 6, { align: 'center' });
         currentY += 15;
     }
+    // Sidebar layout - COTIZACIÓN title on the right side of main content
+    else if (style.layout === 'sidebar') {
+        doc.setFontSize(16);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.setTextColor(...primary);
+        doc.text("COTIZACIÓN", contentStartX + contentWidth, 25, { align: 'right' });
+
+        doc.setFontSize(12);
+        doc.setTextColor(...secondary);
+        doc.text(cotizacion.numero, contentStartX + contentWidth, 33, { align: 'right' });
+
+        doc.setFontSize(9);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.setTextColor(...text);
+        doc.text(format(new Date(cotizacion.fecha), "dd MMMM yyyy", { locale: es }), contentStartX + contentWidth, 39, { align: 'right' });
+    }
 
 
     // --- 3. CLIENT INFO SECTION ---
@@ -278,38 +294,36 @@ export const generateQuotePDF = (
     const clientBoxY = currentY > 0 ? currentY + 5 : 60; // fallback
 
     if (style.components.clientBoxStyle === 'filled') {
-        // Gray background block
+        // Gray background block - increased height for all info
         doc.setFillColor(...accent);
-        doc.rect(contentStartX, clientBoxY, contentWidth, 30, 'F');
+        doc.rect(contentStartX, clientBoxY, contentWidth, 35, 'F');
 
         // Label block with better contrast
         doc.setTextColor(...secondary);
         doc.setFontSize(10);
         doc.setFont(style.fonts.header, 'bold');
-        doc.text("CLIENTE", contentStartX + 5, clientBoxY + 8);
+        doc.text("CLIENTE:", contentStartX + 5, clientBoxY + 8);
 
         doc.setTextColor(...text);
         doc.setFontSize(10);
         doc.setFont(style.fonts.body, 'bold');
         doc.text(cotizacion.cliente.nombre, contentStartX + 5, clientBoxY + 15);
 
-        doc.setFont('normal');
+        doc.setFont(style.fonts.body, 'normal');
         doc.setFontSize(9);
-        doc.text(`NIT: ${cotizacion.cliente.documento}`, contentStartX + 5, clientBoxY + 20);
-        doc.text(`Dir: ${cotizacion.cliente.direccion}`, contentStartX + 5, clientBoxY + 25);
+        doc.text(`NIT/CC: ${cotizacion.cliente.documento}`, contentStartX + 5, clientBoxY + 21);
+        doc.text(`Dirección: ${cotizacion.cliente.direccion}`, contentStartX + 5, clientBoxY + 27);
 
         // Right side of box
-        doc.text(`Contacto: ${cotizacion.cliente.contactoPrincipal}`, contentStartX + contentWidth / 2, clientBoxY + 15);
-        doc.text(`Tel: ${cotizacion.cliente.telefono}`, contentStartX + contentWidth / 2, clientBoxY + 20);
+        doc.text(`Contacto: ${cotizacion.cliente.telefono || ''}`, contentStartX + contentWidth / 2, clientBoxY + 15);
 
-        currentY = clientBoxY + 35;
+        currentY = clientBoxY + 42;
     }
     else if (style.components.clientBoxStyle === 'box') {
-        // Oultined box
+        // Outlined box - increased height
         doc.setDrawColor(...secondary);
-        doc.roundedRect(contentStartX, clientBoxY, contentWidth, 30, 1, 1);
+        doc.roundedRect(contentStartX, clientBoxY, contentWidth, 35, 1, 1);
 
-        // Label on border mechanism? No, simpler: inside
         doc.setTextColor(...secondary);
         doc.setFontSize(8);
         doc.text("CLIENTE:", contentStartX + 4, clientBoxY + 6);
@@ -321,10 +335,13 @@ export const generateQuotePDF = (
 
         doc.setFontSize(9);
         doc.setFont(style.fonts.body, 'normal');
-        doc.text(`${cotizacion.cliente.documento} | ${cotizacion.cliente.telefono}`, contentStartX + 4, clientBoxY + 19);
-        doc.text(cotizacion.cliente.direccion, contentStartX + 4, clientBoxY + 24);
+        doc.text(`NIT/CC: ${cotizacion.cliente.documento}`, contentStartX + 4, clientBoxY + 19);
+        doc.text(`Dirección: ${cotizacion.cliente.direccion}`, contentStartX + 4, clientBoxY + 25);
 
-        currentY = clientBoxY + 35;
+        // Right side info
+        doc.text(`Contacto: ${cotizacion.cliente.telefono || ''}`, contentStartX + contentWidth / 2, clientBoxY + 19);
+
+        currentY = clientBoxY + 42;
     }
     else {
         // Clean / Line style
@@ -345,25 +362,33 @@ export const generateQuotePDF = (
         doc.setFont(style.fonts.body, 'bold');
         doc.text(cotizacion.cliente.nombre, contentStartX, currentY + 11);
 
-        doc.setFont('normal');
+        doc.setFont(style.fonts.body, 'normal');
         doc.setFontSize(9);
-        doc.text(`${cotizacion.cliente.documento}`, contentStartX, currentY + 16);
-        doc.text(`${cotizacion.cliente.direccion}`, contentStartX, currentY + 21);
+        doc.text(`NIT/CC: ${cotizacion.cliente.documento}`, contentStartX, currentY + 17);
+        doc.text(`Dirección: ${cotizacion.cliente.direccion}`, contentStartX, currentY + 22);
 
-        currentY += 28;
+        // Contact info on the right
+        doc.text(`Contacto: ${cotizacion.cliente.telefono || ''}`, contentStartX + contentWidth / 2, currentY + 17);
+
+        currentY += 30;
     }
 
 
     // --- 4. DESCRIPTION ---
+    currentY += 3; // Extra spacing before description
+
     doc.setFontSize(10);
     doc.setFont(style.fonts.header, 'bold');
     doc.setTextColor(...primary);
     doc.text("DESCRIPCIÓN TRABAJO:", contentStartX, currentY);
 
+    // Place description text BELOW the label (not beside it)
+    currentY += 6;
     doc.setFont(style.fonts.body, 'normal');
     doc.setTextColor(...text);
-    const splitDesc = doc.splitTextToSize(cotizacion.descripcionTrabajo || "", contentWidth - 25);
-    doc.text(splitDesc, contentStartX + 22, currentY);
+    doc.setFontSize(10);
+    const splitDesc = doc.splitTextToSize(cotizacion.descripcionTrabajo || "", contentWidth);
+    doc.text(splitDesc, contentStartX + 1, currentY);
 
     currentY += (splitDesc.length * 5) + 8;
 

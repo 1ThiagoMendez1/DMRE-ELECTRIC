@@ -1693,8 +1693,8 @@ export function TrabajoHistoryDialog({
                     </TabsContent>
 
                     {/* PREVIEW & DESIGN TAB */}
-                    <TabsContent value="preview" className="flex-1 overflow-hidden mt-4 h-full">
-                        <div className="flex flex-col md:flex-row gap-6 h-full">
+                    <TabsContent value="preview" className="flex-1 overflow-y-auto mt-4">
+                        <div className="flex flex-col md:flex-row gap-6 min-h-0">
 
                             {/* LEFT SIDEBAR: CONTROLS */}
                             <div className="w-full md:w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto pr-2 pb-4">
