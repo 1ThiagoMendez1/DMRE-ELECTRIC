@@ -24,7 +24,12 @@ import {
     Navigation, // For location
     Wrench,
     Video,
-    Settings
+    Settings,
+    Upload,
+    Download,
+    FolderOpen,
+    Shield,
+    Loader2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -236,7 +241,7 @@ export function TrabajoHistoryDialog({
 }: TrabajoHistoryDialogProps) {
     const { inventario, codigosTrabajo, deductInventoryItem } = useErp();
     const [isOpen, setIsOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState(defaultTab);
+    const [activeTab, setActiveTab] = useState<'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'historial'>(defaultTab);
     const [newNote, setNewNote] = useState("");
     const [newProgress, setNewProgress] = useState<EstadoCotizacion>(trabajo.estado);
     const [progressPercent, setProgressPercent] = useState<number>(trabajo.progreso || 0);
@@ -350,6 +355,15 @@ export function TrabajoHistoryDialog({
     const photoInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
+
+    // --- DOCUMENT TAB STATE ---
+    const [documentosLegales, setDocumentosLegales] = useState<{ name: string, url: string, size: number, created_at: string }[]>([]);
+    const [polizasSeguros, setPolizasSeguros] = useState<{ name: string, url: string, size: number, created_at: string }[]>([]);
+    const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+    const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+    const docLegalInputRef = useRef<HTMLInputElement>(null);
+    const docPolizaInputRef = useRef<HTMLInputElement>(null);
+    const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string } | null>(null);
 
     // Job Execution Details State
     const [notas, setNotas] = useState(trabajo.notas || "");
@@ -469,6 +483,110 @@ export function TrabajoHistoryDialog({
             setIsUploading(false);
             if (event.target) event.target.value = '';
         }
+    };
+
+    // --- DOCUMENT TAB HANDLERS ---
+    const loadDocuments = async () => {
+        setIsLoadingDocs(true);
+        try {
+            const { data: legalFiles } = await supabase.storage
+                .from('Documentost_rabajos')
+                .list(`Documentacion/${trabajo.id}`, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+
+            const { data: polizaFiles } = await supabase.storage
+                .from('Documentost_rabajos')
+                .list(`Polizasyseguros/${trabajo.id}`, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+
+            if (legalFiles) {
+                setDocumentosLegales(legalFiles.filter(f => f.name !== '.emptyFolderPlaceholder').map(f => ({
+                    name: f.name,
+                    url: supabase.storage.from('Documentost_rabajos').getPublicUrl(`Documentacion/${trabajo.id}/${f.name}`).data.publicUrl,
+                    size: f.metadata?.size || 0,
+                    created_at: f.created_at || ''
+                })));
+            }
+
+            if (polizaFiles) {
+                setPolizasSeguros(polizaFiles.filter(f => f.name !== '.emptyFolderPlaceholder').map(f => ({
+                    name: f.name,
+                    url: supabase.storage.from('Documentost_rabajos').getPublicUrl(`Polizasyseguros/${trabajo.id}/${f.name}`).data.publicUrl,
+                    size: f.metadata?.size || 0,
+                    created_at: f.created_at || ''
+                })));
+            }
+        } catch (error) {
+            console.error('Error loading documents:', error);
+        } finally {
+            setIsLoadingDocs(false);
+        }
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (activeTab === 'documentos' && isOpen) {
+            loadDocuments();
+        }
+    }, [activeTab, isOpen]);
+
+    const handleDocUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros') => {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        setIsUploadingDoc(true);
+        try {
+            for (const file of Array.from(files)) {
+                const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                const filePath = `${category}/${trabajo.id}/${safeFileName}`;
+
+                const { error } = await supabase.storage
+                    .from('Documentost_rabajos')
+                    .upload(filePath, file);
+
+                if (error) throw error;
+            }
+
+            toast({ title: "Archivo(s) subido(s)", description: "Se cargaron correctamente." });
+            await loadDocuments();
+        } catch (error: any) {
+            console.error('Error uploading document:', error);
+            toast({ variant: "destructive", title: "Error al subir", description: error.message || "No se pudo subir el archivo." });
+        } finally {
+            setIsUploadingDoc(false);
+            if (event.target) event.target.value = '';
+        }
+    };
+
+    const handleDeleteDoc = async (fileName: string, category: 'Documentacion' | 'Polizasyseguros') => {
+        try {
+            const { error } = await supabase.storage
+                .from('Documentost_rabajos')
+                .remove([`${category}/${trabajo.id}/${fileName}`]);
+
+            if (error) throw error;
+
+            toast({ title: "Archivo eliminado", description: `${fileName.replace(/^\d+_/, '')} eliminado.` });
+            await loadDocuments();
+        } catch (error: any) {
+            console.error('Error deleting document:', error);
+            toast({ variant: "destructive", title: "Error al eliminar", description: error.message });
+        }
+    };
+
+    const formatFileSize = (bytes: number): string => {
+        if (bytes === 0) return '';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+    };
+
+    const getDocFileIcon = (fileName: string) => {
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return <Image className="h-5 w-5 text-green-500" />;
+        if (['pdf'].includes(ext)) return <FileText className="h-5 w-5 text-red-500" />;
+        if (['doc', 'docx'].includes(ext)) return <FileText className="h-5 w-5 text-blue-500" />;
+        if (['xls', 'xlsx'].includes(ext)) return <FileText className="h-5 w-5 text-emerald-500" />;
+        return <FolderOpen className="h-5 w-5 text-gray-500" />;
     };
 
     const handleAddLocation = () => {
@@ -847,12 +965,13 @@ export function TrabajoHistoryDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'items' | 'preview' | 'historial')} className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className={`grid w-full ${showExecution ? 'grid-cols-5' : 'grid-cols-4'}`}>
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'historial')} className="flex-1 overflow-hidden flex flex-col">
+                    <TabsList className={`grid w-full ${showExecution ? 'grid-cols-6' : 'grid-cols-5'}`}>
                         <TabsTrigger value="detalles">Detalles</TabsTrigger>
                         <TabsTrigger value="items">Items & Edición</TabsTrigger>
                         {showExecution && <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>}
                         <TabsTrigger value="preview">Vista PDF</TabsTrigger>
+                        <TabsTrigger value="documentos">Documentos</TabsTrigger>
                         <TabsTrigger value="historial">Historial</TabsTrigger>
                     </TabsList>
 
@@ -2009,6 +2128,244 @@ export function TrabajoHistoryDialog({
                                 </Card>
                             </div>
                         </div>
+                    </TabsContent>
+
+                    {/* DOCUMENTOS TAB */}
+                    <TabsContent value="documentos" className="flex-1 overflow-auto mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* DOCUMENTACIÓN LEGAL */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <FolderOpen className="h-5 w-5 text-blue-600" />
+                                        Documentación Legal
+                                    </CardTitle>
+                                    <CardDescription>Contratos, permisos, certificaciones y documentos legales</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Upload zone */}
+                                    <div
+                                        onClick={() => !isUploadingDoc && docLegalInputRef.current?.click()}
+                                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${isUploadingDoc
+                                            ? 'border-muted-foreground/15 bg-muted/30 cursor-not-allowed'
+                                            : 'border-muted-foreground/25 hover:border-blue-500/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
+                                            }`}
+                                    >
+                                        {isUploadingDoc ? (
+                                            <>
+                                                <Loader2 className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2 animate-spin" />
+                                                <p className="text-sm font-medium text-muted-foreground">Subiendo...</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                                                <p className="text-sm font-medium">Click para subir archivos</p>
+                                                <p className="text-xs text-muted-foreground mt-1">PDF, imágenes, Word, Excel y más</p>
+                                            </>
+                                        )}
+                                        <input
+                                            ref={docLegalInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            accept="*/*"
+                                            multiple
+                                            onChange={(e) => handleDocUpload(e, 'Documentacion')}
+                                        />
+                                    </div>
+
+                                    {/* File list */}
+                                    {isLoadingDocs ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                            <span className="ml-2 text-sm text-muted-foreground">Cargando documentos...</span>
+                                        </div>
+                                    ) : documentosLegales.length === 0 ? (
+                                        <div className="text-center py-6">
+                                            <FileText className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+                                            <p className="text-sm text-muted-foreground">No hay documentos legales cargados</p>
+                                        </div>
+                                    ) : (
+                                        <ScrollArea className="h-[220px]">
+                                            <div className="space-y-2 pr-3">
+                                                {documentosLegales.map((doc, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg border bg-card hover:bg-accent/30 transition-colors group">
+                                                        {getDocFileIcon(doc.name)}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium truncate" title={doc.name.replace(/^\d+_/, '')}>
+                                                                {doc.name.replace(/^\d+_/, '')}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {formatFileSize(doc.size)}
+                                                                {doc.created_at && ` • ${format(new Date(doc.created_at), "dd MMM yyyy", { locale: es })}`}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPreviewDoc({ url: doc.url, name: doc.name.replace(/^\d+_/, '') })} title="Vista previa">
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                                <a href={doc.url} target="_blank" rel="noopener noreferrer" title="Descargar">
+                                                                    <Download className="h-4 w-4" />
+                                                                </a>
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteDoc(doc.name, 'Documentacion')} title="Eliminar">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* PÓLIZAS Y SEGUROS */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Shield className="h-5 w-5 text-amber-600" />
+                                        Pólizas y Seguros
+                                    </CardTitle>
+                                    <CardDescription>Pólizas de cumplimiento, seguros y garantías</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Upload zone */}
+                                    <div
+                                        onClick={() => !isUploadingDoc && docPolizaInputRef.current?.click()}
+                                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${isUploadingDoc
+                                            ? 'border-muted-foreground/15 bg-muted/30 cursor-not-allowed'
+                                            : 'border-muted-foreground/25 hover:border-amber-500/50 hover:bg-amber-50/50 dark:hover:bg-amber-950/20'
+                                            }`}
+                                    >
+                                        {isUploadingDoc ? (
+                                            <>
+                                                <Loader2 className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2 animate-spin" />
+                                                <p className="text-sm font-medium text-muted-foreground">Subiendo...</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                                                <p className="text-sm font-medium">Click para subir archivos</p>
+                                                <p className="text-xs text-muted-foreground mt-1">PDF, imágenes, Word, Excel y más</p>
+                                            </>
+                                        )}
+                                        <input
+                                            ref={docPolizaInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            accept="*/*"
+                                            multiple
+                                            onChange={(e) => handleDocUpload(e, 'Polizasyseguros')}
+                                        />
+                                    </div>
+
+                                    {/* File list */}
+                                    {isLoadingDocs ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                            <span className="ml-2 text-sm text-muted-foreground">Cargando documentos...</span>
+                                        </div>
+                                    ) : polizasSeguros.length === 0 ? (
+                                        <div className="text-center py-6">
+                                            <Shield className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+                                            <p className="text-sm text-muted-foreground">No hay pólizas cargadas</p>
+                                        </div>
+                                    ) : (
+                                        <ScrollArea className="h-[220px]">
+                                            <div className="space-y-2 pr-3">
+                                                {polizasSeguros.map((doc, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg border bg-card hover:bg-accent/30 transition-colors group">
+                                                        {getDocFileIcon(doc.name)}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium truncate" title={doc.name.replace(/^\d+_/, '')}>
+                                                                {doc.name.replace(/^\d+_/, '')}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {formatFileSize(doc.size)}
+                                                                {doc.created_at && ` • ${format(new Date(doc.created_at), "dd MMM yyyy", { locale: es })}`}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPreviewDoc({ url: doc.url, name: doc.name.replace(/^\d+_/, '') })} title="Vista previa">
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                                <a href={doc.url} target="_blank" rel="noopener noreferrer" title="Descargar">
+                                                                    <Download className="h-4 w-4" />
+                                                                </a>
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteDoc(doc.name, 'Polizasyseguros')} title="Eliminar">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* DOCUMENT PREVIEW DIALOG */}
+                        <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+                            <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2">
+                                        <Eye className="h-5 w-5" />
+                                        {previewDoc?.name || 'Vista previa'}
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        <Button variant="outline" size="sm" className="mt-1" asChild>
+                                            <a href={previewDoc?.url} target="_blank" rel="noopener noreferrer">
+                                                <Download className="h-4 w-4 mr-2" /> Descargar archivo
+                                            </a>
+                                        </Button>
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="flex-1 min-h-0 rounded-lg overflow-hidden border bg-muted/30">
+                                    {previewDoc && (() => {
+                                        const ext = previewDoc.name.split('.').pop()?.toLowerCase() || '';
+                                        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext);
+                                        const isPdf = ext === 'pdf';
+
+                                        if (isPdf) {
+                                            return (
+                                                <iframe
+                                                    src={previewDoc.url}
+                                                    className="w-full h-[70vh] border-0"
+                                                    title={previewDoc.name}
+                                                />
+                                            );
+                                        }
+                                        if (isImage) {
+                                            return (
+                                                <div className="flex items-center justify-center h-[70vh] p-4">
+                                                    <img
+                                                        src={previewDoc.url}
+                                                        alt={previewDoc.name}
+                                                        className="max-w-full max-h-full object-contain rounded-lg"
+                                                    />
+                                                </div>
+                                            );
+                                        }
+                                        // Other file types — show download message
+                                        return (
+                                            <div className="flex flex-col items-center justify-center h-[40vh] gap-4">
+                                                <FolderOpen className="h-16 w-16 text-muted-foreground/30" />
+                                                <p className="text-muted-foreground">Vista previa no disponible para este tipo de archivo.</p>
+                                                <Button asChild>
+                                                    <a href={previewDoc.url} target="_blank" rel="noopener noreferrer">
+                                                        <Download className="h-4 w-4 mr-2" /> Descargar para ver
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </DialogContent>
+                        </Dialog>
                     </TabsContent>
 
                     {/* HISTORIAL TAB */}

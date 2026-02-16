@@ -110,6 +110,7 @@ export interface Cotizacion {
     fecha: Date;
     clienteId: string;
     cliente: Cliente;
+    trabajoId?: string; // Links to trabajos table
     descripcionTrabajo: string; // New
     items: CotizacionItem[];
     subtotal: number;
@@ -192,8 +193,8 @@ export type EstadoFactura = 'BORRADOR' | 'PENDIENTE' | 'PARCIAL' | 'PAGADA' | 'V
 
 export interface Factura {
     id: string; // Consecutivo DIAN opcional o interno
-    cotizacionId: string;
-    cotizacion: Cotizacion;
+    cotizacionId?: string;
+    cotizacion?: Cotizacion;
     fechaEmision: Date;
     fechaVencimiento: Date;
     valorFacturado: number;

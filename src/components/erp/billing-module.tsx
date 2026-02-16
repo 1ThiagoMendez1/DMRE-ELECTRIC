@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 
 import { CreateFacturaDialog } from "@/components/erp/create-factura-dialog";
+import { FacturarTrabajosDialog } from "@/components/erp/facturar-trabajos-dialog";
 import { FacturaHistoryDialog } from "@/components/erp/factura-history-dialog";
 import { useErp } from "@/components/providers/erp-provider";
 import { useToast } from "@/hooks/use-toast";
@@ -49,19 +50,28 @@ export function BillingModule() {
     // Calculate Next ID
     const nextInvoiceId = useMemo(() => {
         if (facturas.length === 0) return "Fac-0001";
-        const ids = facturas.map(f => {
-            const num = parseInt(f.id.replace(/[^0-9]/g, ''));
-            return isNaN(num) ? 0 : num;
-        });
-        const maxId = Math.max(0, ...ids);
-        return `Fac-${String(maxId + 1).padStart(4, '0')}`;
+
+        const ids = facturas
+            .map(f => {
+                // Extract number only if it matches standard format Fac-XXXX
+                const match = f.id.match(/^Fac-(\d+)$/i);
+                if (match && match[1]) {
+                    return parseInt(match[1], 10);
+                }
+                return 0;
+            })
+            .filter(n => !isNaN(n) && n > 0 && n < 999999); // Ignore huge numbers
+
+        const maxId = ids.length > 0 ? Math.max(...ids) : 0;
+        return `Fac-${String(maxId + 1).padStart(4, '0')}`; // Fac-0001
     }, [facturas]);
 
     // Filter Logic
     const filteredFacturas = useMemo(() => {
         return facturas.filter(f =>
             f.id.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-            f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase())
+            f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+            f.cotizacion?.numero?.toLowerCase().includes(invoiceSearch.toLowerCase())
         );
     }, [facturas, invoiceSearch]);
 
@@ -124,6 +134,10 @@ export function BillingModule() {
                                 onChange={(e) => setInvoiceSearch(e.target.value)}
                             />
                         </div>
+                        <FacturarTrabajosDialog
+                            onFacturaCreated={handleCreateInvoice}
+                            nextId={nextInvoiceId}
+                        />
                         <CreateFacturaDialog
                             onFacturaCreated={handleCreateInvoice}
                             nextId={nextInvoiceId}
@@ -235,7 +249,16 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                     return (
                         <TableRow key={fac.id} className={cn(rowClassName, isOverdue && "bg-red-50/50 dark:bg-red-950/10")}>
                             <TableCell className="font-mono font-bold">{fac.id}</TableCell>
-                            <TableCell>{fac.cotizacion?.cliente?.nombre || "Cliente General"}</TableCell>
+                            <TableCell>
+                                <div className="flex flex-col">
+                                    <span className="font-medium">{fac.cotizacion?.cliente?.nombre || "Cliente General"}</span>
+                                    {fac.cotizacion?.numero && (
+                                        <span className="text-xs text-muted-foreground">
+                                            {fac.cotizacion.numero}
+                                        </span>
+                                    )}
+                                </div>
+                            </TableCell>
                             <TableCell>{format(new Date(fac.fechaEmision), "dd MMM yyyy", { locale: es })}</TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2">

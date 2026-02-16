@@ -272,6 +272,7 @@ export default function FinancieraPage() {
                                                     <EditAccountDialog cuenta={account} onAccountUpdated={handleUpdateAccount} />
                                                     <CuentaHistoryDialog
                                                         cuenta={account}
+                                                        movimientos={movimientos}
                                                         trigger={
                                                             <Button variant="ghost" size="icon" title="Ver Historial">
                                                                 <History className="h-4 w-4" />

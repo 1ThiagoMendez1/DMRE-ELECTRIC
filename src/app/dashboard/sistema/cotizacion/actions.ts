@@ -43,6 +43,7 @@ function mapToUI(db: any, items: any[] = [], cliente?: any): Cotizacion {
         tipo: db.tipo || "NORMAL",
         fecha: new Date(db.fecha),
         clienteId: db.cliente_id,
+        trabajoId: db.trabajo_id, // Map from DB
         cliente: cliente ? {
             id: cliente.id,
             nombre: cliente.nombre,

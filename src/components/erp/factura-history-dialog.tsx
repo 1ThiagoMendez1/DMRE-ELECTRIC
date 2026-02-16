@@ -299,7 +299,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
             <DialogTrigger asChild>
                 {trigger || (
                     <span className="cursor-pointer hover:underline text-primary font-medium">
-                        {factura.cotizacion.cliente.nombre}
+                        {factura.cotizacion?.cliente?.nombre || "Sin Cotización Vinculada"}
+                        {factura.cotizacion?.numero ? ` - ${factura.cotizacion.numero}` : ""}
                     </span>
                 )}
             </DialogTrigger>
@@ -310,7 +311,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                         Factura {factura.numero || factura.id}
                     </DialogTitle>
                     <DialogDescription>
-                        {factura.cotizacion.cliente.nombre} - {formatCurrency(factura.valorFacturado)}
+                        {factura.cotizacion?.cliente?.nombre || "Cliente Desconocido"} {factura.cotizacion?.numero ? `- ${factura.cotizacion.numero}` : ""} - {formatCurrency(factura.valorFacturado)}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -332,9 +333,12 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="font-semibold">{factura.cotizacion.cliente.nombre}</p>
-                                    <p className="text-xs text-muted-foreground">{factura.cotizacion.cliente.documento}</p>
-                                    <p className="text-xs text-muted-foreground">{factura.cotizacion.cliente.telefono}</p>
+                                    <p className="font-semibold">
+                                        {factura.cotizacion?.cliente?.nombre || "N/A"}
+                                        {factura.cotizacion?.numero ? ` - ${factura.cotizacion.numero}` : ""}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">{factura.cotizacion?.cliente?.documento || ""}</p>
+                                    <p className="text-xs text-muted-foreground">{factura.cotizacion?.cliente?.telefono || ""}</p>
                                 </CardContent>
                             </Card>
 

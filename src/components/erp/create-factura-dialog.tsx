@@ -22,7 +22,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Factura, Cliente, Cotizacion } from "@/types/sistema";
-import { initialClients } from "@/lib/mock-data";
 import { useErp } from "@/components/providers/erp-provider";
 import { formatCurrency } from "@/lib/utils";
 
@@ -34,7 +33,7 @@ interface CreateFacturaDialogProps {
 
 export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [] }: CreateFacturaDialogProps) {
     const [open, setOpen] = useState(false);
-    const { facturas } = useErp();
+    const { facturas, clientes } = useErp();
     const [clienteId, setClienteId] = useState("");
     const [selectedCotizacionId, setSelectedCotizacionId] = useState("MANUAL");
     const [numero, setNumero] = useState(nextId || "");
@@ -67,17 +66,23 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
             }
         }
 
-        const cliente = initialClients.find(c => c.id === clienteId);
+        const cliente = clientes.find(c => c.id === clienteId);
         const cotizacion = cotizaciones?.find(c => c.id === selectedCotizacionId);
 
         const newFactura: Factura = {
             id: numero,
+            numero: numero,
             fechaEmision: new Date(fechaEmision),
             fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : new Date(fechaEmision),
+            subtotal: parseFloat(valor),
+            iva: 0,
             valorFacturado: parseFloat(valor),
+            valorPagado: estado === "PAGADA" ? parseFloat(valor) : 0,
             saldoPendiente: estado === "PAGADA" ? 0 : parseFloat(valor),
             estado: estado,
-            cotizacionId: selectedCotizacionId,
+            cotizacionId: selectedCotizacionId !== "MANUAL" ? selectedCotizacionId : undefined,
+            clienteId: clienteId,
+            trabajoId: (selectedCotizacionId !== "MANUAL" && cotizacion?.trabajoId) ? cotizacion.trabajoId : undefined,
             cotizacion: cotizacion ? cotizacion : {
                 id: "MANUAL",
                 numero: "N/A",
@@ -134,9 +139,9 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                 <SelectValue placeholder="Seleccione cliente" />
                             </SelectTrigger>
                             <SelectContent>
-                                {initialClients?.map(c => (
+                                {clientes.length > 0 ? clientes.map(c => (
                                     <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                                )) || <SelectItem value="dev">Modo Desarrollo</SelectItem>}
+                                )) : <SelectItem value="dev" disabled>No hay clientes registrados</SelectItem>}
                             </SelectContent>
                         </Select>
                     </div>

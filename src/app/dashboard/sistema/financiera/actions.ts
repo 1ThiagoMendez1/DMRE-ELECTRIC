@@ -57,25 +57,27 @@ function mapToUI(db: any, cotizacionRaw?: any): Factura {
 }
 
 function mapToDB(ui: Partial<Factura>) {
-    return {
+    const raw: Record<string, any> = {
         numero: ui.numero,
         cotizacion_id: ui.cotizacionId,
         trabajo_id: ui.trabajoId,
         cliente_id: ui.clienteId,
         fecha_emision: ui.fechaEmision,
         fecha_vencimiento: ui.fechaVencimiento,
-        subtotal: ui.subtotal,
-        iva: ui.iva,
+        subtotal: ui.subtotal ?? ui.valorFacturado ?? 0,
+        iva: ui.iva ?? 0,
         valor_total: ui.valorFacturado,
-        anticipo_recibido: ui.anticipoRecibido,
-        retencion_fuente: ui.retencionRenta,
-        retencion_ica: ui.retencionIca,
-        retencion_iva: ui.retencionIva,
-        valor_pagado: ui.valorPagado,
+        anticipo_recibido: ui.anticipoRecibido ?? 0,
+        retencion_fuente: ui.retencionRenta ?? 0,
+        retencion_ica: ui.retencionIca ?? 0,
+        retencion_iva: ui.retencionIva ?? 0,
+        valor_pagado: ui.valorPagado ?? 0,
         saldo_pendiente: ui.saldoPendiente,
         estado: ui.estado,
         observaciones: ui.observaciones,
     };
+    // Remove undefined keys so Supabase uses DB defaults
+    return Object.fromEntries(Object.entries(raw).filter(([_, v]) => v !== undefined));
 }
 
 async function getNextNumero(supabase: any) {
@@ -134,12 +136,18 @@ export async function createFacturaAction(factura: Omit<Factura, "id">): Promise
     const { data, error } = await supabase
         .from("facturas")
         .insert(dbData)
-        .select()
+        .select(`
+            *,
+            cotizaciones (
+                id, numero, total, estado, created_at,
+                clientes (id, nombre, documento, telefono, direccion)
+            )
+        `)
         .single();
 
     if (error) {
         console.error("Error creating factura:", error);
-        throw new Error("Failed to create factura");
+        throw new Error(`Failed to create factura: ${error.message}`);
     }
 
     // Update Cotizacion Status

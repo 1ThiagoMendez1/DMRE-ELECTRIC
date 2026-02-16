@@ -4,6 +4,10 @@ import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, PieChart, Pie, Cell, Legend
+} from "recharts";
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -28,18 +32,19 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
 import { Landmark, Wallet, History, Search, X } from "lucide-react";
-import { CuentaBancaria } from "@/types/sistema";
+import { CuentaBancaria, MovimientoFinanciero } from "@/types/sistema";
 import { formatCurrency } from "@/lib/utils";
-import { initialMovimientos } from "@/lib/mock-data";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DynamicChart, DashboardPanel } from "@/components/erp/charts";
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
 interface CuentaHistoryDialogProps {
     cuenta: CuentaBancaria;
+    movimientos: MovimientoFinanciero[];
     trigger?: React.ReactNode;
 }
 
-export function CuentaHistoryDialog({ cuenta, trigger }: CuentaHistoryDialogProps) {
+export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHistoryDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     // Filter states
@@ -51,11 +56,9 @@ export function CuentaHistoryDialog({ cuenta, trigger }: CuentaHistoryDialogProp
     const [categoryFilter, setCategoryFilter] = useState("TODAS");
     const [typeFilter, setTypeFilter] = useState("TODOS");
 
-    // Chart state types
-    const [catType, setCatType] = useState("pie");
 
-    // Base movements for this account
-    const accountMovimientos = initialMovimientos.filter(m => m.cuenta.id === cuenta.id);
+    // Base movements for this account (filter by cuentaId or cuenta.id)
+    const accountMovimientos = movimientos.filter(m => m.cuentaId === cuenta.id || (m.cuenta && m.cuenta.id === cuenta.id));
 
     // Get unique categories for filter
     const categories = Array.from(new Set(accountMovimientos.map(m => m.categoria))).sort();
@@ -63,9 +66,11 @@ export function CuentaHistoryDialog({ cuenta, trigger }: CuentaHistoryDialogProp
     // Apply filters
     const filteredMovimientos = accountMovimientos.filter(m => {
         // Search filter
+        const concepto = m.concepto || m.descripcion || "";
+        const tercero = m.tercero || "";
         const matchesSearch =
-            m.concepto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            m.tercero.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            concepto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            tercero.toLowerCase().includes(searchTerm.toLowerCase()) ||
             m.valor.toString().includes(searchTerm);
 
         // Date filter
@@ -97,7 +102,7 @@ export function CuentaHistoryDialog({ cuenta, trigger }: CuentaHistoryDialogProp
         const trendMap: Record<string, { name: string, ingresos: number, egresos: number }> = {};
 
         filteredMovimientos.forEach(m => {
-            const dateStr = format(m.fecha, "dd MMM", { locale: es });
+            const dateStr = format(new Date(m.fecha), "dd MMM", { locale: es });
             if (!trendMap[dateStr]) trendMap[dateStr] = { name: dateStr, ingresos: 0, egresos: 0 };
 
             if (m.tipo === 'INGRESO') trendMap[dateStr].ingresos += m.valor;
@@ -142,8 +147,8 @@ export function CuentaHistoryDialog({ cuenta, trigger }: CuentaHistoryDialogProp
             .filter(m => m.tipo === 'EGRESO')
             .sort((a, b) => b.valor - a.valor) // Highest to lowest
             .map(m => ({
-                fecha: format(m.fecha, "dd MMM yyyy", { locale: es }),
-                concepto: m.concepto,
+                fecha: format(new Date(m.fecha), "dd MMM yyyy", { locale: es }),
+                concepto: m.concepto || m.descripcion || "Sin concepto",
                 categoria: m.categoria,
                 valor: formatCurrency(m.valor)
             }));
@@ -261,13 +266,13 @@ export function CuentaHistoryDialog({ cuenta, trigger }: CuentaHistoryDialogProp
                                         filteredMovimientos.map((mov) => (
                                             <TableRow key={mov.id}>
                                                 <TableCell className="font-mono text-xs">
-                                                    {format(mov.fecha, "dd MMM yyyy", { locale: es })}
+                                                    {format(new Date(mov.fecha), "dd MMM yyyy", { locale: es })}
                                                     <br />
-                                                    <span className="text-muted-foreground">{format(mov.fecha, "HH:mm:ss")}</span>
+                                                    <span className="text-muted-foreground">{format(new Date(mov.fecha), "HH:mm:ss")}</span>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="font-medium">{mov.concepto}</div>
-                                                    <div className="text-xs text-muted-foreground">{mov.tercero}</div>
+                                                    <div className="font-medium">{mov.concepto || mov.descripcion || "Sin concepto"}</div>
+                                                    <div className="text-xs text-muted-foreground">{mov.tercero || "—"}</div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant="outline" className="text-xs">{mov.categoria}</Badge>
@@ -294,43 +299,159 @@ export function CuentaHistoryDialog({ cuenta, trigger }: CuentaHistoryDialogProp
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="analisis" className="flex-1 overflow-auto space-y-4 data-[state=inactive]:hidden pb-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[350px]">
-                            <DashboardPanel title="Gastos por Categoría" sub="Distribución Visual" typeState={[catType, setCatType]}>
-                                <DynamicChart type={catType} data={analyticsData.categoryData} dataKey="value" xAxisKey="name" color="#EF4444" height={270} />
-                            </DashboardPanel>
-                            <Card className="flex flex-col">
-                                <CardHeader className="py-4">
-                                    <CardTitle className="text-base">Comparativa por Categoría (Ingresos vs Egresos)</CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex-1 overflow-auto p-0">
-                                    <div className="h-[270px]">
-                                        <DynamicChart type="table" data={analyticsData.categoryTable} dataKey="total" height={270} />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                    <TabsContent value="analisis" className="flex-1 overflow-auto space-y-6 data-[state=inactive]:hidden pb-4">
+                        {filteredMovimientos.length === 0 ? (
+                            <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                                No hay movimientos para generar análisis con los filtros seleccionados.
+                            </div>
+                        ) : (
+                            <>
+                                {/* Row 1: Pie Chart + Category Table */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Pie Chart - Gastos por Categoría */}
+                                    <Card>
+                                        <CardHeader className="py-3">
+                                            <CardTitle className="text-base">Gastos por Categoría</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {analyticsData.categoryData.length > 0 ? (
+                                                <div style={{ width: '100%', height: 280 }}>
+                                                    <ResponsiveContainer width="100%" height={280}>
+                                                        <PieChart>
+                                                            <Pie
+                                                                data={analyticsData.categoryData}
+                                                                cx="50%"
+                                                                cy="50%"
+                                                                innerRadius={50}
+                                                                outerRadius={90}
+                                                                paddingAngle={3}
+                                                                dataKey="value"
+                                                                nameKey="name"
+                                                            >
+                                                                {analyticsData.categoryData.map((_, index) => (
+                                                                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                                ))}
+                                                            </Pie>
+                                                            <Tooltip
+                                                                formatter={(value: number) => formatCurrency(value)}
+                                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                                                            />
+                                                            <Legend verticalAlign="bottom" height={36} />
+                                                        </PieChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
+                                                    No hay egresos para mostrar
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
 
-                        <Card className="flex flex-col h-[350px]">
-                            <CardHeader className="py-4">
-                                <CardTitle className="text-base">Top Gastos Individuales (Mayor a Menor)</CardTitle>
-                            </CardHeader>
-                            <CardContent className="flex-1 overflow-auto p-0">
-                                <div className="h-[270px] w-full">
-                                    <DynamicChart type="table" data={analyticsData.expensesTable} dataKey="valor" height={270} />
+                                    {/* Category Comparison Table */}
+                                    <Card>
+                                        <CardHeader className="py-3">
+                                            <CardTitle className="text-base">Comparativa por Categoría</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="p-0">
+                                            <div className="overflow-auto max-h-[300px]">
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow>
+                                                            <TableHead>Categoría</TableHead>
+                                                            <TableHead className="text-right text-green-600">Ingresos</TableHead>
+                                                            <TableHead className="text-right text-red-600">Egresos</TableHead>
+                                                            <TableHead className="text-right">Neto</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {analyticsData.categoryTable.map((row, i) => (
+                                                            <TableRow key={i}>
+                                                                <TableCell>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                                                                        <span className="capitalize text-sm">{row.categoria.toLowerCase()}</span>
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell className="text-right text-green-600 font-medium">{row.ingresos}</TableCell>
+                                                                <TableCell className="text-right text-red-600 font-medium">{row.egresos}</TableCell>
+                                                                <TableCell className="text-right font-bold">{row.neto}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
                                 </div>
-                            </CardContent>
-                        </Card>
 
-                        <Card>
-                            <CardHeader className="py-4">
-                                <CardTitle className="text-base">Evolución de Ingresos vs Egresos</CardTitle>
-                            </CardHeader>
-                            <CardContent className="h-[250px]">
-                                <DynamicChart type="bar" data={analyticsData.trendData} dataKey="egresos" xAxisKey="name" color="#EF4444" height={250} />
-                                <p className="text-xs text-center text-muted-foreground mt-2">Tendencia de gastos en el tiempo</p>
-                            </CardContent>
-                        </Card>
+                                {/* Row 2: Trend Bar Chart - Ingresos vs Egresos */}
+                                <Card>
+                                    <CardHeader className="py-3">
+                                        <CardTitle className="text-base">Evolución de Ingresos vs Egresos</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div style={{ width: '100%', height: 280 }}>
+                                            <ResponsiveContainer width="100%" height={280}>
+                                                <BarChart data={analyticsData.trendData}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                    <XAxis dataKey="name" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
+                                                    <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`} />
+                                                    <Tooltip
+                                                        formatter={(value: number) => formatCurrency(value)}
+                                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                                                    />
+                                                    <Legend />
+                                                    <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                                    <Bar dataKey="egresos" name="Egresos" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Row 3: Top Expenses Table */}
+                                <Card>
+                                    <CardHeader className="py-3">
+                                        <CardTitle className="text-base">Top Gastos Individuales (Mayor a Menor)</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="overflow-auto max-h-[300px]">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Fecha</TableHead>
+                                                        <TableHead>Concepto</TableHead>
+                                                        <TableHead>Categoría</TableHead>
+                                                        <TableHead className="text-right">Valor</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {analyticsData.expensesTable.length > 0 ? (
+                                                        analyticsData.expensesTable.map((row, i) => (
+                                                            <TableRow key={i}>
+                                                                <TableCell className="text-sm">{row.fecha}</TableCell>
+                                                                <TableCell className="text-sm font-medium">{row.concepto}</TableCell>
+                                                                <TableCell>
+                                                                    <Badge variant="outline" className="text-xs">{row.categoria}</Badge>
+                                                                </TableCell>
+                                                                <TableCell className="text-right text-red-600 font-medium">{row.valor}</TableCell>
+                                                            </TableRow>
+                                                        ))
+                                                    ) : (
+                                                        <TableRow>
+                                                            <TableCell colSpan={4} className="h-16 text-center text-muted-foreground">
+                                                                No hay egresos registrados
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </>
+                        )}
                     </TabsContent>
                 </Tabs>
             </DialogContent>
