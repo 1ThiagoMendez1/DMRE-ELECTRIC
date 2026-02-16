@@ -38,7 +38,7 @@ export const PDF_STYLES: PDFStyleConfig[] = [
             // Navy Blue & Gold/Orange
             primary: [10, 50, 90],
             secondary: [255, 140, 0],
-            text: [30, 30, 30],
+            text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [245, 245, 245]
         },
@@ -59,7 +59,7 @@ export const PDF_STYLES: PDFStyleConfig[] = [
             // Bright Blue & White
             primary: [0, 80, 200],
             secondary: [255, 255, 255],
-            text: [40, 40, 40],
+            text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [240, 248, 255]
         },
@@ -80,7 +80,7 @@ export const PDF_STYLES: PDFStyleConfig[] = [
             // Slate & Red/Burgundy
             primary: [40, 40, 40],
             secondary: [180, 50, 50],
-            text: [20, 20, 20],
+            text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [250, 250, 250]
         },
@@ -122,7 +122,7 @@ export const PDF_STYLES: PDFStyleConfig[] = [
             // Purple & Teal (or user brand)
             primary: [80, 40, 120],
             secondary: [0, 0, 0],
-            text: [50, 50, 50],
+            text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [245, 240, 255]
         },
@@ -163,7 +163,7 @@ export const PDF_STYLES: PDFStyleConfig[] = [
             // Blue-Grey
             primary: [55, 71, 79],
             secondary: [0, 120, 215],
-            text: [60, 60, 60],
+            text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [236, 239, 241] // Blue Grey Light
         },
@@ -184,7 +184,7 @@ export const PDF_STYLES: PDFStyleConfig[] = [
             // Forest Green
             primary: [20, 80, 40],
             secondary: [200, 160, 50], // Gold
-            text: [20, 20, 20],
+            text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [250, 250, 240]
         },

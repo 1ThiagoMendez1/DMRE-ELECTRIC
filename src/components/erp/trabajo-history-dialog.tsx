@@ -290,7 +290,7 @@ export function TrabajoHistoryDialog({
     const [materialVisibilityMode, setMaterialVisibilityMode] = useState<MaterialVisibilityMode>('MOSTRAR_TODO');
 
     // PDF Style State
-    const [selectedStyleId, setSelectedStyleId] = useState<string>('corporate_blue');
+    const [selectedStyleId, setSelectedStyleId] = useState<string>('corporate_classic');
     const [customColors, setCustomColors] = useState<{ primary: string, secondary: string } | null>(null);
 
     // Current Style Config (Memoized)
@@ -311,10 +311,10 @@ export function TrabajoHistoryDialog({
 
     // Company info state (editable for PDF generation)
     const [companyInfo, setCompanyInfo] = useState({
-        nombre: "D.M.R.E. S.A.S.",
-        nit: "900.123.456-7",
-        direccion: "Calle 123 #45-67, Bogotá D.C.",
-        telefono: "(601) 123 4567",
+        nombre: "DMRE",
+        nit: "1075652553-9",
+        direccion: "CARRERA 4 N° 5 -122 INT 2 BARANDILLAS, Zipaquirá, Cundinamarca",
+        telefono: "CEL: 3115368577 - 3124074257 | TEL: 8816064",
         email: "info@dmre.com.co",
         descripcion: "Diseño y Montajes de Redes Eléctricas"
     });
@@ -1017,7 +1017,7 @@ export function TrabajoHistoryDialog({
                                             <Input
                                                 value={direccionProyecto}
                                                 onChange={(e) => setDireccionProyecto(e.target.value)}
-                                                placeholder="Calle 123 #45-67..."
+                                                placeholder="Carrera 4 # 5-122..."
                                                 className="h-8 text-sm"
                                             />
                                         </div>
@@ -1857,12 +1857,24 @@ export function TrabajoHistoryDialog({
                                             <div className="h-32 w-full absolute top-0 left-0" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
                                         )}
                                         {currentStyle.layout === 'sidebar' && (
-                                            <div className="absolute top-0 left-0 bottom-0 w-20 h-full" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
+                                            <div className="absolute top-0 left-0 bottom-0 w-1/4 h-full p-4 flex flex-col items-center gap-4 border-r overflow-hidden" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary), color: '#fff' }}>
+                                                <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain bg-white rounded-md p-1 mt-4" />
+                                                <div className="text-center space-y-1">
+                                                    <h3 className="font-bold text-lg">{companyInfo.nombre}</h3>
+                                                    <p className="text-[10px] opacity-80">{companyInfo.descripcion}</p>
+                                                    <div className="text-[9px] mt-4 pt-4 border-t border-white/20 space-y-1 text-white/90">
+                                                        <p>NIT: {companyInfo.nit}</p>
+                                                        <p className="px-2">{companyInfo.direccion}</p>
+                                                        <p>{companyInfo.telefono}</p>
+                                                        <p className="truncate">{companyInfo.email}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         )}
 
-                                        <div className={`p-8 relative z-10 ${currentStyle.layout === 'sidebar' ? 'pl-28' : ''}`}>
+                                        <div className={`p-8 relative z-10 ${currentStyle.layout === 'sidebar' ? 'ml-[25%] pl-8' : ''}`}>
                                             {/* HEADER CONTENT */}
-                                            <div className={`flex justify-between items-start mb-8 ${currentStyle.layout === 'centered' ? 'flex-col items-center text-center' : ''} ${currentStyle.layout === 'bold' ? 'text-white' : ''}`}>
+                                            <div className={`flex justify-between items-start mb-8 ${currentStyle.layout === 'centered' ? 'flex-col items-center text-center' : ''} ${currentStyle.layout === 'bold' ? 'text-white' : ''} ${currentStyle.layout === 'sidebar' ? 'hidden' : ''}`}>
                                                 <div className={`flex items-start gap-4 ${currentStyle.layout === 'centered' ? 'flex-col items-center' : ''}`}>
                                                     <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain bg-white rounded-md p-1" />
                                                     <div>
@@ -1886,19 +1898,22 @@ export function TrabajoHistoryDialog({
                                                 <div className={`mt-4 ${currentStyle.layout === 'centered' ? 'mt-8 text-center' : 'text-right'}`}>
                                                     <div className={`p-4 rounded-lg ${currentStyle.components.clientBoxStyle === 'box' && currentStyle.layout !== 'bold' ? 'bg-gray-50' : ''}`}>
                                                         <h2 className="text-xl font-bold" style={{ color: currentStyle.layout === 'bold' ? '#fff' : rgbToHex(currentStyle.colors.secondary) }}>COTIZACIÓN</h2>
-                                                        <p className="text-lg font-mono text-red-600">{trabajo.numero}</p>
+                                                        <p className="text-lg font-mono" style={{ color: currentStyle.layout === 'bold' ? '#fff' : rgbToHex(currentStyle.colors.secondary) }}>{trabajo.numero}</p>
                                                         <p className={`text-sm ${currentStyle.layout === 'bold' ? 'text-gray-200' : 'text-gray-500'}`}>{format(trabajo.fecha, "dd MMMM yyyy", { locale: es })}</p>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* CLIENT */}
-                                            <div className={`mb-8 p-4 rounded ${currentStyle.components.clientBoxStyle === 'filled' ? 'text-white' : 'bg-gray-50'} ${currentStyle.components.clientBoxStyle === 'line' ? 'border-t-2 border-gray-200 bg-transparent px-0' : ''}`}
-                                                style={{ backgroundColor: currentStyle.components.clientBoxStyle === 'filled' ? rgbToHex(currentStyle.colors.accent) : (currentStyle.components.clientBoxStyle === 'box' ? '#f9fafb' : 'transparent') }}
+                                            <div className={`mb-8 p-4 rounded ${currentStyle.components.clientBoxStyle === 'filled' ? '' : 'bg-gray-50'} ${currentStyle.components.clientBoxStyle === 'line' ? 'border-t-2 border-gray-200 bg-transparent px-0' : ''}`}
+                                                style={{
+                                                    backgroundColor: currentStyle.components.clientBoxStyle === 'filled' ? rgbToHex(currentStyle.colors.accent) : (currentStyle.components.clientBoxStyle === 'box' ? '#f9fafb' : 'transparent'),
+                                                    color: '#000' // Force black text for client box
+                                                }}
                                             >
-                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: currentStyle.components.clientBoxStyle === 'filled' ? rgbToHex(currentStyle.colors.primary) : rgbToHex(currentStyle.colors.secondary) }}>Cliente:</h3>
+                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: rgbToHex(currentStyle.colors.primary) }}>CLIENTE:</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                                                    <p className="font-bold col-span-2 text-base">{trabajo.cliente.nombre}</p>
+                                                    <p className="font-bold col-span-2 text-base text-black">{trabajo.cliente.nombre}</p>
                                                     <p><span className="opacity-70">NIT/CC:</span> {trabajo.cliente.documento}</p>
                                                     <p><span className="opacity-70">Contacto:</span> {trabajo.cliente.contactoPrincipal}</p>
                                                     <p className="col-span-2"><span className="opacity-70">Dirección:</span> {trabajo.cliente.direccion}</p>
@@ -1907,8 +1922,8 @@ export function TrabajoHistoryDialog({
 
                                             {/* BODY */}
                                             <div className="mb-8">
-                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>Objeto:</h3>
-                                                <p className="text-sm bg-white p-2 rounded border border-transparent">{trabajo.descripcionTrabajo}</p>
+                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: rgbToHex(currentStyle.colors.primary) }}>DESCRIPCIÓN TRABAJO:</h3>
+                                                <p className="text-sm bg-white p-2 rounded border border-transparent text-black">{trabajo.descripcionTrabajo}</p>
                                             </div>
 
                                             {/* TABLE */}
@@ -1934,7 +1949,7 @@ export function TrabajoHistoryDialog({
 
                                                             return (
                                                                 <React.Fragment key={item.id}>
-                                                                    <tr className={`border-b ${currentStyle.components.tableTheme === 'striped' && idx % 2 === 0 ? 'bg-gray-50' : ''}`}>
+                                                                    <tr className={`border-b text-black ${currentStyle.components.tableTheme === 'striped' && idx % 2 === 0 ? 'bg-gray-50' : ''}`}>
                                                                         <td className="p-2 font-mono text-xs">{idx + 1}</td>
                                                                         <td className="p-2">{item.descripcion}</td>
                                                                         <td className="p-2 text-center">{showValues ? item.cantidad : '-'}</td>
@@ -1944,7 +1959,7 @@ export function TrabajoHistoryDialog({
                                                                     </tr>
                                                                     {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO' &&
                                                                         item.subItems.map((sub, sIdx) => (
-                                                                            <tr key={`${item.id}-sub-${sIdx}`} className="bg-gray-50/30 text-[10px] text-gray-400 italic">
+                                                                            <tr key={`${item.id}-sub-${sIdx}`} className="bg-gray-50/30 text-[10px] text-gray-600 italic">
                                                                                 <td className="p-1"></td>
                                                                                 <td className="p-1 pl-6">↳ {sub.nombre}</td>
                                                                                 <td className="p-1 text-center">{(sub.cantidad || 0) * item.cantidad}</td>
@@ -1970,8 +1985,8 @@ export function TrabajoHistoryDialog({
                                                         const totalVisible = subVisible + ivaVisible; // Simplification for preview
                                                         return (
                                                             <>
-                                                                <div className="flex justify-between text-sm"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(subVisible)}</span></div>
-                                                                <div className="flex justify-between text-sm"><span>IVA:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
+                                                                <div className="flex justify-between text-sm text-black"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(subVisible)}</span></div>
+                                                                <div className="flex justify-between text-sm text-black"><span>IVA:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
                                                                 <div className="border-t pt-2 flex justify-between text-lg font-bold" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>
                                                                     <span>TOTAL:</span>
                                                                     <span className="font-mono">{formatCurrency(totalVisible)}</span>

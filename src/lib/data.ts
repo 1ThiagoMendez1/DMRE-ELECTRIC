@@ -146,7 +146,7 @@ export const mockQuotes = [
 ];
 
 export const mockClients = [
-    { id: 'C001', name: 'Constructora Alfa', document: '900.123.456-7', address: 'Cra 7 # 71-21, Bogotá', email: 'proyectos@alfa.com', phone: '3101234567' },
+    { id: 'C001', name: 'Constructora Alfa', document: '900.888.777-6', address: 'Cra 7 # 71-21, Bogotá', email: 'proyectos@alfa.com', phone: '3101234567' },
     { id: 'C002', name: 'Inversiones Omega', document: '900.789.012-3', address: 'Cl 100 # 19-54, Bogotá', email: 'gerencia@omega.com', phone: '3209876543' },
     { id: 'C003', name: 'Centro Comercial El Sol', document: '800.456.789-1', address: 'Av. El Dorado # 85-53, Bogotá', email: 'admin@elsol.com', phone: '3157654321' },
 ];

@@ -780,8 +780,8 @@ export const initialTrabajos: Cotizacion[] = [
         clienteId: "CLI-001",
         cliente: {
             id: "CLI-001",
-            nombre: "Empresa Demo S.A.S",
-            documento: "900.123.456-7",
+            nombre: "Empresa Demo",
+            documento: "1075652553-9",
             direccion: "Calle 123 # 45-67",
             telefono: "300 123 4567",
             correo: "contacto@demo.com",

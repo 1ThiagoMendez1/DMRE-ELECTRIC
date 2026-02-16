@@ -28,6 +28,10 @@ export const generateQuotePDF = (
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
 
+    // Force white background for the entire page to avoid transparency or dark mode issues
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
     // Default formatting
     const currencyFmt = new Intl.NumberFormat('es-CO', {
         style: 'currency',
@@ -43,10 +47,10 @@ export const generateQuotePDF = (
 
     // Default company info
     const company = companyInfo || {
-        nombre: "D.M.R.E. S.A.S.",
-        nit: "900.123.456-7",
-        direccion: "Calle 123 #45-67, Bogotá D.C.",
-        telefono: "(601) 123 4567",
+        nombre: "DMRE",
+        nit: "1075652553-9",
+        direccion: "CARRERA 4 N° 5 -122 INT 2 BARANDILLAS, Zipaquirá, Cundinamarca",
+        telefono: "CEL: 3115368577 - 3124074257 | TEL: 8816064",
         email: "info@dmre.com.co",
         descripcion: "Diseño y Montajes de Redes Eléctricas"
     };
@@ -182,7 +186,7 @@ export const generateQuotePDF = (
 
         // Contact Block
         doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
+        doc.setTextColor(...text); // Use black text
         doc.text(`NIT: ${company.nit}`, 45, 34);
         doc.text(`${company.direccion}`, 45, 39);
         doc.text(`${company.telefono} | ${company.email}`, 45, 44);
@@ -217,7 +221,7 @@ export const generateQuotePDF = (
         // Boxed Standard
         else {
             doc.setDrawColor(...accent);
-            doc.setFillColor(250, 250, 250);
+            doc.setFillColor(255, 255, 255);
             if (style.components.clientBoxStyle === 'box') {
                 doc.roundedRect(boxX, boxY, 66, 30, 2, 2, 'FD');
             } else {
@@ -230,12 +234,12 @@ export const generateQuotePDF = (
             doc.setTextColor(...primary);
             doc.text("COTIZACIÓN", boxX + 33, boxY + 8, { align: 'center' });
 
-            doc.setTextColor(200, 50, 50); // Red highlight
+            doc.setTextColor(...secondary); // Use selected secondary color instead of hardcoded red
             doc.text(`${cotizacion.numero}`, boxX + 33, boxY + 16, { align: 'center' });
 
             doc.setFontSize(9);
             doc.setFont(style.fonts.body, 'normal');
-            doc.setTextColor(60, 60, 60);
+            doc.setTextColor(...text); // Use black text
             doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd/MM/yyyy")}`, boxX + 33, boxY + 24, { align: 'center' });
         }
     }
@@ -278,7 +282,8 @@ export const generateQuotePDF = (
         doc.setFillColor(...accent);
         doc.rect(contentStartX, clientBoxY, contentWidth, 30, 'F');
 
-        doc.setTextColor(...primary);
+        // Label block with better contrast
+        doc.setTextColor(...secondary);
         doc.setFontSize(10);
         doc.setFont(style.fonts.header, 'bold');
         doc.text("CLIENTE", contentStartX + 5, clientBoxY + 8);
@@ -307,9 +312,9 @@ export const generateQuotePDF = (
         // Label on border mechanism? No, simpler: inside
         doc.setTextColor(...secondary);
         doc.setFontSize(8);
-        doc.text("FACTURAR A:", contentStartX + 4, clientBoxY + 6);
+        doc.text("CLIENTE:", contentStartX + 4, clientBoxY + 6);
 
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(...text);
         doc.setFontSize(11);
         doc.setFont(style.fonts.header, 'bold');
         doc.text(cotizacion.cliente.nombre, contentStartX + 4, clientBoxY + 13);
@@ -333,10 +338,10 @@ export const generateQuotePDF = (
 
         doc.setFontSize(9);
         doc.setTextColor(...secondary);
-        doc.text("PREPARADO PARA:", contentStartX, currentY + 5);
+        doc.text("CLIENTE:", contentStartX, currentY + 5);
 
         doc.setFontSize(11);
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(...text);
         doc.setFont(style.fonts.body, 'bold');
         doc.text(cotizacion.cliente.nombre, contentStartX, currentY + 11);
 
@@ -353,10 +358,10 @@ export const generateQuotePDF = (
     doc.setFontSize(10);
     doc.setFont(style.fonts.header, 'bold');
     doc.setTextColor(...primary);
-    doc.text("PROYECTO:", contentStartX, currentY);
+    doc.text("DESCRIPCIÓN TRABAJO:", contentStartX, currentY);
 
     doc.setFont(style.fonts.body, 'normal');
-    doc.setTextColor(0);
+    doc.setTextColor(...text);
     const splitDesc = doc.splitTextToSize(cotizacion.descripcionTrabajo || "", contentWidth - 25);
     doc.text(splitDesc, contentStartX + 22, currentY);
 
@@ -428,6 +433,10 @@ export const generateQuotePDF = (
         margin: { left: contentStartX, right: pageWidth - (contentStartX + contentWidth) },
         alternateRowStyles: {
             fillColor: style.components.tableTheme === 'striped' ? accent : [255, 255, 255]
+        },
+        // Ensure black text in table even in dark mode (though we forced white bg)
+        bodyStyles: {
+            textColor: [0, 0, 0]
         }
     });
 
@@ -443,15 +452,13 @@ export const generateQuotePDF = (
     doc.setFontSize(10);
 
     // Subtotal
-    doc.setTextColor(80);
+    doc.setTextColor(...text);
     doc.text("Subtotal:", totalsX, finalY + 4);
-    doc.setTextColor(0);
     doc.text(currencyFmt.format(cotizacion.subtotal), contentStartX + contentWidth, finalY + 4, { align: "right" });
 
     // IVA
-    doc.setTextColor(80);
-    doc.text(`IVA (${Math.round((cotizacion.iva / (cotizacion.subtotal || 1)) * 100)}%):`, totalsX, finalY + 9);
-    doc.setTextColor(0);
+    doc.setTextColor(...text);
+    doc.text("IVA:", totalsX, finalY + 9);
     doc.text(currencyFmt.format(cotizacion.iva), contentStartX + contentWidth, finalY + 9, { align: "right" });
 
     // GRAND TOTAL
@@ -467,7 +474,7 @@ export const generateQuotePDF = (
         doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, finalY + 21, { align: "right" });
     } else {
         doc.setTextColor(...primary);
-        doc.text("TOTAL NETO:", totalsX, finalY + 18);
+        doc.text("TOTAL:", totalsX, finalY + 18);
         doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, finalY + 18, { align: "right" });
     }
 
@@ -482,7 +489,7 @@ export const generateQuotePDF = (
     } else {
         // Minimal footer
         doc.setFontSize(8);
-        doc.setTextColor(150);
+        doc.setTextColor(...text);
         doc.text("Gracias por su confianza.", pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 

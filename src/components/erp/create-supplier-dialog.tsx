@@ -107,7 +107,7 @@ export function CreateSupplierDialog({ onSupplierCreated }: CreateSupplierDialog
                                     <FormItem>
                                         <FormLabel>NIT / Documento</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="900.123.456-7" {...field} />
+                                            <Input placeholder="1075652553-9" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
