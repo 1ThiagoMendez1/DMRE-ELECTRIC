@@ -312,10 +312,13 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             .channel('erp_cotizaciones_changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, async (payload) => {
                 console.log('Realtime update: cotizaciones', payload);
-                // Refresh full list to get relations and mapped data
-                // In a more optimized version we would only fetch the updated record
-                const updated = await getCotizacionesAction();
-                setCotizaciones(updated);
+                // Refresh list
+                try {
+                    const updated = await getCotizacionesAction();
+                    setCotizaciones(updated);
+                } catch (e) {
+                    console.error("Realtime refresh failed", e);
+                }
             })
             .subscribe();
 

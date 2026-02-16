@@ -208,7 +208,10 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
     const { data, error } = await supabase
         .from("cotizaciones")
         .insert(dbData)
-        .select()
+        .select(`
+            *,
+            clientes (id, nombre, documento, direccion, correo, telefono, contacto_principal, created_at)
+        `)
         .single();
 
     if (error) {
@@ -249,7 +252,7 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
 
     revalidatePath("/dashboard/sistema/cotizacion");
     revalidatePath("/dashboard/sistema/comercial");
-    return mapToUI(data, cotizacion.items || []);
+    return mapToUI(data, cotizacion.items || [], data.clientes);
 }
 
 export async function updateCotizacionAction(id: string, cotizacion: Partial<Cotizacion>): Promise<Cotizacion> {
@@ -264,7 +267,10 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
         .from("cotizaciones")
         .update(dbData)
         .eq("id", id)
-        .select()
+        .select(`
+            *,
+            clientes (id, nombre, documento, direccion, correo, telefono, contacto_principal, created_at)
+        `)
         .single();
 
     if (error) {
@@ -345,7 +351,7 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
 
     revalidatePath("/dashboard/sistema/cotizacion");
     revalidatePath("/dashboard/sistema/comercial");
-    return mapToUI(data, cotizacion.items || []);
+    return mapToUI(data, cotizacion.items || [], data.clientes);
 }
 
 export async function deleteCotizacionAction(id: string): Promise<boolean> {

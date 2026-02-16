@@ -111,6 +111,7 @@ interface TrabajoHistoryDialogProps {
     onTrabajoUpdated: (updated: Cotizacion) => void;
     trigger?: React.ReactNode;
     defaultTab?: 'detalles' | 'items' | 'preview' | 'historial';
+    showExecution?: boolean;
 }
 
 // --- FINANCIAL SUB-COMPONENT ---
@@ -226,7 +227,13 @@ const getStatusColor = (estado: EstadoCotizacion): string => {
     }
 };
 
-export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defaultTab = 'detalles' }: TrabajoHistoryDialogProps) {
+export function TrabajoHistoryDialog({
+    trabajo,
+    onTrabajoUpdated,
+    trigger,
+    defaultTab = 'detalles',
+    showExecution = true
+}: TrabajoHistoryDialogProps) {
     const { inventario, codigosTrabajo, deductInventoryItem } = useErp();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState(defaultTab);
@@ -345,13 +352,37 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
     const supabase = createClient();
 
     // Job Execution Details State
+    const [notas, setNotas] = useState(trabajo.notas || "");
     const [direccionProyecto, setDireccionProyecto] = useState(trabajo.direccionProyecto || "");
     const [fechaInicio, setFechaInicio] = useState(trabajo.fechaInicio ? new Date(trabajo.fechaInicio).toISOString().split('T')[0] : "");
     const [fechaFinEstimada, setFechaFinEstimada] = useState(trabajo.fechaFinEstimada ? new Date(trabajo.fechaFinEstimada).toISOString().split('T')[0] : "");
     const [fechaFinReal, setFechaFinReal] = useState(trabajo.fechaFinReal ? new Date(trabajo.fechaFinReal).toISOString().split('T')[0] : "");
     const [costoReal, setCostoReal] = useState(trabajo.costoReal || 0);
     const [responsableId, setResponsableId] = useState(trabajo.responsableId || "");
-    const [notas, setNotas] = useState(trabajo.notas || "");
+
+    // Sync local state with prop changes (Real-time updates)
+    useEffect(() => {
+        if (trabajo) {
+            setNewProgress(trabajo.estado);
+            setProgressPercent(trabajo.progreso || 0);
+            setDireccionProyecto(trabajo.direccionProyecto || "");
+            setFechaInicio(trabajo.fechaInicio ? new Date(trabajo.fechaInicio).toISOString().split('T')[0] : "");
+            setFechaFinEstimada(trabajo.fechaFinEstimada ? new Date(trabajo.fechaFinEstimada).toISOString().split('T')[0] : "");
+            setFechaFinReal(trabajo.fechaFinReal ? new Date(trabajo.fechaFinReal).toISOString().split('T')[0] : "");
+            setCostoReal(trabajo.costoReal || 0);
+            setResponsableId(trabajo.responsableId || "");
+            setNotas(trabajo.notas || "");
+            setLocalEvidence(trabajo.evidencia || []);
+            setItems(trabajo.items.map(item => ({
+                ...item,
+                aiuAdminPorcentaje: item.aiuAdminPorcentaje || trabajo.aiuAdminGlobalPorcentaje || 0,
+                aiuImprevistoPorcentaje: item.aiuImprevistoPorcentaje || trabajo.aiuImprevistoGlobalPorcentaje || 0,
+                aiuUtilidadPorcentaje: item.aiuUtilidadPorcentaje || trabajo.aiuUtilidadGlobalPorcentaje || 0,
+                ivaUtilidadPorcentaje: item.ivaUtilidadPorcentaje || trabajo.ivaUtilidadGlobalPorcentaje || 19,
+                visibleEnPdf: true
+            })));
+        }
+    }, [trabajo.id, trabajo.estado, trabajo.progreso, trabajo.fechaActualizacion]);
 
     const handleAddEvidence = async (type: 'FOTO' | 'VIDEO' | 'NOTA', content?: string, fileUrl?: string) => {
         const newEvidence: EvidenciaTrabajo = {
@@ -669,7 +700,11 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
         setHistorial([entry, ...historial]);
 
         // We use the status from the dropdown/manual selection OR force it if progress is 100
-        const finalEstado = progressPercent === 100 ? 'FINALIZADA' : newProgress;
+        // FIXED: Only override with FINALIZADA if progress is 100, otherwise ALWAYS respect newProgress selected by user
+        let finalEstado = newProgress;
+        if (progressPercent === 100) {
+            finalEstado = 'FINALIZADA';
+        }
 
         const updated: Cotizacion = {
             ...trabajo,
@@ -813,10 +848,10 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'items' | 'preview' | 'historial')} className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className="grid w-full grid-cols-5">
+                    <TabsList className={`grid w-full ${showExecution ? 'grid-cols-5' : 'grid-cols-4'}`}>
                         <TabsTrigger value="detalles">Detalles</TabsTrigger>
                         <TabsTrigger value="items">Items & Edición</TabsTrigger>
-                        <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>
+                        {showExecution && <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>}
                         <TabsTrigger value="preview">Vista PDF</TabsTrigger>
                         <TabsTrigger value="historial">Historial</TabsTrigger>
                     </TabsList>
@@ -966,449 +1001,451 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                     </TabsContent>
 
                     {/* EJECUCIÓN / EVIDENCIA TAB */}
-                    <TabsContent value="ejecucion" className="flex-1 overflow-auto space-y-4 mt-4">
-                        {/* Project Management Fields */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Card>
-                                <CardHeader className="py-2 px-4 border-b">
-                                    <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
-                                        <MapPin className="h-3 w-3" /> Ubicación y Datos
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 space-y-3">
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px]">Dirección del Proyecto</Label>
-                                        <Input
-                                            value={direccionProyecto}
-                                            onChange={(e) => setDireccionProyecto(e.target.value)}
-                                            placeholder="Calle 123 #45-67..."
-                                            className="h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px]">Responsable (ID)</Label>
-                                        <Input
-                                            value={responsableId}
-                                            onChange={(e) => setResponsableId(e.target.value)}
-                                            placeholder="ID del Empleado"
-                                            className="h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px]">Costo Real Ejecución</Label>
-                                        <Input
-                                            type="number"
-                                            value={costoReal}
-                                            onChange={(e) => setCostoReal(Number(e.target.value))}
-                                            className="h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px]">Notas Generales Trabajo</Label>
-                                        <Textarea
-                                            value={notas}
-                                            onChange={(e) => setNotas(e.target.value)}
-                                            placeholder="Notas generales sobre el trabajo..."
-                                            className="min-h-[60px] text-xs"
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="py-2 px-4 border-b">
-                                    <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
-                                        <Clock className="h-3 w-3" /> Cronograma Ejecución
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 space-y-3">
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px]">Fecha Inicio</Label>
-                                        <Input
-                                            type="date"
-                                            value={fechaInicio}
-                                            onChange={(e) => setFechaInicio(e.target.value)}
-                                            className="h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px]">Fin Estimado</Label>
-                                        <Input
-                                            type="date"
-                                            value={fechaFinEstimada}
-                                            onChange={(e) => setFechaFinEstimada(e.target.value)}
-                                            className="h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px]">Fin Real</Label>
-                                        <Input
-                                            type="date"
-                                            value={fechaFinReal}
-                                            onChange={(e) => setFechaFinReal(e.target.value)}
-                                            className="h-8 text-sm cursor-pointer border-green-200 focus:border-green-500 bg-green-50/30"
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="flex flex-col">
-                                <CardHeader className="py-2 px-4 border-b">
-                                    <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
-                                        <TrendingUp className="h-3 w-3" /> Guardar Cambios
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 flex-1 flex flex-col justify-center items-center gap-4">
-                                    <p className="text-xs text-center text-muted-foreground">Recuerda guardar los cambios despues de actualizar los datos de ejecución.</p>
-                                    <Button className="w-full" onClick={handleUpdateProgress}>
-                                        <Save className="mr-2 h-4 w-4" /> Guardar Todo
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Materials Consumption Section */}
-                        <Collapsible defaultOpen className="mt-4">
-                            <Card>
-                                <CollapsibleTrigger className="w-full">
-                                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                                        <CardTitle className="text-base flex items-center gap-2">
-                                            <Package className="h-4 w-4 text-orange-500" /> Materiales y Códigos del Trabajo
-                                            <Badge variant="outline" className="ml-auto">
-                                                {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length} grupos
-                                            </Badge>
+                    {showExecution && (
+                        <TabsContent value="ejecucion" className="flex-1 overflow-auto space-y-4 mt-4">
+                            {/* Project Management Fields */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <Card>
+                                    <CardHeader className="py-2 px-4 border-b">
+                                        <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
+                                            <MapPin className="h-3 w-3" /> Ubicación y Datos
                                         </CardTitle>
-                                        <CardDescription>Marca como utilizado para descontar del inventario (incluye materiales de códigos).</CardDescription>
                                     </CardHeader>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent>
-                                    <CardContent className="p-4 space-y-4">
-                                        {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-4">No hay materiales ni códigos con materiales en este trabajo.</p>
-                                        ) : (
-                                            <div className="space-y-6">
-                                                {/* Independent Materials */}
-                                                {items.filter(i => i.tipo === 'PRODUCTO').length > 0 && (
-                                                    <div className="space-y-2">
-                                                        <h4 className="text-xs font-bold uppercase text-muted-foreground px-2">Materiales Independientes</h4>
-                                                        <Table>
-                                                            <TableHeader>
-                                                                <TableRow>
-                                                                    <TableHead className="w-12">Usado</TableHead>
-                                                                    <TableHead>Material</TableHead>
-                                                                    <TableHead className="text-right">Cant.</TableHead>
-                                                                    <TableHead className="text-right">Existencias</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody>
-                                                                {items.filter(i => i.tipo === 'PRODUCTO').map((pItem: ItemConVisibilidad) => {
-                                                                    const itemKey = `${trabajo.id}-${pItem.inventarioId || pItem.id}`;
-                                                                    const inventoryItem = inventario.find(inv => inv.id === pItem.inventarioId);
-                                                                    const isUsed = materialesUsados.has(itemKey);
+                                    <CardContent className="p-4 space-y-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Dirección del Proyecto</Label>
+                                            <Input
+                                                value={direccionProyecto}
+                                                onChange={(e) => setDireccionProyecto(e.target.value)}
+                                                placeholder="Calle 123 #45-67..."
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Responsable (ID)</Label>
+                                            <Input
+                                                value={responsableId}
+                                                onChange={(e) => setResponsableId(e.target.value)}
+                                                placeholder="ID del Empleado"
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Costo Real Ejecución</Label>
+                                            <Input
+                                                type="number"
+                                                value={costoReal}
+                                                onChange={(e) => setCostoReal(Number(e.target.value))}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Notas Generales Trabajo</Label>
+                                            <Textarea
+                                                value={notas}
+                                                onChange={(e) => setNotas(e.target.value)}
+                                                placeholder="Notas generales sobre el trabajo..."
+                                                className="min-h-[60px] text-xs"
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                                                                    return (
-                                                                        <TableRow key={pItem.id} className={isUsed ? "bg-green-50 dark:bg-green-950/20" : ""}>
-                                                                            <TableCell>
-                                                                                <Checkbox
-                                                                                    checked={isUsed}
-                                                                                    disabled={!pItem.inventarioId || isUsed}
-                                                                                    onCheckedChange={async (checked: boolean) => {
-                                                                                        if (checked && pItem.inventarioId) {
-                                                                                            const success = await deductInventoryItem(pItem.inventarioId, pItem.cantidad);
-                                                                                            if (success) {
-                                                                                                setMaterialesUsados(prev => new Set(prev).add(itemKey));
-                                                                                                toast({
-                                                                                                    title: "Inventario Actualizado",
-                                                                                                    description: `Se descontaron ${pItem.cantidad} unidades de ${pItem.descripcion}.`
-                                                                                                });
-                                                                                            } else {
-                                                                                                toast({
-                                                                                                    title: "Error",
-                                                                                                    description: "No se pudo actualizar el inventario.",
-                                                                                                    variant: "destructive"
-                                                                                                });
+                                <Card>
+                                    <CardHeader className="py-2 px-4 border-b">
+                                        <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
+                                            <Clock className="h-3 w-3" /> Cronograma Ejecución
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-4 space-y-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Fecha Inicio</Label>
+                                            <Input
+                                                type="date"
+                                                value={fechaInicio}
+                                                onChange={(e) => setFechaInicio(e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Fin Estimado</Label>
+                                            <Input
+                                                type="date"
+                                                value={fechaFinEstimada}
+                                                onChange={(e) => setFechaFinEstimada(e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Fin Real</Label>
+                                            <Input
+                                                type="date"
+                                                value={fechaFinReal}
+                                                onChange={(e) => setFechaFinReal(e.target.value)}
+                                                className="h-8 text-sm cursor-pointer border-green-200 focus:border-green-500 bg-green-50/30"
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="flex flex-col">
+                                    <CardHeader className="py-2 px-4 border-b">
+                                        <CardTitle className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
+                                            <TrendingUp className="h-3 w-3" /> Guardar Cambios
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-4 flex-1 flex flex-col justify-center items-center gap-4">
+                                        <p className="text-xs text-center text-muted-foreground">Recuerda guardar los cambios despues de actualizar los datos de ejecución.</p>
+                                        <Button className="w-full" onClick={handleUpdateProgress}>
+                                            <Save className="mr-2 h-4 w-4" /> Guardar Todo
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Materials Consumption Section */}
+                            <Collapsible defaultOpen className="mt-4">
+                                <Card>
+                                    <CollapsibleTrigger className="w-full">
+                                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                                <Package className="h-4 w-4 text-orange-500" /> Materiales y Códigos del Trabajo
+                                                <Badge variant="outline" className="ml-auto">
+                                                    {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length} grupos
+                                                </Badge>
+                                            </CardTitle>
+                                            <CardDescription>Marca como utilizado para descontar del inventario (incluye materiales de códigos).</CardDescription>
+                                        </CardHeader>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <CardContent className="p-4 space-y-4">
+                                            {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length === 0 ? (
+                                                <p className="text-sm text-muted-foreground text-center py-4">No hay materiales ni códigos con materiales en este trabajo.</p>
+                                            ) : (
+                                                <div className="space-y-6">
+                                                    {/* Independent Materials */}
+                                                    {items.filter(i => i.tipo === 'PRODUCTO').length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <h4 className="text-xs font-bold uppercase text-muted-foreground px-2">Materiales Independientes</h4>
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead className="w-12">Usado</TableHead>
+                                                                        <TableHead>Material</TableHead>
+                                                                        <TableHead className="text-right">Cant.</TableHead>
+                                                                        <TableHead className="text-right">Existencias</TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {items.filter(i => i.tipo === 'PRODUCTO').map((pItem: ItemConVisibilidad) => {
+                                                                        const itemKey = `${trabajo.id}-${pItem.inventarioId || pItem.id}`;
+                                                                        const inventoryItem = inventario.find(inv => inv.id === pItem.inventarioId);
+                                                                        const isUsed = materialesUsados.has(itemKey);
+
+                                                                        return (
+                                                                            <TableRow key={pItem.id} className={isUsed ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                                                                                <TableCell>
+                                                                                    <Checkbox
+                                                                                        checked={isUsed}
+                                                                                        disabled={!pItem.inventarioId || isUsed}
+                                                                                        onCheckedChange={async (checked: boolean) => {
+                                                                                            if (checked && pItem.inventarioId) {
+                                                                                                const success = await deductInventoryItem(pItem.inventarioId, pItem.cantidad);
+                                                                                                if (success) {
+                                                                                                    setMaterialesUsados(prev => new Set(prev).add(itemKey));
+                                                                                                    toast({
+                                                                                                        title: "Inventario Actualizado",
+                                                                                                        description: `Se descontaron ${pItem.cantidad} unidades de ${pItem.descripcion}.`
+                                                                                                    });
+                                                                                                } else {
+                                                                                                    toast({
+                                                                                                        title: "Error",
+                                                                                                        description: "No se pudo actualizar el inventario.",
+                                                                                                        variant: "destructive"
+                                                                                                    });
+                                                                                                }
                                                                                             }
-                                                                                        }
-                                                                                    }}
-                                                                                />
-                                                                            </TableCell>
-                                                                            <TableCell className="font-medium">{pItem.descripcion}</TableCell>
-                                                                            <TableCell className="text-right">{pItem.cantidad}</TableCell>
-                                                                            <TableCell className="text-right text-muted-foreground">
-                                                                                {inventoryItem ? inventoryItem.cantidad : 'N/A'}
-                                                                            </TableCell>
-                                                                        </TableRow>
-                                                                    );
-                                                                })}
-                                                            </TableBody>
-                                                        </Table>
-                                                    </div>
-                                                )}
-
-                                                {/* Work Codes (APUs) */}
-                                                {items.filter(i => i.tipo === 'SERVICIO' && i.subItems && i.subItems.length > 0).map((sItem: ItemConVisibilidad) => {
-                                                    const itemKey = `${trabajo.id}-${sItem.id}`;
-                                                    const isUsed = materialesUsados.has(itemKey);
-
-                                                    return (
-                                                        <div key={sItem.id} className="border rounded-lg overflow-hidden">
-                                                            <div className={`p-3 border-b flex justify-between items-center ${isUsed ? "bg-green-50 dark:bg-green-950/20" : "bg-muted/30"}`}>
-                                                                <div className="flex items-center gap-3">
-                                                                    <Checkbox
-                                                                        checked={isUsed}
-                                                                        disabled={isUsed || isDeducting}
-                                                                        onCheckedChange={async (checked: boolean) => {
-                                                                            if (checked) {
-                                                                                setIsDeducting(true);
-                                                                                try {
-                                                                                    const totalDeducted = await deductRecursive(sItem, sItem.cantidad);
-                                                                                    setMaterialesUsados(prev => new Set(prev).add(itemKey));
-                                                                                    toast({
-                                                                                        title: "Código Aplicado",
-                                                                                        description: `Se descontaron los materiales para ${sItem.cantidad} unidades de "${sItem.descripcion}".`
-                                                                                    });
-                                                                                } catch (err) {
-                                                                                    toast({
-                                                                                        title: "Error",
-                                                                                        description: "No se pudieron descontar todos los materiales del código.",
-                                                                                        variant: "destructive"
-                                                                                    });
-                                                                                } finally {
-                                                                                    setIsDeducting(false);
-                                                                                }
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <div>
-                                                                        <p className="text-sm font-bold">{sItem.descripcion}</p>
-                                                                        <p className="text-[10px] text-muted-foreground">Código de Trabajo • Cantidad: {sItem.cantidad}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <Badge variant={isUsed ? "default" : "outline"} className={isUsed ? "bg-green-600" : ""}>
-                                                                    {isUsed ? "Consumido" : "Pendiente"}
-                                                                </Badge>
-                                                            </div>
-                                                            <Collapsible>
-                                                                <CollapsibleTrigger className="w-full text-left text-[10px] p-2 hover:bg-muted/50 transition-colors flex items-center gap-2">
-                                                                    Ver materiales incluidos ({sItem.subItems?.length})
-                                                                </CollapsibleTrigger>
-                                                                <CollapsibleContent>
-                                                                    <Table>
-                                                                        <TableBody>
-                                                                            {sItem.subItems?.map((sub: MaterialAsociado, sIdx: number) => (
-                                                                                <TableRow key={sIdx} className="bg-muted/5 border-0">
-                                                                                    <TableCell className="pl-10 py-1 text-xs">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className="text-muted-foreground">↳</span>
-                                                                                            {sub.nombre}
-                                                                                        </div>
-                                                                                    </TableCell>
-                                                                                    <TableCell className="text-right py-1 text-xs text-muted-foreground">
-                                                                                        {(sub.cantidad || 0) * sItem.cantidad} unidades
-                                                                                    </TableCell>
-                                                                                </TableRow>
-                                                                            ))}
-                                                                        </TableBody>
-                                                                    </Table>
-                                                                </CollapsibleContent>
-                                                            </Collapsible>
+                                                                                        }}
+                                                                                    />
+                                                                                </TableCell>
+                                                                                <TableCell className="font-medium">{pItem.descripcion}</TableCell>
+                                                                                <TableCell className="text-right">{pItem.cantidad}</TableCell>
+                                                                                <TableCell className="text-right text-muted-foreground">
+                                                                                    {inventoryItem ? inventoryItem.cantidad : 'N/A'}
+                                                                                </TableCell>
+                                                                            </TableRow>
+                                                                        );
+                                                                    })}
+                                                                </TableBody>
+                                                            </Table>
                                                         </div>
-                                                    );
-                                                })}
+                                                    )}
+
+                                                    {/* Work Codes (APUs) */}
+                                                    {items.filter(i => i.tipo === 'SERVICIO' && i.subItems && i.subItems.length > 0).map((sItem: ItemConVisibilidad) => {
+                                                        const itemKey = `${trabajo.id}-${sItem.id}`;
+                                                        const isUsed = materialesUsados.has(itemKey);
+
+                                                        return (
+                                                            <div key={sItem.id} className="border rounded-lg overflow-hidden">
+                                                                <div className={`p-3 border-b flex justify-between items-center ${isUsed ? "bg-green-50 dark:bg-green-950/20" : "bg-muted/30"}`}>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <Checkbox
+                                                                            checked={isUsed}
+                                                                            disabled={isUsed || isDeducting}
+                                                                            onCheckedChange={async (checked: boolean) => {
+                                                                                if (checked) {
+                                                                                    setIsDeducting(true);
+                                                                                    try {
+                                                                                        const totalDeducted = await deductRecursive(sItem, sItem.cantidad);
+                                                                                        setMaterialesUsados(prev => new Set(prev).add(itemKey));
+                                                                                        toast({
+                                                                                            title: "Código Aplicado",
+                                                                                            description: `Se descontaron los materiales para ${sItem.cantidad} unidades de "${sItem.descripcion}".`
+                                                                                        });
+                                                                                    } catch (err) {
+                                                                                        toast({
+                                                                                            title: "Error",
+                                                                                            description: "No se pudieron descontar todos los materiales del código.",
+                                                                                            variant: "destructive"
+                                                                                        });
+                                                                                    } finally {
+                                                                                        setIsDeducting(false);
+                                                                                    }
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                        <div>
+                                                                            <p className="text-sm font-bold">{sItem.descripcion}</p>
+                                                                            <p className="text-[10px] text-muted-foreground">Código de Trabajo • Cantidad: {sItem.cantidad}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Badge variant={isUsed ? "default" : "outline"} className={isUsed ? "bg-green-600" : ""}>
+                                                                        {isUsed ? "Consumido" : "Pendiente"}
+                                                                    </Badge>
+                                                                </div>
+                                                                <Collapsible>
+                                                                    <CollapsibleTrigger className="w-full text-left text-[10px] p-2 hover:bg-muted/50 transition-colors flex items-center gap-2">
+                                                                        Ver materiales incluidos ({sItem.subItems?.length})
+                                                                    </CollapsibleTrigger>
+                                                                    <CollapsibleContent>
+                                                                        <Table>
+                                                                            <TableBody>
+                                                                                {sItem.subItems?.map((sub: MaterialAsociado, sIdx: number) => (
+                                                                                    <TableRow key={sIdx} className="bg-muted/5 border-0">
+                                                                                        <TableCell className="pl-10 py-1 text-xs">
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="text-muted-foreground">↳</span>
+                                                                                                {sub.nombre}
+                                                                                            </div>
+                                                                                        </TableCell>
+                                                                                        <TableCell className="text-right py-1 text-xs text-muted-foreground">
+                                                                                            {(sub.cantidad || 0) * sItem.cantidad} unidades
+                                                                                        </TableCell>
+                                                                                    </TableRow>
+                                                                                ))}
+                                                                            </TableBody>
+                                                                        </Table>
+                                                                    </CollapsibleContent>
+                                                                </Collapsible>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </CollapsibleContent>
+                                </Card>
+                            </Collapsible>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Evidence Upload Form */}
+                                <Card className="h-fit">
+                                    <CardHeader>
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Camera className="h-4 w-4" /> Nueva Evidencia
+                                        </CardTitle>
+                                        <CardDescription>Sube fotos, videos o registra tu ubicación.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <Textarea
+                                            placeholder="Describe la evidencia o actividad..."
+                                            value={evidenceNote}
+                                            onChange={(e) => setEvidenceNote(e.target.value)}
+                                        />
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                className="hidden"
+                                                ref={photoInputRef}
+                                                onChange={(e) => handleFileUpload(e, 'FOTO')}
+                                            />
+                                            <input
+                                                type="file"
+                                                accept="video/*"
+                                                capture="environment"
+                                                className="hidden"
+                                                ref={videoInputRef}
+                                                onChange={(e) => handleFileUpload(e, 'VIDEO')}
+                                            />
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="flex-1"
+                                                onClick={() => photoInputRef.current?.click()}
+                                                disabled={isUploading}
+                                            >
+                                                <Camera className="mr-2 h-4 w-4" />
+                                                {isUploading ? "..." : "Foto"}
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="flex-1"
+                                                onClick={() => videoInputRef.current?.click()}
+                                                disabled={isUploading}
+                                            >
+                                                <Share2 className="mr-2 h-4 w-4" /> Video
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="flex-1"
+                                                onClick={() => handleAddEvidence('NOTA', evidenceNote)}
+                                                disabled={!evidenceNote}
+                                            >
+                                                <FileText className="mr-2 h-4 w-4" /> Nota
+                                            </Button>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            className="w-full"
+                                            variant={isLocating ? "secondary" : "default"}
+                                            onClick={handleAddLocation}
+                                            disabled={isLocating}
+                                        >
+                                            {isLocating ? (
+                                                <>
+                                                    <Navigation className="mr-2 h-4 w-4 animate-spin" /> ...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <MapPin className="mr-2 h-4 w-4" /> Registrar Ubicación GPS
+                                                </>
+                                            )}
+                                        </Button>
+
+                                    </CardContent>
+                                </Card>
+
+                                {/* Recent Location / Map Placeholder */}
+                                <Card className="h-fit">
+                                    <CardHeader>
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <MapPin className="h-4 w-4 text-primary" /> Última Ubicación
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {localEvidence.filter(e => e.tipo === 'UBICACION').length > 0 ? (
+                                            (() => {
+                                                const lastLoc = localEvidence.filter(e => e.tipo === 'UBICACION').sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+                                                return (
+                                                    <div className="space-y-2">
+                                                        <div className="h-[150px] bg-muted rounded-md flex items-center justify-center relative overflow-hidden group">
+                                                            {/* Simulated Map View */}
+                                                            <div className="absolute inset-0 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                                                                <MapPin className="h-8 w-8 text-primary drop-shadow-md" />
+                                                                <span className="sr-only">Mapa simulado</span>
+                                                            </div>
+                                                            <a
+                                                                href={`https://www.google.com/maps/search/?api=1&query=${lastLoc.ubicacion?.lat},${lastLoc.ubicacion?.lng}`}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="absolute bottom-2 right-2 bg-white/90 dark:bg-black/90 text-xs px-2 py-1 rounded shadow-sm hover:bg-primary hover:text-white transition-colors"
+                                                            >
+                                                                Ver en Google Maps
+                                                            </a>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                                            <span>{format(lastLoc.fecha, "dd MMM HH:mm", { locale: es })}</span>
+                                                            <span>Lat: {lastLoc.ubicacion?.lat.toFixed(4)}, Lng: {lastLoc.ubicacion?.lng.toFixed(4)}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()
+                                        ) : (
+                                            <div className="h-[150px] border border-dashed rounded-md flex flex-col items-center justify-center text-muted-foreground">
+                                                <Navigation className="h-8 w-8 mb-2 opacity-50" />
+                                                <span className="text-xs">Sin ubicación registrada</span>
                                             </div>
                                         )}
                                     </CardContent>
-                                </CollapsibleContent>
-                            </Card>
-                        </Collapsible>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Evidence Upload Form */}
-                            <Card className="h-fit">
-                                <CardHeader>
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <Camera className="h-4 w-4" /> Nueva Evidencia
-                                    </CardTitle>
-                                    <CardDescription>Sube fotos, videos o registra tu ubicación.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <Textarea
-                                        placeholder="Describe la evidencia o actividad..."
-                                        value={evidenceNote}
-                                        onChange={(e) => setEvidenceNote(e.target.value)}
-                                    />
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            capture="environment"
-                                            className="hidden"
-                                            ref={photoInputRef}
-                                            onChange={(e) => handleFileUpload(e, 'FOTO')}
-                                        />
-                                        <input
-                                            type="file"
-                                            accept="video/*"
-                                            capture="environment"
-                                            className="hidden"
-                                            ref={videoInputRef}
-                                            onChange={(e) => handleFileUpload(e, 'VIDEO')}
-                                        />
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="flex-1"
-                                            onClick={() => photoInputRef.current?.click()}
-                                            disabled={isUploading}
-                                        >
-                                            <Camera className="mr-2 h-4 w-4" />
-                                            {isUploading ? "..." : "Foto"}
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="flex-1"
-                                            onClick={() => videoInputRef.current?.click()}
-                                            disabled={isUploading}
-                                        >
-                                            <Share2 className="mr-2 h-4 w-4" /> Video
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="flex-1"
-                                            onClick={() => handleAddEvidence('NOTA', evidenceNote)}
-                                            disabled={!evidenceNote}
-                                        >
-                                            <FileText className="mr-2 h-4 w-4" /> Nota
-                                        </Button>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        className="w-full"
-                                        variant={isLocating ? "secondary" : "default"}
-                                        onClick={handleAddLocation}
-                                        disabled={isLocating}
-                                    >
-                                        {isLocating ? (
-                                            <>
-                                                <Navigation className="mr-2 h-4 w-4 animate-spin" /> ...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <MapPin className="mr-2 h-4 w-4" /> Registrar Ubicación GPS
-                                            </>
-                                        )}
-                                    </Button>
-
-                                </CardContent>
-                            </Card>
-
-                            {/* Recent Location / Map Placeholder */}
-                            <Card className="h-fit">
-                                <CardHeader>
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <MapPin className="h-4 w-4 text-primary" /> Última Ubicación
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {localEvidence.filter(e => e.tipo === 'UBICACION').length > 0 ? (
-                                        (() => {
-                                            const lastLoc = localEvidence.filter(e => e.tipo === 'UBICACION').sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
-                                            return (
-                                                <div className="space-y-2">
-                                                    <div className="h-[150px] bg-muted rounded-md flex items-center justify-center relative overflow-hidden group">
-                                                        {/* Simulated Map View */}
-                                                        <div className="absolute inset-0 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-                                                            <MapPin className="h-8 w-8 text-primary drop-shadow-md" />
-                                                            <span className="sr-only">Mapa simulado</span>
-                                                        </div>
-                                                        <a
-                                                            href={`https://www.google.com/maps/search/?api=1&query=${lastLoc.ubicacion?.lat},${lastLoc.ubicacion?.lng}`}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="absolute bottom-2 right-2 bg-white/90 dark:bg-black/90 text-xs px-2 py-1 rounded shadow-sm hover:bg-primary hover:text-white transition-colors"
-                                                        >
-                                                            Ver en Google Maps
-                                                        </a>
-                                                    </div>
-                                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                                        <span>{format(lastLoc.fecha, "dd MMM HH:mm", { locale: es })}</span>
-                                                        <span>Lat: {lastLoc.ubicacion?.lat.toFixed(4)}, Lng: {lastLoc.ubicacion?.lng.toFixed(4)}</span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()
-                                    ) : (
-                                        <div className="h-[150px] border border-dashed rounded-md flex flex-col items-center justify-center text-muted-foreground">
-                                            <Navigation className="h-8 w-8 mb-2 opacity-50" />
-                                            <span className="text-xs">Sin ubicación registrada</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Evidence History Timeline */}
-                        <div className="mt-4">
-                            <h3 className="font-semibold mb-2 flex items-center gap-2">
-                                <Clock className="h-4 w-4" /> Historial de Ejecución ({localEvidence.length})
-                            </h3>
-                            <div className="space-y-4 pl-2">
-                                {localEvidence.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((ev) => (
-                                    <div key={ev.id} className="flex gap-4 border-l-2 border-muted pl-4 relative pb-4 last:pb-0">
-                                        <div className="absolute -left-[9px] top-0 bg-background border rounded-full p-1">
-                                            {ev.tipo === 'FOTO' && <Camera className="h-3 w-3 text-blue-500" />}
-                                            {ev.tipo === 'VIDEO' && <Video className="h-3 w-3 text-purple-500" />}
-                                            {ev.tipo === 'NOTA' && <FileText className="h-3 w-3 text-amber-500" />}
-                                            {ev.tipo === 'UBICACION' && <MapPin className="h-3 w-3 text-red-500" />}
-                                        </div>
-                                        <div className="flex-1 bg-muted/30 p-3 rounded-md">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <div>
-                                                    <span className="font-medium text-sm">{ev.usuarioNombre}</span>
-                                                    <Badge variant="outline" className="ml-2 text-[10px]">{ev.tipo}</Badge>
-                                                </div>
-                                                <span className="text-xs text-muted-foreground">{format(ev.fecha, "dd MMM yyyy HH:mm", { locale: es })}</span>
-                                            </div>
-
-                                            {ev.descripcion && (
-                                                <p className="text-sm mb-2">{ev.descripcion}</p>
-                                            )}
-
-                                            {ev.url && ev.tipo === 'FOTO' && (
-                                                <div className="relative h-40 w-full max-w-sm rounded-md overflow-hidden bg-black/5 mt-2">
-                                                    {/* Simulated Image */}
-                                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-muted">
-                                                        <Image className="h-8 w-8 opacity-20" />
-                                                    </div>
-                                                    <img src={ev.url} alt="Evidencia" className="object-cover w-full h-full relative z-10" />
-                                                </div>
-                                            )}
-                                            {ev.url && ev.tipo === 'VIDEO' && (
-                                                <div className="relative mt-2 rounded-md overflow-hidden bg-black max-w-sm aspect-video">
-                                                    <video
-                                                        src={ev.url}
-                                                        controls
-                                                        playsInline
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {ev.tipo === 'UBICACION' && ev.ubicacion && (
-                                                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mt-1 bg-background/50 p-1 rounded w-fit">
-                                                    <MapPin className="h-3 w-3" />
-                                                    {ev.ubicacion.lat.toFixed(6)}, {ev.ubicacion.lng.toFixed(6)}
-                                                    <span className="text-[10px] opacity-70">(±{ev.ubicacion.precision?.toFixed(0)}m)</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                                </Card>
                             </div>
-                        </div>
-                    </TabsContent>
+
+                            {/* Evidence History Timeline */}
+                            <div className="mt-4">
+                                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                                    <Clock className="h-4 w-4" /> Historial de Ejecución ({localEvidence.length})
+                                </h3>
+                                <div className="space-y-4 pl-2">
+                                    {localEvidence.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((ev) => (
+                                        <div key={ev.id} className="flex gap-4 border-l-2 border-muted pl-4 relative pb-4 last:pb-0">
+                                            <div className="absolute -left-[9px] top-0 bg-background border rounded-full p-1">
+                                                {ev.tipo === 'FOTO' && <Camera className="h-3 w-3 text-blue-500" />}
+                                                {ev.tipo === 'VIDEO' && <Video className="h-3 w-3 text-purple-500" />}
+                                                {ev.tipo === 'NOTA' && <FileText className="h-3 w-3 text-amber-500" />}
+                                                {ev.tipo === 'UBICACION' && <MapPin className="h-3 w-3 text-red-500" />}
+                                            </div>
+                                            <div className="flex-1 bg-muted/30 p-3 rounded-md">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <div>
+                                                        <span className="font-medium text-sm">{ev.usuarioNombre}</span>
+                                                        <Badge variant="outline" className="ml-2 text-[10px]">{ev.tipo}</Badge>
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground">{format(ev.fecha, "dd MMM yyyy HH:mm", { locale: es })}</span>
+                                                </div>
+
+                                                {ev.descripcion && (
+                                                    <p className="text-sm mb-2">{ev.descripcion}</p>
+                                                )}
+
+                                                {ev.url && ev.tipo === 'FOTO' && (
+                                                    <div className="relative h-40 w-full max-w-sm rounded-md overflow-hidden bg-black/5 mt-2">
+                                                        {/* Simulated Image */}
+                                                        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-muted">
+                                                            <Image className="h-8 w-8 opacity-20" />
+                                                        </div>
+                                                        <img src={ev.url} alt="Evidencia" className="object-cover w-full h-full relative z-10" />
+                                                    </div>
+                                                )}
+                                                {ev.url && ev.tipo === 'VIDEO' && (
+                                                    <div className="relative mt-2 rounded-md overflow-hidden bg-black max-w-sm aspect-video">
+                                                        <video
+                                                            src={ev.url}
+                                                            controls
+                                                            playsInline
+                                                            className="w-full h-full object-contain"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {ev.tipo === 'UBICACION' && ev.ubicacion && (
+                                                    <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mt-1 bg-background/50 p-1 rounded w-fit">
+                                                        <MapPin className="h-3 w-3" />
+                                                        {ev.ubicacion.lat.toFixed(6)}, {ev.ubicacion.lng.toFixed(6)}
+                                                        <span className="text-[10px] opacity-70">(±{ev.ubicacion.precision?.toFixed(0)}m)</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </TabsContent>
+                    )}
 
                     {/* ITEMS TAB */}
                     <TabsContent value="items" className="flex-1 overflow-auto space-y-4 mt-4">
@@ -1991,7 +2028,7 @@ export function TrabajoHistoryDialog({ trabajo, onTrabajoUpdated, trigger, defau
                         </ScrollArea>
                     </TabsContent>
                 </Tabs>
-            </DialogContent>
+            </DialogContent >
         </Dialog >
     );
 }

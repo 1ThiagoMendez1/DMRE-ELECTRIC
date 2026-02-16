@@ -231,8 +231,16 @@ export default function CommercialPage() {
 
     const filteredQuotes = useMemo(() => {
         return cotizaciones.filter(q =>
-            q.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            q.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+            q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [searchTerm, cotizaciones]);
+
+    const filteredProjects = useMemo(() => {
+        return cotizaciones.filter(q =>
+            ['APROBADA', 'EN_EJECUCION', 'FINALIZADA'].includes(q.estado) &&
+            (q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
         );
     }, [searchTerm, cotizaciones]);
 
@@ -256,9 +264,9 @@ export default function CommercialPage() {
                 <TabsList>
                     <TabsTrigger value="resumen" className="gap-2"><LayoutDashboardIcon className="h-4 w-4" /> Resumen</TabsTrigger>
                     <TabsTrigger value="clientes" className="gap-2"><Users className="h-4 w-4" /> Clientes</TabsTrigger>
-                    <TabsTrigger value="trabajos" className="gap-2"><Briefcase className="h-4 w-4" /> Trabajos</TabsTrigger>
-                    <TabsTrigger value="cotizador" className="gap-2"><FileText className="h-4 w-4" /> Cotizador</TabsTrigger>
-                    <TabsTrigger value="facturacion" className="gap-2"><Receipt className="h-4 w-4" /> Facturación</TabsTrigger>
+                    <TabsTrigger value="ofertas" className="gap-2"><Briefcase className="h-4 w-4" /> Ofertas</TabsTrigger>
+                    <TabsTrigger value="cotizaciones" className="gap-2"><FileText className="h-4 w-4" /> Cotizaciones</TabsTrigger>
+                    <TabsTrigger value="proyectos" className="gap-2"><Briefcase className="h-4 w-4" /> Proyectos</TabsTrigger>
                 </TabsList>
 
                 {/* --- RESUMEN TAB --- */}
@@ -422,12 +430,12 @@ export default function CommercialPage() {
                     </Card>
                 </TabsContent>
 
-                {/* --- TRABAJOS TAB --- */}
-                <TabsContent value="trabajos" className="space-y-4">
+                {/* --- OFERTAS TAB --- */}
+                <TabsContent value="ofertas" className="space-y-4">
                     <Card>
                         <CardHeader>
                             <div className="flex justify-between items-center">
-                                <CardTitle>Control de Trabajos</CardTitle>
+                                <CardTitle>Control de Ofertas</CardTitle>
                                 <div className="flex items-center gap-4">
                                     <div className="relative w-64">
                                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -459,6 +467,127 @@ export default function CommercialPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {filteredQuotes.map((quote) => (
+                                        <TableRow key={quote.id}>
+                                            <TableCell className="font-mono text-xs">{quote.numero}</TableCell>
+                                            <TableCell>
+                                                <TrabajoHistoryDialog
+                                                    trabajo={quote}
+                                                    onTrabajoUpdated={(updated) => updateCotizacion(updated)}
+                                                    showExecution={false}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col max-w-[180px]">
+                                                    <span className="truncate text-sm" title={quote.descripcionTrabajo}>{quote.descripcionTrabajo}</span>
+                                                    <Badge variant="outline" className="w-fit text-[10px] mt-1">{quote.tipo}</Badge>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {format(quote.fecha, "dd/MM/yyyy", { locale: es })}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {format(quote.fechaActualizacion || quote.fecha, "dd/MM/yyyy", { locale: es })}
+                                            </TableCell>
+                                            <TableCell className="w-[120px]">
+                                                <div className="flex flex-col gap-1">
+                                                    <Progress value={quote.progreso || getProgressValue(quote.estado)} className="h-2" />
+                                                    <span className="text-[10px] text-muted-foreground text-right">{quote.progreso || getProgressValue(quote.estado)}%</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="font-mono text-sm">{formatCurrency(quote.total)}</TableCell>
+                                            <TableCell>
+                                                <Badge className={getStatusColor(quote.estado)} variant="secondary">
+                                                    {quote.estado.replace('_', ' ')}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <TrabajoHistoryDialog
+                                                        trabajo={quote}
+                                                        onTrabajoUpdated={(updated) => updateCotizacion(updated)}
+                                                        defaultTab="items"
+                                                        showExecution={false}
+                                                        trigger={
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                title="Editar"
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                        }
+                                                    />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        title="Eliminar"
+                                                        onClick={() => {
+                                                            if (confirm(`¿Eliminar trabajo ${quote.numero}?`)) {
+                                                                deleteCotizacion(quote.id);
+                                                                toast({ title: "Eliminado", description: "Trabajo eliminado correctamente" });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                        title="Generar PDF"
+                                                        onClick={() => generateQuotePDF(quote)}
+                                                    >
+                                                        <FileText className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* --- PROYECTOS TAB --- */}
+                <TabsContent value="proyectos" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-center">
+                                <CardTitle>Control de Proyectos</CardTitle>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Buscar proyecto o cliente..."
+                                            className="pl-8"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <CreateProjectDialog clientes={clientes} onProjectCreated={handleCreateQuote} />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>Cliente</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Fecha Creación</TableHead>
+                                        <TableHead>Última Actualización</TableHead>
+                                        <TableHead>Progreso</TableHead>
+                                        <TableHead>Valor</TableHead>
+                                        <TableHead>Estado</TableHead>
+                                        <TableHead className="text-center">Acciones</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredProjects.map((quote) => (
                                         <TableRow key={quote.id}>
                                             <TableCell className="font-mono text-xs">{quote.numero}</TableCell>
                                             <TableCell>
@@ -541,13 +670,8 @@ export default function CommercialPage() {
                     </Card>
                 </TabsContent>
 
-                {/* --- FACTURACION TAB --- */}
-                <TabsContent value="facturacion" className="space-y-4">
-                    <BillingModule />
-                </TabsContent>
-
-                {/* --- COTIZADOR TAB --- */}
-                <TabsContent value="cotizador" className="space-y-4">
+                {/* --- COTIZACIONES TAB --- */}
+                <TabsContent value="cotizaciones" className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Crear Nueva Cotización</CardTitle>
