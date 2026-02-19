@@ -81,6 +81,7 @@ import { ProductSelectorDialog } from "./product-selector-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/client";
 import { getHistorialAction, addHistorialEntryAction } from "@/app/dashboard/sistema/cotizacion/actions";
+import { getConsumosByCotizacionAction } from "@/app/dashboard/sistema/inventario/materiales-consumo-actions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PDF_STYLES, getStyleById, PDFStyleConfig } from '@/utils/pdf-styles';
 
@@ -239,7 +240,7 @@ export function TrabajoHistoryDialog({
     defaultTab = 'detalles',
     showExecution = true
 }: TrabajoHistoryDialogProps) {
-    const { inventario, codigosTrabajo, deductInventoryItem } = useErp();
+    const { inventario, codigosTrabajo, addConsumoMaterial } = useErp();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'historial'>(defaultTab);
     const [newNote, setNewNote] = useState("");
@@ -349,8 +350,35 @@ export function TrabajoHistoryDialog({
     const [localEvidence, setLocalEvidence] = useState<EvidenciaTrabajo[]>(trabajo.evidencia || []);
     const [isLocating, setIsLocating] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    // Track consumed materials by item ID (Set of material inventory IDs that have been deducted)
+    // Track consumed materials by item ID (Set of material keys that have been used)
     const [materialesUsados, setMaterialesUsados] = useState<Set<string>>(new Set());
+
+    // Load existing consumo records for this cotizacion to persist checkbox state
+    useEffect(() => {
+        if (isOpen && trabajo.id) {
+            getConsumosByCotizacionAction(trabajo.id).then(consumos => {
+                const usedKeys = new Set<string>();
+                for (const c of consumos) {
+                    // The checkbox key format is: `${trabajo.id}-${pItem.inventarioId || pItem.id}`
+                    // We need to match by inventarioId if available
+                    if (c.inventarioId) {
+                        usedKeys.add(`${trabajo.id}-${c.inventarioId}`);
+                    }
+                    // Also match by description for items without inventarioId
+                    // We search items to find the matching item ID
+                    if (c.descripcionMaterial) {
+                        const matchingItem = items.find(i => i.descripcion === c.descripcionMaterial);
+                        if (matchingItem) {
+                            usedKeys.add(`${trabajo.id}-${matchingItem.inventarioId || matchingItem.id}`);
+                        }
+                    }
+                }
+                if (usedKeys.size > 0) {
+                    setMaterialesUsados(usedKeys);
+                }
+            }).catch(err => console.error("Error loading existing consumos:", err));
+        }
+    }, [isOpen, trabajo.id, items]);
 
     const photoInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
@@ -760,7 +788,14 @@ export function TrabajoHistoryDialog({
             for (const mat of item.subItems) {
                 const qty = (mat.cantidad || 0) * multiplier;
                 if (mat.inventarioId) {
-                    await deductInventoryItem(mat.inventarioId, qty);
+                    await addConsumoMaterial({
+                        inventarioId: mat.inventarioId,
+                        descripcionMaterial: mat.descripcion,
+                        cotizacionId: trabajo.id,
+                        cantidad: qty,
+                        unidad: 'UND',
+                        descripcion: `Consumo desde trabajo #${trabajo.numero} — ${item.descripcion}`,
+                    });
                     count++;
                 } else if (mat.subCodigoId) {
                     const subCode = codigosTrabajo.find((c: any) => c.id === mat.subCodigoId);
@@ -780,7 +815,14 @@ export function TrabajoHistoryDialog({
                 for (const mat of fullCode.materiales) {
                     const qty = (mat.cantidad || 0) * multiplier;
                     if (mat.inventarioId) {
-                        await deductInventoryItem(mat.inventarioId, qty);
+                        await addConsumoMaterial({
+                            inventarioId: mat.inventarioId,
+                            descripcionMaterial: mat.descripcion,
+                            cotizacionId: trabajo.id,
+                            cantidad: qty,
+                            unidad: 'UND',
+                            descripcion: `Consumo desde trabajo #${trabajo.numero} — ${item.descripcion}`,
+                        });
                         count++;
                     } else if (mat.subCodigoId) {
                         const subCode = codigosTrabajo.find((c: any) => c.id === mat.subCodigoId);
@@ -1266,20 +1308,28 @@ export function TrabajoHistoryDialog({
                                                                                 <TableCell>
                                                                                     <Checkbox
                                                                                         checked={isUsed}
-                                                                                        disabled={!pItem.inventarioId || isUsed}
+                                                                                        disabled={isUsed}
                                                                                         onCheckedChange={async (checked: boolean) => {
-                                                                                            if (checked && pItem.inventarioId) {
-                                                                                                const success = await deductInventoryItem(pItem.inventarioId, pItem.cantidad);
-                                                                                                if (success) {
+                                                                                            if (checked) {
+                                                                                                try {
+                                                                                                    await addConsumoMaterial({
+                                                                                                        inventarioId: pItem.inventarioId || undefined,
+                                                                                                        descripcionMaterial: pItem.descripcion,
+                                                                                                        cotizacionId: trabajo.id,
+                                                                                                        cantidad: pItem.cantidad,
+                                                                                                        unidad: 'UND',
+                                                                                                        descripcion: `Consumo desde trabajo #${trabajo.numero} — ${pItem.descripcion}`,
+                                                                                                    });
                                                                                                     setMaterialesUsados(prev => new Set(prev).add(itemKey));
                                                                                                     toast({
-                                                                                                        title: "Inventario Actualizado",
-                                                                                                        description: `Se descontaron ${pItem.cantidad} unidades de ${pItem.descripcion}.`
+                                                                                                        title: "✅ Consumo Registrado",
+                                                                                                        description: `${pItem.descripcion} marcado como utilizado.`
                                                                                                     });
-                                                                                                } else {
+                                                                                                } catch (err: any) {
+                                                                                                    console.error("Error registrando consumo:", err);
                                                                                                     toast({
-                                                                                                        title: "Error",
-                                                                                                        description: "No se pudo actualizar el inventario.",
+                                                                                                        title: "Error al Registrar",
+                                                                                                        description: err?.message || "No se pudo registrar el consumo. Verifica la tabla consumo_material en Supabase.",
                                                                                                         variant: "destructive"
                                                                                                     });
                                                                                                 }

@@ -28,6 +28,7 @@ import { getUsers, updateUserPermissionsAction, deleteUserAction, toggleUserStat
 import { getTareasAction, createTareaAction, updateTareaAction, deleteTareaAction } from "@/app/dashboard/sistema/agenda/actions";
 import { getRolesWithPermissionsAction, getPermissionsAction, createRoleAction, updateRolePermissionsAction } from "@/app/dashboard/sistema/roles/actions";
 import { getOrdenesCompraAction, createOrdenCompraAction, updateOrdenCompraAction } from "@/app/dashboard/sistema/suministro/ordenes-actions";
+import { getConsumosResumenAction, createConsumoAction } from "@/app/dashboard/sistema/inventario/materiales-consumo-actions";
 import { createClient } from "@/utils/supabase/client";
 import { getInitialErpDataAction } from "@/actions/erp-actions";
 
@@ -61,6 +62,7 @@ interface ErpContextType {
     agenda: TareaAgenda[];
     roles: Role[];
     permissions: Permission[];
+    consumosResumen: Record<string, number>;
 
     // Loading states
     isLoading: boolean;
@@ -150,6 +152,10 @@ interface ErpContextType {
     addOrdenCompra: (oc: any) => Promise<void>;
     updateOrdenCompra: (id: string, oc: any) => Promise<void>;
 
+    // Consumo Material Actions
+    addConsumoMaterial: (input: { inventarioId?: string; descripcionMaterial?: string; cotizacionId?: string; cantidad: number; unidad: string; descripcion?: string }) => Promise<void>;
+    refreshConsumosResumen: () => Promise<void>;
+
     // Refresh function
     refreshData: () => Promise<void>;
 
@@ -197,6 +203,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const [agenda, setAgenda] = useState<TareaAgenda[]>([]);
     const [roles, setRoles] = useState<Role[]>([]);
     const [permissions, setPermissions] = useState<Permission[]>([]);
+    const [consumosResumen, setConsumosResumen] = useState<Record<string, number>>({});
 
     // Load all data from Supabase
     const loadAllData = async () => {
@@ -233,6 +240,10 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setAgenda(agendaData);
             setRoles(rolesData);
             setPermissions(permsData);
+
+            // Load consumos resumen
+            const consumosData = await getConsumosResumenAction();
+            setConsumosResumen(consumosData);
 
             // Load liquidations separately for now to avoid breaking existing initial load structure if not updated there
             const liqs = await getLiquidacionesAction();
@@ -746,6 +757,24 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         setUsers(u);
     };
 
+    const addConsumoMaterial = async (input: { inventarioId?: string; descripcionMaterial?: string; cotizacionId?: string; cantidad: number; unidad: string; descripcion?: string }) => {
+        try {
+            await createConsumoAction(input);
+            // Refresh the resumen totals
+            const updated = await getConsumosResumenAction();
+            setConsumosResumen(updated);
+        } catch (error) {
+            console.error("Error adding consumo material:", error);
+            throw error; // Re-throw so callers can show error feedback
+        }
+    };
+    const refreshConsumosResumen = async () => {
+        try {
+            const updated = await getConsumosResumenAction();
+            setConsumosResumen(updated);
+        } catch (error) { console.error("Error refreshing consumos:", error); }
+    };
+
     const addOrdenCompra = async (oc: any) => {
         try {
             const saved = await createOrdenCompraAction(oc);
@@ -822,6 +851,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addRole, updateRolePermission, toggleUserStatus,
 
             addOrdenCompra, updateOrdenCompra,
+            consumosResumen, addConsumoMaterial, refreshConsumosResumen,
 
             // Refresh
             refreshData: loadAllData,

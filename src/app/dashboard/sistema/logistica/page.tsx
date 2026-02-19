@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -40,7 +40,7 @@ import {
     initialEmpleados,
     initialCodigosTrabajo
 } from "@/lib/mock-data";
-import { CodigoTrabajo } from "@/types/sistema";
+import { CodigoTrabajo, InventarioItem } from "@/types/sistema";
 
 // Import submodule components
 import { InventoryTable } from "../inventario/inventory-table";
@@ -66,6 +66,8 @@ import { AlertConfigDialog } from "@/components/erp/alert-config-dialog";
 import { AlertsBanner } from "@/components/erp/alerts-banner";
 import { WorkCodesTable } from "@/components/erp/work-codes-table";
 import { CuentasPorPagarDashboard } from "@/components/erp/cuentas-por-pagar-dashboard";
+import { MaterialDetailConsumoDialog } from "@/components/erp/material-detail-consumo-dialog";
+import { getTrabajosListAction } from "@/app/dashboard/sistema/inventario/trabajos-list-action";
 
 export default function LogisticaPage() {
     const { toast } = useToast();
@@ -91,7 +93,10 @@ export default function LogisticaPage() {
         updateInventarioItem,
         updateEntregaDotacion,
         ordenesCompra,
-        cuentasBancarias // Correct property name
+        cuentasBancarias,
+        consumosResumen,
+        addConsumoMaterial,
+        refreshConsumosResumen,
     } = useErp();
 
     // Sub-tabs for Suministro
@@ -107,6 +112,9 @@ export default function LogisticaPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
     const [itemDetailOpen, setItemDetailOpen] = useState(false);
+    const [materialDetailOpen, setMaterialDetailOpen] = useState(false);
+    const [selectedMaterial, setSelectedMaterial] = useState<InventarioItem | null>(null);
+    const [trabajosList, setTrabajosList] = useState<{ id: string; nombre: string; codigo: string }[]>([]);
 
     // Supplier State
     const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
@@ -117,9 +125,14 @@ export default function LogisticaPage() {
     const [vehicleDetailOpen, setVehicleDetailOpen] = useState(false);
 
     const handleItemClick = (item: any) => {
-        setSelectedItem(item);
-        setItemDetailOpen(true);
+        setSelectedMaterial(item);
+        setMaterialDetailOpen(true);
     };
+
+    // Load trabajos list for consumo dialogs
+    useEffect(() => {
+        getTrabajosListAction().then(setTrabajosList).catch(console.error);
+    }, []);
 
     // Actions Wrapper (Connecting Dialogs to Context)
     const handleCreateSupplier = (newProv: any) => addProveedor(newProv);
@@ -160,9 +173,9 @@ export default function LogisticaPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="resumen" className="gap-2"><LayoutDashboard className="h-4 w-4" /> Resumen</TabsTrigger>
-                    <TabsTrigger value="catalogo" className="gap-2"><ListOrdered className="h-4 w-4" /> Catálogo de Inventario</TabsTrigger>
-                    <TabsTrigger value="inventario" className="gap-2"><Package className="h-4 w-4" /> Códigos de Trabajo</TabsTrigger>
-                    <TabsTrigger value="suministro" className="gap-2"><Truck className="h-4 w-4" /> Suministro</TabsTrigger>
+                    <TabsTrigger value="catalogo" className="gap-2"><ListOrdered className="h-4 w-4" /> Materiales</TabsTrigger>
+                    <TabsTrigger value="inventario" className="gap-2"><Package className="h-4 w-4" /> Suministro</TabsTrigger>
+                    <TabsTrigger value="suministro" className="gap-2"><Truck className="h-4 w-4" /> Proveedores</TabsTrigger>
                     <TabsTrigger value="dotacion" className="gap-2"><HardHat className="h-4 w-4" /> Dotación</TabsTrigger>
                     <TabsTrigger value="activos" className="gap-2"><Car className="h-4 w-4" /> Activos</TabsTrigger>
                 </TabsList>
@@ -255,12 +268,11 @@ export default function LogisticaPage() {
                     </div>
                 </TabsContent>
 
-                {/* CATALOGO DE INVENTARIO TAB */}
                 <TabsContent value="catalogo" className="space-y-4">
                     <Card>
                         <CardHeader>
                             <div className="flex justify-between items-center">
-                                <CardTitle>Catálogo de Inventario</CardTitle>
+                                <CardTitle>Materiales</CardTitle>
                                 <div className="flex items-center gap-2">
                                     <div className="relative w-64">
                                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -282,12 +294,10 @@ export default function LogisticaPage() {
                                         <TableHead>SKU</TableHead>
                                         <TableHead>Descripción</TableHead>
                                         <TableHead>Marca</TableHead>
-                                        <TableHead>Modelo</TableHead>
                                         <TableHead>Proveedor</TableHead>
                                         <TableHead>Categoría</TableHead>
-                                        <TableHead>Ubicación</TableHead>
-                                        <TableHead>Stock</TableHead>
-                                        <TableHead>Estado</TableHead>
+                                        <TableHead>Unidad</TableHead>
+                                        <TableHead className="text-right">Total Consumido</TableHead>
                                         <TableHead className="text-right">Precio Proveedor</TableHead>
                                         <TableHead className="text-right">Precio de Venta</TableHead>
                                         <TableHead className="text-right">Acciones</TableHead>
@@ -300,10 +310,9 @@ export default function LogisticaPage() {
                                             item.sku.toLowerCase().includes(searchTerm.toLowerCase())
                                         )
                                         .map((item) => {
-                                            const stockStatus = item.cantidad <= item.stockMinimo ? 'BAJO' : 'OK';
-                                            // const precioProveedor = item.costoMateriales || Math.round(item.valorUnitario * 0.7);
                                             const precioProveedor = item.precioProveedor || item.costoMateriales || 0;
                                             const proveedorInfo = proveedores.find(p => p.id === item.proveedorId);
+                                            const totalConsumido = consumosResumen[item.id] || 0;
                                             return (
                                                 <TableRow
                                                     key={item.id}
@@ -313,7 +322,6 @@ export default function LogisticaPage() {
                                                     <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                                                     <TableCell className="font-medium">{item.descripcion}</TableCell>
                                                     <TableCell className="text-xs">{item.marca || '-'}</TableCell>
-                                                    <TableCell className="text-xs">{item.modelo || '-'}</TableCell>
                                                     <TableCell>
                                                         {proveedorInfo ? (
                                                             <span className="text-xs text-muted-foreground">{proveedorInfo.nombre}</span>
@@ -322,17 +330,15 @@ export default function LogisticaPage() {
                                                         )}
                                                     </TableCell>
                                                     <TableCell><Badge variant="outline">{item.categoria}</Badge></TableCell>
-                                                    <TableCell>{item.ubicacion}</TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <span>{item.cantidad} {item.unidad}</span>
-                                                            {stockStatus === 'BAJO' && <AlertTriangle className="h-3 w-3 text-orange-500" />}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="w-[100px]">
-                                                            <Progress value={(item.cantidad / (item.stockMinimo * 3)) * 100} className={cn("h-2", stockStatus === 'BAJO' ? "bg-orange-200" : "")} />
-                                                        </div>
+                                                    <TableCell className="text-xs">{item.unidad}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        {totalConsumido > 0 ? (
+                                                            <Badge variant="secondary" className="font-medium">
+                                                                {totalConsumido.toLocaleString("es-CO")} {item.unidad}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">0</span>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-medium text-amber-600 dark:text-amber-400">{formatCurrency(precioProveedor)}</TableCell>
                                                     <TableCell className="text-right font-bold text-primary">{formatCurrency(item.valorUnitario)}</TableCell>
@@ -346,14 +352,25 @@ export default function LogisticaPage() {
                             </Table>
                         </CardContent>
                     </Card>
+
+                    {/* Material Detail Dialog with Consumption History */}
+                    <MaterialDetailConsumoDialog
+                        open={materialDetailOpen}
+                        onOpenChange={setMaterialDetailOpen}
+                        material={selectedMaterial}
+                        totalConsumido={selectedMaterial ? (consumosResumen[selectedMaterial.id] || 0) : 0}
+                        trabajos={trabajosList}
+                        onConsumoRegistered={addConsumoMaterial}
+                        onConsumoDeleted={refreshConsumosResumen}
+                    />
                 </TabsContent>
 
-                {/* CÓDIGOS DE TRABAJO TAB */}
+                {/* SUMINISTRO TAB */}
                 <TabsContent value="inventario" className="space-y-4">
                     <WorkCodesTable />
                 </TabsContent>
 
-                {/* SUMINISTRO TAB - WITH SUB-TABS */}
+                {/* PROVEEDORES TAB - WITH SUB-TABS */}
                 <TabsContent value="suministro" className="space-y-4">
                     <Tabs value={suministroTab} onValueChange={setSuministroTab}>
                         <TabsList>

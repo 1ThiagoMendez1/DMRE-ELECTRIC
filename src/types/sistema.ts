@@ -305,6 +305,21 @@ export interface MovimientoInventario {
     proyectoId?: string; // Oferta
 }
 
+// CONSUMO DE MATERIALES
+export interface ConsumoMaterial {
+    id: string;
+    inventarioId?: string;
+    descripcionMaterial?: string;  // Material name for items not linked to inventario
+    cotizacionId?: string;
+    cotizacionNumero?: string;        // Denormalized for UI display
+    cotizacionDescripcion?: string;   // Denormalized for UI display
+    cantidad: number;
+    unidad: string;
+    descripcion?: string;
+    registradoPor?: string;
+    fecha: Date;
+}
+
 // 4. SUMINISTRO
 export type CategoriaProveedor = 'MATERIALES' | 'SERVICIOS' | 'MIXTO';
 
