@@ -59,7 +59,7 @@ export function FacturarTrabajosDialog({ onFacturaCreated, nextId }: FacturarTra
 
     // Filter only approved/in-execution/finalized cotizaciones
     const trabajosAprobados = useMemo(() => {
-        const estadosValidos: EstadoCotizacion[] = ['APROBADA', 'EN_REVISION', 'MODIFICACION'];
+        const estadosValidos: EstadoCotizacion[] = ['APROBADA'];
         return cotizaciones
             .filter(c => estadosValidos.includes(c.estado))
             .map(c => {
@@ -93,9 +93,9 @@ export function FacturarTrabajosDialog({ onFacturaCreated, nextId }: FacturarTra
     const handleCreate = () => {
         if (!selected || !fechaEmision) return;
 
-        const newFactura: Factura = {
-            id: nextId || `Fac-${Date.now()}`,
-            numero: nextId,
+        const newFactura: any = {
+            id: "", // Server ignores this or assigns randomly, but we leave it empty to avoid clashes if DB expects uuid
+            numero: undefined,
             cotizacionId: selected.id,
             cotizacion: selected as Cotizacion,
             clienteId: selected.clienteId,
@@ -158,58 +158,74 @@ export function FacturarTrabajosDialog({ onFacturaCreated, nextId }: FacturarTra
                     </div>
 
                     {/* Project List */}
-                    <ScrollArea className="h-[280px] border rounded-lg">
-                        {filtered.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                <CheckCircle2 className="h-8 w-8 mb-2 opacity-50" />
-                                <p className="text-sm">No hay trabajos aprobados pendientes de facturar</p>
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[100px]">Número</TableHead>
-                                        <TableHead>Cliente</TableHead>
-                                        <TableHead>Descripción</TableHead>
-                                        <TableHead>Estado</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
-                                        <TableHead className="text-right">Facturado</TableHead>
-                                        <TableHead className="text-right">Pendiente</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filtered.map(t => (
-                                        <TableRow
-                                            key={t.id}
-                                            className={cn(
-                                                "cursor-pointer transition-colors",
-                                                selectedId === t.id
-                                                    ? "bg-blue-50 dark:bg-blue-950/20 border-l-2 border-l-blue-500"
-                                                    : "hover:bg-muted/50",
-                                                t.pendiente <= 0 && "opacity-50"
-                                            )}
-                                            onClick={() => t.pendiente > 0 && setSelectedId(t.id)}
-                                        >
-                                            <TableCell className="font-mono font-bold text-xs">{t.numero}</TableCell>
-                                            <TableCell className="text-sm">{t.cliente?.nombre || "Sin cliente"}</TableCell>
-                                            <TableCell className="text-sm max-w-[180px] truncate" title={t.descripcionTrabajo}>
-                                                {t.descripcionTrabajo || "—"}
-                                            </TableCell>
-                                            <TableCell>{getEstadoBadge(t.estado)}</TableCell>
-                                            <TableCell className="text-right text-sm font-medium">{formatCurrency(t.total)}</TableCell>
-                                            <TableCell className="text-right text-sm text-blue-600">{formatCurrency(t.yaFacturado)}</TableCell>
-                                            <TableCell className={cn(
-                                                "text-right text-sm font-bold",
-                                                t.pendiente > 0 ? "text-orange-600" : "text-green-600"
-                                            )}>
-                                                {t.pendiente > 0 ? formatCurrency(t.pendiente) : "✓ Facturado"}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </ScrollArea>
+                    <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
+                        <ScrollArea className="h-[280px]">
+                            {filtered.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center p-12 text-muted-foreground text-center">
+                                    <CheckCircle2 className="h-8 w-8 mb-2 opacity-50 mx-auto" />
+                                    <p className="text-sm">No hay proyectos aprobados pendientes de facturar</p>
+                                </div>
+                            ) : (
+                                <div className="w-full relative overflow-auto">
+                                    <Table className="min-w-[600px] w-full">
+                                        <TableHeader>
+                                            <TableRow className="bg-muted/50">
+                                                <TableHead className="w-[80px] sm:w-[100px] font-semibold text-xs sm:text-sm">Proyecto</TableHead>
+                                                <TableHead className="font-semibold text-xs sm:text-sm">Cliente</TableHead>
+                                                <TableHead className="hidden md:table-cell font-semibold text-xs sm:text-sm">Descripción</TableHead>
+                                                <TableHead className="font-semibold text-xs sm:text-sm text-right">Total</TableHead>
+                                                <TableHead className="font-semibold text-xs sm:text-sm text-right">Facturado</TableHead>
+                                                <TableHead className="font-semibold text-xs sm:text-sm text-right">Pendiente</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filtered.map(t => (
+                                                <TableRow
+                                                    key={t.id}
+                                                    className={cn(
+                                                        "cursor-pointer transition-colors hover:bg-muted/50",
+                                                        selectedId === t.id && "bg-blue-50/80 dark:bg-blue-900/20 border-l-4 border-l-blue-600",
+                                                        t.pendiente <= 0 && "opacity-60 grayscale-[0.5]"
+                                                    )}
+                                                    onClick={() => t.pendiente > 0 && setSelectedId(t.id)}
+                                                >
+                                                    <TableCell className="font-mono font-bold text-xs">
+                                                        <div className="flex flex-col gap-1 items-start">
+                                                            <span>{t.numero}</span>
+                                                            <span className="md:hidden scale-75 origin-left">{getEstadoBadge(t.estado)}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-sm font-medium">
+                                                        <span className="line-clamp-2 md:line-clamp-1">{t.cliente?.nombre || "Sin cliente"}</span>
+                                                        {/* Description inline on very small screens */}
+                                                        <span className="block md:hidden text-xs text-muted-foreground font-normal line-clamp-1 mt-0.5" title={t.descripcionTrabajo}>
+                                                            {t.descripcionTrabajo || "—"}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="hidden md:table-cell text-xs sm:text-sm text-muted-foreground max-w-[200px] truncate" title={t.descripcionTrabajo}>
+                                                        {t.descripcionTrabajo || "—"}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-xs sm:text-sm font-medium">{formatCurrency(t.total)}</TableCell>
+                                                    <TableCell className="text-right text-xs sm:text-sm text-blue-600 dark:text-blue-400 font-medium">{formatCurrency(t.yaFacturado)}</TableCell>
+                                                    <TableCell className={cn(
+                                                        "text-right text-xs sm:text-sm font-bold",
+                                                        t.pendiente > 0 ? "text-orange-600 dark:text-orange-400" : "text-emerald-600 dark:text-emerald-400"
+                                                    )}>
+                                                        {t.pendiente > 0 ? formatCurrency(t.pendiente) : (
+                                                            <span className="inline-flex items-center gap-1 justify-end">
+                                                                <CheckCircle2 className="w-3 h-3 md:hidden" />
+                                                                <span className="hidden md:inline">✓ Facturado</span>
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </ScrollArea>
+                    </div>
 
                     {/* Selected Project Summary + Date Inputs */}
                     {selected && (

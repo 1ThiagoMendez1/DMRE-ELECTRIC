@@ -160,7 +160,7 @@ export async function createFacturaAction(factura: Omit<Factura, "id">): Promise
 
     revalidatePath("/dashboard/sistema/financiera");
     revalidatePath("/dashboard/sistema/comercial");
-    return mapToUI(data);
+    return mapToUI(data, data.cotizaciones);
 }
 
 export async function updateFacturaAction(id: string, factura: Partial<Factura>): Promise<Factura> {
@@ -270,6 +270,221 @@ export async function registrarPagoFacturaAction(
         console.error("Error updating factura:", upError);
         throw new Error(`Error actualizando factura: ${upError.message}`);
     }
+
+    revalidatePath("/dashboard/sistema/financiera");
+    return mapToUI(updatedFactura, updatedFactura.cotizaciones);
+}
+
+export async function registrarAdelantoFacturaAction(
+    facturaId: string,
+    monto: number,
+    fecha: Date,
+    cuentaId: string,
+    concepto: string
+): Promise<Factura> {
+    const supabase = await createClient();
+
+    // 1. Get current Invoice
+    const { data: facturaRef, error: fError } = await supabase
+        .from("facturas")
+        .select("valor_total, anticipo_recibido, saldo_pendiente, numero")
+        .eq("id", facturaId)
+        .single();
+
+    if (fError || !facturaRef) throw new Error("Factura no encontrada");
+
+    // 2. Calculate new values
+    const nuevoAnticipo = (Number(facturaRef.anticipo_recibido) || 0) + monto;
+    const nuevoSaldo = Math.max(0, (Number(facturaRef.saldo_pendiente) || 0) - monto);
+    const nuevoEstado = nuevoSaldo <= 0 ? 'PAGADA' : 'PARCIAL';
+
+    // 3. Create Financial Movement (INGRESO)
+    const { error: movError } = await supabase
+        .from("movimientos_financieros")
+        .insert({
+            tipo: 'INGRESO',
+            categoria: 'VENTAS',
+            concepto: `Adelanto Factura ${facturaRef.numero}`,
+            descripcion: concepto || `Adelanto a factura ${facturaRef.numero}`,
+            valor: monto,
+            fecha: fecha,
+            cuenta_id: cuentaId,
+            factura_id: facturaId
+        });
+
+    if (movError) throw new Error("Error creando movimiento financiero: " + movError.message);
+
+    // 4. Update Bank Account Balance (Trigger on movimientos handles this usually, but let's be safe via RPC or Trigger)
+    // Assuming 'update_cuenta_saldo' RPC exists from previous migrations or triggers are set.
+    await supabase.rpc("update_cuenta_saldo", {
+        cuenta_uuid: cuentaId,
+        delta_valor: monto
+    });
+
+    // 5. Update Invoice
+    const { data: updatedFactura, error: upError } = await supabase
+        .from("facturas")
+        .update({
+            anticipo_recibido: nuevoAnticipo,
+            saldo_pendiente: nuevoSaldo,
+            estado: nuevoEstado
+        })
+        .eq("id", facturaId)
+        .select(`
+            *,
+            cotizaciones (
+                id, numero, total, estado, created_at,
+                clientes (id, nombre, documento, telefono, direccion)
+            )
+        `)
+        .single();
+
+    if (upError) {
+        console.error("Error updating factura:", upError);
+        throw new Error(`Error registrando adelanto: ${upError.message}`);
+    }
+
+    revalidatePath("/dashboard/sistema/financiera");
+    return mapToUI(updatedFactura, updatedFactura.cotizaciones);
+}
+
+export async function actualizarEstadoFacturaAction(
+    facturaId: string,
+    nuevoEstado: string,
+    estadoAnterior: string,
+    userId?: string
+): Promise<Factura> {
+    const supabase = await createClient();
+
+    const { data: facturaRef, error: fError } = await supabase
+        .from("facturas")
+        .select("numero")
+        .eq("id", facturaId)
+        .single();
+
+    if (fError || !facturaRef) throw new Error("Factura no encontrada");
+
+    // Update Invoice
+    const { data: updatedFactura, error: upError } = await supabase
+        .from("facturas")
+        .update({
+            estado: nuevoEstado
+        })
+        .eq("id", facturaId)
+        .select(`
+            *,
+            cotizaciones (
+                id, numero, total, estado, created_at,
+                clientes (id, nombre, documento, telefono, direccion)
+            )
+        `)
+        .single();
+
+    if (upError) {
+        console.error("Error updating factura estado:", upError);
+        throw new Error(`Error actualizando estado: ${upError.message}`);
+    }
+
+    // Record the manual status change as a trace (NOTA type) without a financial impact
+    await supabase
+        .from("movimientos_financieros")
+        .insert({
+            tipo: 'EGRESO', // Using EGRESO with 0 value or OTROS, let's use a 0 value OTROS or just standard to trace it without affecting balance.
+            // But 'tipo' is ENUM (INGRESO, EGRESO). We can't insert 'NOTA' easily. 
+            // Wait, what does the DB say? tipo is 'movimiento_tipo' 
+            concepto: `Estado cambiado a ${nuevoEstado}`,
+            descripcion: `Estado manual actualizado de ${estadoAnterior} a ${nuevoEstado}`,
+            valor: 0,
+            fecha: new Date(),
+            categoria: 'OTROS',
+            factura_id: facturaId,
+            registrado_por: userId || undefined
+        });
+
+    revalidatePath("/dashboard/sistema/financiera");
+    return mapToUI(updatedFactura, updatedFactura.cotizaciones);
+}
+
+export async function actualizarFechaVencimientoFacturaAction(
+    facturaId: string,
+    nuevaFecha: Date,
+    userId?: string
+): Promise<Factura> {
+    const supabase = await createClient();
+
+    const { data: updatedFactura, error: upError } = await supabase
+        .from("facturas")
+        .update({
+            fecha_vencimiento: nuevaFecha
+        })
+        .eq("id", facturaId)
+        .select(`
+            *,
+            cotizaciones (
+                id, numero, total, estado, created_at,
+                clientes (id, nombre, documento, telefono, direccion)
+            )
+        `)
+        .single();
+
+    if (upError) {
+        console.error("Error updating factura fecha:", upError);
+        throw new Error(`Error actualizando fecha: ${upError.message}`);
+    }
+
+    await supabase
+        .from("movimientos_financieros")
+        .insert({
+            tipo: 'EGRESO',
+            concepto: `Fecha vencimiento actualizada`,
+            descripcion: `Nueva fecha: ${nuevaFecha.toISOString().split('T')[0]}`,
+            valor: 0,
+            fecha: new Date(),
+            categoria: 'OTROS',
+            factura_id: facturaId,
+            registrado_por: userId || undefined
+        });
+
+    revalidatePath("/dashboard/sistema/financiera");
+    return mapToUI(updatedFactura, updatedFactura.cotizaciones);
+}
+
+export async function agregarNotaFacturaAction(
+    facturaId: string,
+    nota: string,
+    userId?: string
+): Promise<Factura> {
+    const supabase = await createClient();
+
+    const { data: updatedFactura, error: upError } = await supabase
+        .from("facturas")
+        .select(`
+            *,
+            cotizaciones (
+                id, numero, total, estado, created_at,
+                clientes (id, nombre, documento, telefono, direccion)
+            )
+        `)
+        .eq("id", facturaId)
+        .single();
+
+    if (upError) {
+        console.error("Error fetching factura para nota:", upError);
+        throw new Error(`Error al agregar nota: ${upError.message}`);
+    }
+
+    await supabase
+        .from("movimientos_financieros")
+        .insert({
+            tipo: 'EGRESO',
+            concepto: `Nota interna`,
+            descripcion: nota,
+            valor: 0,
+            fecha: new Date(),
+            categoria: 'OTROS',
+            factura_id: facturaId,
+            registrado_por: userId || undefined
+        });
 
     revalidatePath("/dashboard/sistema/financiera");
     return mapToUI(updatedFactura, updatedFactura.cotizaciones);

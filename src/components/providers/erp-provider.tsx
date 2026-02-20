@@ -151,6 +151,12 @@ interface ErpContextType {
     payCuentaPorPagar: (id: string, cuentaBancariaId: string, valor: number, fecha: Date, nota?: string) => Promise<void>;
     payNomina: (liquidacionId: string, empleadoId: string, periodo: string, valor: number, cuentaBancariaId: string, fecha: Date) => Promise<void>;
 
+    // Factura extra actions
+    registrarAdelantoFactura: (facturaId: string, monto: number, cuentaId: string, fecha: Date, nota?: string) => Promise<void>;
+    actualizarEstadoFactura: (facturaId: string, nuevoEstado: string, estadoAnterior: string) => Promise<void>;
+    actualizarFechaVencimientoFactura: (facturaId: string, nuevaFecha: Date) => Promise<void>;
+    agregarNotaFactura: (facturaId: string, nota: string) => Promise<void>;
+
     // Liquidacion Actions
     addLiquidacion: (liq: Omit<LiquidacionNomina, "id" | "empleado">) => Promise<void>;
     updateLiquidacionEstado: (id: string, estado: 'PENDIENTE' | 'PAGADO') => Promise<void>;
@@ -784,6 +790,44 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const refreshUsers = async () => {
         const u = await getUsers();
         setUsers(u);
+    };
+
+    // FACTURA EXTRA ACTIONS
+    const registrarAdelantoFactura = async (facturaId: string, monto: number, cuentaId: string, fecha: Date, nota?: string) => {
+        try {
+            const { registrarAdelantoFacturaAction } = await import("@/app/dashboard/sistema/financiera/actions");
+            const updated = await registrarAdelantoFacturaAction(facturaId, monto, fecha, cuentaId, nota || "");
+            setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f));
+            await loadAllData();
+        } catch (error) { console.error("Error registrando adelanto:", error); throw error; }
+    };
+
+    const actualizarEstadoFactura = async (facturaId: string, nuevoEstado: string, estadoAnterior: string) => {
+        try {
+            const { actualizarEstadoFacturaAction } = await import("@/app/dashboard/sistema/financiera/actions");
+            const updated = await actualizarEstadoFacturaAction(facturaId, nuevoEstado, estadoAnterior, currentUser?.id);
+            setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f));
+            await loadAllData();
+        } catch (error) { console.error("Error actualizando estado factura:", error); throw error; }
+    };
+
+    const actualizarFechaVencimientoFactura = async (facturaId: string, nuevaFecha: Date) => {
+        try {
+            const { actualizarFechaVencimientoFacturaAction } = await import("@/app/dashboard/sistema/financiera/actions");
+            const updated = await actualizarFechaVencimientoFacturaAction(facturaId, nuevaFecha, currentUser?.id);
+            setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f));
+            await loadAllData();
+        } catch (error) { console.error("Error actualizando fecha vencimiento:", error); throw error; }
+    };
+
+    const agregarNotaFactura = async (facturaId: string, nota: string) => {
+        try {
+            const { agregarNotaFacturaAction } = await import("@/app/dashboard/sistema/financiera/actions");
+            const updated = await agregarNotaFacturaAction(facturaId, nota, currentUser?.id);
+            // Updating facturas state just triggers a re-render
+            setFacturas(prev => prev.map(f => f.id === updated.id ? updated : f));
+            await loadAllData();
+        } catch (error) { console.error("Error agregando nota factura:", error); throw error; }
     };
 
     const addConsumoMaterial = async (input: { inventarioId?: string; descripcionMaterial?: string; cotizacionId?: string; cantidad: number; unidad: string; descripcion?: string }) => {

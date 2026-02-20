@@ -114,8 +114,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         setAdelantoMonto("");
     }, [factura]);
 
-    // Movimientos history (Mock for now, would replace with real fetch if implementing full audit log)
-    const { movimientosFinancieros, refreshData } = useErp();
+    // Actions from context
+    const { movimientosFinancieros, refreshData, actualizarEstadoFactura, actualizarFechaVencimientoFactura, agregarNotaFactura, registrarAdelantoFactura } = useErp();
 
     const movimientos = useMemo(() => {
         const creationEvent: MovimientoFactura = {
@@ -132,10 +132,10 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
             .map(m => ({
                 id: m.id,
                 fecha: new Date(m.fecha),
-                tipo: m.tipo === 'INGRESO' ? 'ABONO' : 'NOTA',
+                tipo: m.tipo === 'INGRESO' ? (m.descripcion?.toLowerCase().includes('adelanto') ? 'ADELANTO' : 'ABONO') : 'NOTA',
                 descripcion: m.descripcion || m.concepto || 'Abono Recibido',
                 valor: m.valor,
-                usuario: m.registradoPor || 'Tercero',
+                usuario: m.registradoPor || 'Sistema',
             } as MovimientoFactura));
 
         return [creationEvent, ...filtered];
@@ -192,94 +192,75 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         }
     };
 
-    const handleRegistrarAdelanto = () => {
+    const handleRegistrarAdelanto = async () => {
         const monto = parseFloat(adelantoMonto);
         if (isNaN(monto) || monto <= 0) return;
+        if (!selectedCuenta) {
+            toast({ variant: "destructive", title: "Cuenta requerida", description: "Seleccione una cuenta bancaria." });
+            return;
+        }
 
         if (monto > saldoPendiente) {
             toast({ variant: "destructive", title: "Error", description: "El monto supera el saldo." });
             return;
         }
 
-        const nuevoAnticipo = anticipoTotal + monto;
-        const nuevoSaldo = Math.max(0, saldoPendiente - monto);
-        setAnticipoTotal(nuevoAnticipo);
-        setSaldoPendiente(nuevoSaldo);
+        setIsLoading(true);
+        try {
+            await registrarAdelantoFactura(factura.id, monto, selectedCuenta, new Date(), `Adelanto factura ${factura.numero || factura.id}`);
 
-        const entry: MovimientoFactura = {
-            id: Date.now().toString(),
-            fecha: new Date(),
-            tipo: 'ADELANTO',
-            descripcion: 'Adelanto registrado',
-            valor: monto,
-            usuario: 'Usuario Actual',
-        };
-
-        // setMovimientos([entry, ...movimientos]); // Removed mock update
-        setAdelantoMonto("");
-
-        onFacturaUpdated({
-            ...factura,
-            anticipoRecibido: nuevoAnticipo,
-            saldoPendiente: nuevoSaldo,
-            estado: nuevoSaldo === 0 ? 'PAGADA' : 'PARCIAL'
-        });
+            setAdelantoMonto("");
+            toast({ title: "Adelanto Registrado", description: "El adelanto fue registrado exitosamente." });
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: error.message || "No se pudo registrar adelanto." });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleCambiarEstado = () => {
+    const handleCambiarEstado = async () => {
         if (nuevoEstado === factura.estado) return;
 
-        const entry: MovimientoFactura = {
-            id: Date.now().toString(),
-            fecha: new Date(),
-            tipo: 'ESTADO_CAMBIO',
-            descripcion: `Estado cambiado de ${factura.estado} a ${nuevoEstado}`,
-            usuario: 'Usuario Actual',
-            estadoAnterior: factura.estado,
-            estadoNuevo: nuevoEstado,
-        };
-
-        // setMovimientos([entry, ...movimientos]); // Removed after switching to ERP context derivation
-
-        onFacturaUpdated({
-            ...factura,
-            estado: nuevoEstado
-        });
+        setIsLoading(true);
+        try {
+            await actualizarEstadoFactura(factura.id, nuevoEstado, factura.estado);
+            toast({ title: "Estado Actualizado", description: "El estado de la factura ha cambiado." });
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el estado." });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleActualizarFecha = () => {
+    const handleActualizarFecha = async () => {
         const currentDateStr = format(new Date(factura.fechaVencimiento), "yyyy-MM-dd");
         if (fechaVencimiento === currentDateStr) return;
 
-        const nuevaFecha = new Date(fechaVencimiento + 'T12:00:00');
-        const entry: MovimientoFactura = {
-            id: Date.now().toString(),
-            fecha: new Date(),
-            tipo: 'FECHA_CAMBIO',
-            descripcion: `Fecha vencimiento cambiada a ${format(nuevaFecha, "dd/MM/yyyy")}`,
-            usuario: 'Usuario Actual',
-        };
-
-        // setMovimientos([entry, ...movimientos]); // Removed mock update
-        toast({ title: "Fecha Actualizada", description: "La fecha de vencimiento ha sido modificada." });
-
-        onFacturaUpdated({
-            ...factura,
-            fechaVencimiento: nuevaFecha
-        });
+        setIsLoading(true);
+        try {
+            const nuevaFecha = new Date(fechaVencimiento + 'T12:00:00');
+            await actualizarFechaVencimientoFactura(factura.id, nuevaFecha);
+            toast({ title: "Fecha Actualizada", description: "La fecha de vencimiento ha sido modificada." });
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar la fecha." });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleAgregarNota = () => {
+    const handleAgregarNota = async () => {
         if (!nota.trim()) return;
-        const entry: MovimientoFactura = {
-            id: Date.now().toString(),
-            fecha: new Date(),
-            tipo: 'NOTA',
-            descripcion: nota,
-            usuario: 'Usuario Actual',
-        };
-        // setMovimientos([entry, ...movimientos]); // Removed mock update
-        setNota("");
+
+        setIsLoading(true);
+        try {
+            await agregarNotaFactura(factura.id, nota);
+            setNota("");
+            toast({ title: "Nota Agregada", description: "La nota ha sido guardada en el historial." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "Error al guardar la nota." });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const getMovimientoIcon = (tipo: MovimientoFactura['tipo']) => {
@@ -455,10 +436,35 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                                         <SelectItem value="PENDIENTE">Pendiente</SelectItem>
                                                         <SelectItem value="PARCIAL">Parcial</SelectItem>
                                                         <SelectItem value="PAGADA">Pagada</SelectItem>
+                                                        <SelectItem value="VENCIDA">Vencida</SelectItem>
+                                                        <SelectItem value="ANULADA">Anulada</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-                                            <Button variant="secondary" onClick={handleCambiarEstado} disabled={nuevoEstado === factura.estado}>
+                                            <Button variant="secondary" onClick={handleCambiarEstado} disabled={nuevoEstado === factura.estado || isLoading}>
+                                                Actualizar
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Actualizar Fecha */}
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" /> Vencimiento
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex gap-4 items-end">
+                                            <div className="flex-1">
+                                                <Input
+                                                    type="date"
+                                                    value={fechaVencimiento}
+                                                    onChange={(e) => setFechaVencimiento(e.target.value)}
+                                                />
+                                            </div>
+                                            <Button variant="secondary" onClick={handleActualizarFecha} disabled={isLoading || fechaVencimiento === format(new Date(factura.fechaVencimiento), "yyyy-MM-dd")}>
                                                 Actualizar
                                             </Button>
                                         </div>
@@ -477,7 +483,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                                 value={nota}
                                                 onChange={(e) => setNota(e.target.value)}
                                             />
-                                            <Button size="icon" variant="ghost" onClick={handleAgregarNota} disabled={!nota.trim()}>
+                                            <Button size="icon" variant="ghost" onClick={handleAgregarNota} disabled={!nota.trim() || isLoading}>
                                                 <Plus className="h-4 w-4" />
                                             </Button>
                                         </div>
