@@ -99,7 +99,6 @@ const StartLoginOne = () => {
 
     const electricalImages = [
         "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e", // Power lines
-        "https://images.unsplash.com/photo-1542826671-50e5027b4070", // High voltage transmission tower
         "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9", // High voltage tower 2
         "https://images.unsplash.com/photo-1521292270410-a8c4d716d518", // Electric cables/infrastructure
     ];

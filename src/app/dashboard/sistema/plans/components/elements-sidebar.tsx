@@ -14,9 +14,13 @@ import {
     NETWORK_CATALOG,
     DUCT_CATALOG,
     BOX_CATALOG,
+    NetworkType,
+    NetworkVariant,
 } from '@/types/plans';
-import { ChevronDown, Search, Circle, Cable, Square, Box } from 'lucide-react';
+import { ChevronDown, Search, Circle, Cable, Square, Box, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePlans } from '@/components/providers/plans-provider';
+import { getNetworkStyle } from '@/lib/plans/network-styles';
 
 export function ElementsSidebar() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +31,14 @@ export function ElementsSidebar() {
         boxes: false,
     });
 
+    const {
+        selectedNetworkType,
+        selectedNetworkVariant,
+        setSelectedNetwork,
+        setActiveTool,
+        toolState,
+    } = usePlans();
+
     const toggleSection = (section: string) => {
         setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
@@ -36,11 +48,30 @@ export function ElementsSidebar() {
         e.dataTransfer.effectAllowed = 'copy';
     };
 
+    // Click a network to select it and activate connection mode
+    const handleNetworkClick = (networkType: NetworkType, variant: NetworkVariant) => {
+        if (selectedNetworkType === networkType && selectedNetworkVariant === variant) {
+            // Deselect if clicking the same
+            setSelectedNetwork(null, null);
+            if (toolState.activeTool === 'connect') {
+                setActiveTool('select');
+            }
+        } else {
+            setSelectedNetwork(networkType, variant);
+            setActiveTool('connect');
+        }
+    };
+
     const filterItems = <T extends { name: string }>(items: T[]): T[] => {
         if (!searchQuery) return items;
         return items.filter(item =>
             item.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
+    };
+
+    // Check if a network is currently selected
+    const isNetworkSelected = (networkType: NetworkType, variant: NetworkVariant) => {
+        return selectedNetworkType === networkType && selectedNetworkVariant === variant;
     };
 
     return (
@@ -58,6 +89,39 @@ export function ElementsSidebar() {
                     />
                 </div>
             </div>
+
+            {/* Selected Network Indicator */}
+            {selectedNetworkType && selectedNetworkVariant && (
+                <div className="px-3 py-2 border-b bg-muted/50">
+                    <div className="flex items-center gap-2">
+                        <Zap className="h-3.5 w-3.5 text-amber-500" />
+                        <span className="text-[11px] font-medium text-muted-foreground">Red activa:</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span
+                            className="w-4 h-[3px] rounded-full flex-shrink-0"
+                            style={{
+                                backgroundColor: getNetworkStyle(selectedNetworkType, selectedNetworkVariant).color,
+                                borderBottom: getNetworkStyle(selectedNetworkType, selectedNetworkVariant).dashArray
+                                    ? '2px dashed ' + getNetworkStyle(selectedNetworkType, selectedNetworkVariant).color
+                                    : undefined,
+                            }}
+                        />
+                        <span className="text-xs font-semibold truncate">
+                            {getNetworkStyle(selectedNetworkType, selectedNetworkVariant).label}
+                        </span>
+                        <button
+                            onClick={() => {
+                                setSelectedNetwork(null, null);
+                                if (toolState.activeTool === 'connect') setActiveTool('select');
+                            }}
+                            className="ml-auto text-muted-foreground hover:text-foreground text-xs"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Elements List */}
             <ScrollArea className="flex-1">
@@ -120,20 +184,44 @@ export function ElementsSidebar() {
                             </Button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-0.5 pt-1">
-                            {filterItems(NETWORK_CATALOG).map((network, idx) => (
-                                <div
-                                    key={idx}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, { type: 'network', ...network })}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-grab hover:bg-accent active:cursor-grabbing transition-colors"
-                                >
+                            {filterItems(NETWORK_CATALOG).map((network, idx) => {
+                                const nType = network.networkType as NetworkType;
+                                const nVariant = network.variant as NetworkVariant;
+                                const style = getNetworkStyle(nType, nVariant);
+                                const selected = isNetworkSelected(nType, nVariant);
+
+                                return (
                                     <div
-                                        className="w-5 h-1 rounded-full"
-                                        style={{ backgroundColor: network.color }}
-                                    />
-                                    <span className="truncate text-xs">{network.name}</span>
-                                </div>
-                            ))}
+                                        key={idx}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, { type: 'network', networkType: nType, variant: nVariant, name: network.name, color: network.color })}
+                                        onClick={() => handleNetworkClick(nType, nVariant)}
+                                        className={cn(
+                                            "flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent transition-colors",
+                                            selected && "bg-accent ring-2 ring-primary/30"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            {/* Color dot */}
+                                            <div
+                                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: style.color }}
+                                            />
+                                            {/* Line preview */}
+                                            <div
+                                                className="w-5 h-0 flex-shrink-0"
+                                                style={{
+                                                    borderBottom: `${Math.min(style.strokeWidth, 3)}px ${style.dashArray ? 'dashed' : 'solid'} ${style.color}`,
+                                                }}
+                                            />
+                                        </div>
+                                        <span className="truncate text-xs">{network.name}</span>
+                                        {selected && (
+                                            <span className="ml-auto text-[10px] text-primary font-bold">✓</span>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </CollapsibleContent>
                     </Collapsible>
 
@@ -217,8 +305,9 @@ export function ElementsSidebar() {
             </ScrollArea>
 
             {/* Footer - Quick Info */}
-            <div className="p-2 border-t text-[10px] text-muted-foreground">
-                <p>Arrastra elementos al lienzo para agregarlos</p>
+            <div className="p-2 border-t text-[10px] text-muted-foreground space-y-0.5">
+                <p>🖱️ Arrastra elementos al lienzo</p>
+                <p>🔌 Clic en una red para activar modo conexión</p>
             </div>
         </div>
     );

@@ -214,7 +214,8 @@ export type ToolType =
     | 'line-draw'
     | 'polygon-draw'
     | 'eraser'
-    | 'connect';
+    | 'connect'
+    | 'pencil';
 
 export interface ToolState {
     activeTool: ToolType;
