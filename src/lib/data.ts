@@ -84,7 +84,7 @@ export const systemNavItems = [
     {
         id: 'dashboard',
         label: 'Dashboard',
-        href: '/dashboard/sistema',
+        href: '/dashboard',
         icon: FileText, // LayoutDashboardIcon imported elsewhere, using existing for now or fix imports
     },
     {

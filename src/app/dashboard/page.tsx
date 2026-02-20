@@ -1,102 +1,302 @@
-import { Badge } from "@/components/ui/badge";
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle
+} from "@/components/ui/card";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    FileText,
+    DollarSign,
+} from "lucide-react";
+import {
+    DynamicChart,
+    DashboardPanel
+} from "@/components/erp/charts";
+import { DatePickerWithRange } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
+import { isWithinInterval, startOfYear, endOfYear } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { mockQuotes } from "@/lib/data";
-import { cn } from "@/lib/utils";
-import { FilePlus, FileSearch, MoreVertical, ClipboardEdit } from "lucide-react";
-import Link from "next/link";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from "@/components/ui/dropdown-menu";
+import { useErp } from "@/components/providers/erp-provider";
+import { RegistroObra } from "@/types/sistema";
 
 export default function DashboardPage() {
+    const {
+        clientes,
+        inventario,
+        cotizaciones,
+        facturas,
+        isLoading
+    } = useErp();
+
+    // --- State ---
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: startOfYear(new Date()),
+        to: endOfYear(new Date()),
+    });
+    const [selectedClient, setSelectedClient] = useState("all");
+    const [selectedProduct, setSelectedProduct] = useState("all");
+
+    // Chart Types States
+    const [revenueType, setRevenueType] = useState("area");
+    const [statusType, setStatusType] = useState("pie");
+    const [productType, setProductType] = useState("bar");
+    const [clientVolumeType, setClientVolumeType] = useState("bar");
+    const [inventoryType, setInventoryType] = useState("table");
+
+    // --- Derived Data ---
+    const registros = useMemo(() => {
+        return cotizaciones
+            .filter(q => q.estado === 'EN_EJECUCION' || q.estado === 'FINALIZADA')
+            .map(q => ({
+                id: `REG-${q.id}`,
+                cotizacionId: q.id,
+                cotizacion: q,
+                fechaInicio: q.fecha,
+                estado: q.estado === 'FINALIZADA' ? 'FINALIZADO' : 'EN_PROCESO',
+                anticipos: [],
+                saldoPendiente: q.total,
+                nombreObra: q.descripcionTrabajo?.substring(0, 30) + "..." || "Obra sin nombre",
+                cliente: q.cliente?.nombre || "Cliente desconocido",
+                valorTotal: q.total
+            } as RegistroObra));
+    }, [cotizaciones]);
+
+    // --- Filtering ---
+    const filterByDateAndClient = (date: Date | string, clientId?: string) => {
+        const d = new Date(date);
+
+        // Date Logic
+        let dateMatch = true;
+        if (dateRange?.from) {
+            if (dateRange.to) {
+                dateMatch = isWithinInterval(d, { start: dateRange.from, end: dateRange.to });
+            } else {
+                dateMatch = d >= dateRange.from;
+            }
+        }
+
+        // Client Logic
+        let clientMatch = true;
+        if (clientId && selectedClient !== 'all') {
+            clientMatch = clientId === selectedClient;
+        }
+
+        return dateMatch && clientMatch;
+    };
+
+    // Memos
+    const filteredQuotes = useMemo(() => {
+        return cotizaciones.filter(q => {
+            const matchesFilter = filterByDateAndClient(q.fecha, q.clienteId);
+            if (!matchesFilter) return false;
+
+            // Product Filter
+            if (selectedProduct !== 'all') {
+                return q.items.some(i => i.descripcion.toLowerCase().includes(selectedProduct.toLowerCase()));
+            }
+            return true;
+        });
+    }, [dateRange, selectedClient, selectedProduct, cotizaciones]);
+
+    const filteredRegistros = useMemo(() => {
+        return registros.filter(r => {
+            const q = r.cotizacion;
+            const matchesFilter = filterByDateAndClient(q.fecha, q.clienteId);
+            if (!matchesFilter) return false;
+
+            if (selectedProduct !== 'all') {
+                return q.items.some(i => i.descripcion.toLowerCase().includes(selectedProduct.toLowerCase()));
+            }
+            return true;
+        });
+    }, [dateRange, selectedClient, selectedProduct, registros]);
+
+    // --- Derived Data for Charts ---
+
+    // 1. Ingresos (based on invoices / facturas)
+    const revenueData = useMemo(() => {
+        const agg: Record<string, number> = {};
+        facturas.forEach(f => {
+            // Using emission date for trend
+            const dateStr = new Date(f.fechaEmision).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
+            agg[dateStr] = (agg[dateStr] || 0) + f.valorFacturado;
+        });
+        return Object.keys(agg).map(key => ({ name: key, total: agg[key] })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [facturas]);
+
+    // 2. Status
+    const quoteStatusData = useMemo(() => {
+        const statusCount: Record<string, number> = {};
+        filteredQuotes.forEach(q => {
+            statusCount[q.estado] = (statusCount[q.estado] || 0) + 1;
+        });
+        return Object.keys(statusCount).map(key => ({ name: key, value: statusCount[key] }));
+    }, [filteredQuotes]);
+
+    // 3. Top Products (from filtered quotes)
+    const topProducts = useMemo(() => {
+        const productCount: Record<string, number> = {};
+        filteredQuotes.forEach(q => {
+            q.items.forEach(item => {
+                const shortLabel = item.descripcion.substring(0, 15);
+                productCount[shortLabel] = (productCount[shortLabel] || 0) + item.cantidad;
+            });
+        });
+        return Object.entries(productCount)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8);
+    }, [filteredQuotes]);
+
+    // 4. Client Volume (Top Clients by Quote Value)
+    const clientVolumeData = useMemo(() => {
+        const clientAgg: Record<string, number> = {};
+        filteredQuotes.forEach(q => {
+            const name = q.cliente?.nombre || "Otros";
+            clientAgg[name] = (clientAgg[name] || 0) + q.total;
+        });
+        return Object.entries(clientAgg)
+            .map(([name, total]) => ({ name, total }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 8);
+    }, [filteredQuotes]);
+
+    // 5. Inventory Overview
+    const inventoryData = useMemo(() => {
+        let items = inventario;
+        if (selectedProduct !== 'all') {
+            items = items.filter(i => i.descripcion.toLowerCase().includes(selectedProduct.toLowerCase()));
+        }
+        return items.map(i => ({
+            name: i.descripcion.substring(0, 20),
+            stock: i.cantidad,
+            value: i.valorUnitario * i.cantidad,
+            status: i.cantidad <= i.stockMinimo ? 'Bajo' : 'OK'
+        })).sort((a, b) => b.value - a.value).slice(0, 50);
+    }, [selectedProduct, inventario]);
+
+
+    // KPI Values
+    const totalRevenue = revenueData.reduce((acc, curr) => acc + curr.total, 0);
+    const totalQuotesValue = filteredQuotes.reduce((acc, q) => acc + q.total, 0);
+
+    if (isLoading) {
+        return <div className="p-8 text-center text-muted-foreground animate-pulse">Cargando Dashboard...</div>;
+    }
+
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-primary font-headline tracking-tight">Vista General de Ofertas</h1>
-                    <p className="text-muted-foreground">Un resumen de todas las cotizaciones y sus estados.</p>
+        <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+            {/* Header */}
+            <div className="flex flex-col gap-4">
+                <h2 className="text-3xl font-bold tracking-tight font-headline text-primary">Dashboard Avanzado</h2>
+
+                {/* Filters Bar */}
+                <div className="flex flex-wrap items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Rango de Fechas</span>
+                        <DatePickerWithRange value={dateRange} onChange={(d) => setDateRange(d)} />
+                    </div>
+
+                    <div className="flex flex-col gap-1 w-[240px]">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Cliente</span>
+                        <Select value={selectedClient} onValueChange={setSelectedClient}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos los Clientes</SelectItem>
+                                {clientes.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1 w-[240px]">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Filtrar por Producto</span>
+                        <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos los Productos</SelectItem>
+                                <SelectItem value="Cable">Cables</SelectItem>
+                                <SelectItem value="Tornillo">Tornillería</SelectItem>
+                                <SelectItem value="Caja">Cajas Eléctricas</SelectItem>
+                                <SelectItem value="Breaker">Breakers</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="flex-1 text-right pt-4">
+                        <Button variant="outline" onClick={() => { setDateRange(undefined); setSelectedClient('all'); setSelectedProduct('all'); }}>Limpiar Filtros</Button>
+                    </div>
                 </div>
-                <Button asChild size="lg" className="electric-button font-bold text-lg px-8 py-6">
-                    <Link href="/dashboard/quotes/new">
-                        <FilePlus />
-                        <span>Crear Cotización</span>
-                    </Link>
-                </Button>
             </div>
-            
-            <Card className="border-border/50">
-                <CardHeader>
-                    <CardTitle>Cotizaciones Recientes</CardTitle>
-                    <CardDescription>Mostrando las últimas 10 cotizaciones generadas.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[100px]">N° Oferta</TableHead>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead className="text-right">Precio Final (con IVA)</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {mockQuotes.map((quote, index) => (
-                                <TableRow key={quote.id}>
-                                    <TableCell className="font-medium">#{index + 1}</TableCell>
-                                    <TableCell>{new Date(quote.date).toLocaleDateString('es-CO')}</TableCell>
-                                    <TableCell>{quote.client}</TableCell>
-                                    <TableCell>
-                                        <Badge
-                                            className={cn({
-                                                "bg-green-500/20 text-green-400 border-green-500/30": quote.status === 'Aprobado',
-                                                "bg-yellow-500/20 text-yellow-400 border-yellow-500/30": quote.status === 'Pendiente',
-                                                "bg-red-500/20 text-red-400 border-red-500/30": quote.status === 'No aprobado',
-                                            })}
-                                        >
-                                            {quote.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(quote.total)}
-                                    </TableCell>
-                                    <TableCell>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon">
-                                                    <MoreVertical />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <DropdownMenuItem asChild>
-                                                    <Link href={`/dashboard/quotes/${quote.id}`}>
-                                                        <FileSearch className="mr-2"/>
-                                                        Ver Oferta
-                                                    </Link>
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSub>
-                                                    <DropdownMenuSubTrigger>
-                                                        <ClipboardEdit className="mr-2" />
-                                                        Cambiar Estado
-                                                    </DropdownMenuSubTrigger>
-                                                    <DropdownMenuPortal>
-                                                        <DropdownMenuSubContent>
-                                                            <DropdownMenuItem>Aprobado</DropdownMenuItem>
-                                                            <DropdownMenuItem>Pendiente</DropdownMenuItem>
-                                                            <DropdownMenuItem>No aprobado</DropdownMenuItem>
-                                                        </DropdownMenuSubContent>
-                                                    </DropdownMenuPortal>
-                                                </DropdownMenuSub>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+
+            {/* KPIs */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="shadow-sm border-l-4 border-l-primary bg-card">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Ingresos (Facturado)</CardTitle>
+                        <DollarSign className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+                    </CardContent>
+                </Card>
+                <Card className="shadow-sm border-l-4 border-l-green-500 bg-card">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Cotizaciones ({filteredQuotes.length})</CardTitle>
+                        <FileText className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{formatCurrency(totalQuotesValue)}</div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Dynamic Panels */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* 1. Ingresos */}
+                <DashboardPanel title="Tendencia de Facturación" sub="Evolución de ventas mensuales" typeState={[revenueType, setRevenueType]}>
+                    <DynamicChart type={revenueType} data={revenueData} dataKey="total" xAxisKey="name" color="#0088FE" />
+                </DashboardPanel>
+
+                {/* 2. Top Products */}
+                <DashboardPanel title="Productos Demandados" sub="Top items por cantidad cotizada" typeState={[productType, setProductType]}>
+                    <DynamicChart type={productType} data={topProducts} dataKey="count" xAxisKey="name" color="#82ca9d" />
+                </DashboardPanel>
+
+                {/* 3. Quote Status */}
+                <DashboardPanel title="Estado de Cotizaciones" sub="Distribución por estado actual" typeState={[statusType, setStatusType]}>
+                    <DynamicChart type={statusType} data={quoteStatusData} dataKey="value" xAxisKey="name" color="#ffc658" />
+                </DashboardPanel>
+
+                {/* 4. Client Volume */}
+                <DashboardPanel title="Volumen por Cliente" sub="Clientes con mayor valor cotizado" typeState={[clientVolumeType, setClientVolumeType]}>
+                    <DynamicChart type={clientVolumeType} data={clientVolumeData} dataKey="total" xAxisKey="name" color="#FF8042" />
+                </DashboardPanel>
+
+            </div>
+
+            {/* Full Width Table Panel */}
+            <DashboardPanel title="Estado de Inventario" sub="Vista de valorización y alertas de stock" typeState={[inventoryType, setInventoryType]}>
+                <DynamicChart type={inventoryType} data={inventoryData} dataKey="value" xAxisKey="name" color="#8884d8" height={400} />
+            </DashboardPanel>
+
         </div>
-    )
+    );
 }

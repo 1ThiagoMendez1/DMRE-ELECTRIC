@@ -75,9 +75,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton
                         asChild
-                        isActive={pathname.startsWith(item.href)}
+                        isActive={item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)}
                         tooltip={item.label}
-                        className={cn(pathname.startsWith(item.href) && "bg-sidebar-accent text-sidebar-accent-foreground")}
+                        className={cn((item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)) && "bg-sidebar-accent text-sidebar-accent-foreground")}
                       >
                         <Link href={item.href}>
                           <item.icon className="h-4 w-4" />
