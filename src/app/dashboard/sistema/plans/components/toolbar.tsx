@@ -18,6 +18,7 @@ import {
     FileImage,
     FileText,
     Link,
+    Pencil,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -27,6 +28,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
+import { PlanVersionsDialog } from './plan-versions-dialog';
 
 export function Toolbar() {
     const {
@@ -87,6 +89,20 @@ export function Toolbar() {
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>Conectar (C)</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant={toolState.activeTool === 'pencil' ? 'default' : 'ghost'}
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setActiveTool('pencil')}
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Lápiz (P)</TooltipContent>
                     </Tooltip>
                 </div>
 
@@ -242,6 +258,11 @@ export function Toolbar() {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
+
+                <Separator orientation="vertical" className="h-6 mx-1" />
+
+                {/* Versions History */}
+                <PlanVersionsDialog />
             </div>
         </TooltipProvider>
     );

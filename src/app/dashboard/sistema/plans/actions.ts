@@ -21,6 +21,16 @@ export interface ProyectoPlano {
     updated_at: string;
 }
 
+export interface PlanVersion {
+    id: string;
+    project_id: string;
+    name: string;
+    description?: string;
+    canvas_state: unknown;
+    created_by?: string;
+    created_at: string;
+}
+
 export interface CreateProyectoPlanoInput {
     name: string;
     description?: string;
@@ -315,5 +325,123 @@ export async function exportPlanToStorage(
     } catch (err) {
         console.error('Error in exportPlanToStorage:', err);
         return { url: null, error: 'Error exporting plan' };
+    }
+}
+// ============================================
+// VERSIONING ACTIONS
+// ============================================
+
+export async function createPlanVersion(projectId: string, name: string, description?: string, canvasState?: unknown): Promise<{ success: boolean; error: string | null }> {
+    try {
+        const supabase = await createClient();
+
+        let snapshotState = canvasState;
+
+        // 1. If no state provided, fetch current project state
+        if (!snapshotState) {
+            const { data: project } = await supabase
+                .from('proyectos_planos')
+                .select('canvas_state')
+                .eq('id', projectId)
+                .single();
+
+            if (!project) return { success: false, error: 'Proyecto no encontrado' };
+            snapshotState = project.canvas_state;
+        }
+
+        // 2. Create version snapshot
+        const { error } = await supabase
+            .from('plan_versions')
+            .insert({
+                project_id: projectId,
+                name,
+                description,
+                canvas_state: snapshotState
+            });
+
+        if (error) {
+            console.error('Error creating plan version:', error);
+            return { success: false, error: error.message };
+        }
+
+        return { success: true, error: null };
+    } catch (err) {
+        console.error('Error in createPlanVersion:', err);
+        return { success: false, error: 'Error creating version' };
+    }
+}
+
+export async function getPlanVersions(projectId: string): Promise<{ data: PlanVersion[] | null; error: string | null }> {
+    try {
+        const supabase = await createClient();
+
+        const { data, error } = await supabase
+            .from('plan_versions')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching plan versions:', error);
+            return { data: null, error: error.message };
+        }
+
+        return { data: data as PlanVersion[], error: null };
+    } catch (err) {
+        console.error('Error in getPlanVersions:', err);
+        return { data: null, error: 'Error fetching versions' };
+    }
+}
+
+export async function restorePlanVersion(versionId: string): Promise<{ success: boolean; error: string | null }> {
+    try {
+        const supabase = await createClient();
+
+        // 1. Get version state
+        const { data: version } = await supabase
+            .from('plan_versions')
+            .select('*')
+            .eq('id', versionId)
+            .single();
+
+        if (!version) return { success: false, error: 'Versión no encontrada' };
+
+        // 2. Update project with version state
+        const { error } = await supabase
+            .from('proyectos_planos')
+            .update({ canvas_state: version.canvas_state })
+            .eq('id', version.project_id);
+
+        if (error) {
+            console.error('Error restoring version:', error);
+            return { success: false, error: error.message };
+        }
+
+        revalidatePath(`/dashboard/sistema/plans/canvas/${version.project_id}`);
+        return { success: true, error: null };
+    } catch (err) {
+        console.error('Error in restorePlanVersion:', err);
+        return { success: false, error: 'Error restoring version' };
+    }
+}
+
+export async function deletePlanVersion(versionId: string): Promise<{ success: boolean; error: string | null }> {
+    try {
+        const supabase = await createClient();
+
+        const { error } = await supabase
+            .from('plan_versions')
+            .delete()
+            .eq('id', versionId);
+
+        if (error) {
+            console.error('Error deleting version:', error);
+            return { success: false, error: error.message };
+        }
+
+        return { success: true, error: null };
+    } catch (err) {
+        console.error('Error in deletePlanVersion:', err);
+        return { success: false, error: 'Error deleting version' };
     }
 }
