@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Download, MessageSquare, Send, CheckCircle2, Clock, MapPin, Calendar, ArrowLeft, Printer } from "lucide-react";
-import { initialQuotes } from "@/lib/mock-data";
+import { FileText, Download, MessageSquare, Send, CheckCircle2, Clock, MapPin, Calendar, ArrowLeft, Printer, Lock, ShieldAlert, Upload, Loader2, Eye } from "lucide-react";
+import { getPublicCotizacionAction, getSecureCotizacionDocumentsAction, uploadPublicCotizacionDocumentAction } from "@/app/dashboard/sistema/cotizacion/actions";
 import { Cotizacion, ComentarioCotizacion } from "@/types/sistema";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -33,18 +33,72 @@ function PortalViewContent() {
     const [comments, setComments] = useState<ComentarioCotizacion[]>([]);
     const [newComment, setNewComment] = useState("");
     const [loading, setLoading] = useState(true);
+    const [secureDocs, setSecureDocs] = useState<{ legalDocs: any[], polizas: any[] } | null>(null);
+    const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+    const docLegalInputRef = useRef<HTMLInputElement>(null);
+    const docPolizaInputRef = useRef<HTMLInputElement>(null);
+
+    const loadSecureDocs = async (quoteId: string) => {
+        const docs = await getSecureCotizacionDocumentsAction(quoteId);
+        if (docs) {
+            setSecureDocs({ legalDocs: docs.legalDocs, polizas: docs.polizas });
+        }
+    };
 
     useEffect(() => {
-        // Simulate fetch
-        if (id) {
-            const found = initialQuotes.find(q => q.id === id);
-            if (found) {
-                setQuote(found);
-                setComments(initialComments[found.numero] || []); // Use Numero for reliable mock key match if ID varies
+        async function fetchQuote() {
+            if (id) {
+                try {
+                    const found = await getPublicCotizacionAction(id);
+                    if (found) {
+                        setQuote(found);
+                        setComments(initialComments[found.numero] || []); // Mock comments support
+
+                        if (['ACEPTADA'].includes(found.estado)) {
+                            await loadSecureDocs(id);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to load quote", e);
+                }
             }
+            setLoading(false);
         }
-        setLoading(false);
+        fetchQuote();
     }, [id]);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros') => {
+        const file = e.target.files?.[0];
+        if (!file || !quote) return;
+
+        setIsUploadingDoc(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            await uploadPublicCotizacionDocumentAction(quote.numero, category, formData);
+
+            toast({
+                title: "Archivo subido correctamente",
+                description: "El documento se ha compartido de manera segura con DMRE.",
+            });
+
+            // Reload the documents to show the newly uploaded one
+            if (id) await loadSecureDocs(id);
+
+        } catch (error: any) {
+            console.error("Error uploading from portal", error);
+            toast({
+                title: "Error al subir",
+                description: error.message || "Ocurrió un error al subir su documento.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUploadingDoc(false);
+            if (e.target) e.target.value = '';
+        }
+    };
 
     const handleSendComment = () => {
         if (!newComment.trim()) return;
@@ -168,6 +222,99 @@ function PortalViewContent() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Secure Documents Section (Conditionally Rendered based on State AND Backend verification) */}
+                    {secureDocs && (
+                        <Card className="border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                                <ShieldAlert className="w-32 h-32" />
+                            </div>
+                            <CardHeader className="pb-3 border-b border-emerald-500/10">
+                                <div>
+                                    <CardTitle className="text-lg flex items-center gap-2 text-emerald-800 dark:text-emerald-400">
+                                        <Lock className="h-4 w-4" />
+                                        Documentación Confidencial Encriptada
+                                    </CardTitle>
+                                    <CardDescription className="text-emerald-700/70 dark:text-emerald-500/70">
+                                        Documentación de carácter legal y pólizas, accesibles únicamente bajo una conexión segura aprobada.
+                                    </CardDescription>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-6 pt-6 relative z-10">
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                                            <FileText className="h-4 w-4 text-emerald-600" /> Documentación Legal
+                                        </h4>
+                                        <div>
+                                            <input type="file" ref={docLegalInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'Documentacion')} />
+                                            <Button variant="outline" size="sm" onClick={() => docLegalInputRef.current?.click()} disabled={isUploadingDoc}>
+                                                {isUploadingDoc ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                                                Subir Documento
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {secureDocs.legalDocs.map(doc => (
+                                            <div key={doc.id} className="flex items-center justify-between p-3 border rounded-md bg-background hover:border-emerald-500/40 transition-colors">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded">
+                                                        <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <p className="text-sm font-medium truncate">{doc.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{doc.size} • Verificado DMRE</p>
+                                                    </div>
+                                                </div>
+                                                <Button size="icon" variant="ghost" className="shrink-0" asChild>
+                                                    <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" title="Ver Documento">
+                                                        <Eye className="h-4 w-4" />
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <Separator className="bg-emerald-500/10" />
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                                            <ShieldAlert className="h-4 w-4 text-emerald-600" /> Pólizas y Seguros
+                                        </h4>
+                                        <div>
+                                            <input type="file" ref={docPolizaInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'Polizasyseguros')} />
+                                            <Button variant="outline" size="sm" onClick={() => docPolizaInputRef.current?.click()} disabled={isUploadingDoc}>
+                                                {isUploadingDoc ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                                                Subir Póliza
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {secureDocs.polizas.map(doc => (
+                                            <div key={doc.id} className="flex items-center justify-between p-3 border rounded-md bg-background hover:border-emerald-500/40 transition-colors">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded">
+                                                        <ShieldAlert className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <p className="text-sm font-medium truncate">{doc.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{doc.size} • Verificado DMRE</p>
+                                                    </div>
+                                                </div>
+                                                <Button size="icon" variant="ghost" className="shrink-0" asChild>
+                                                    <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" title="Ver Póliza">
+                                                        <Eye className="h-4 w-4" />
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Sidebar: Chat */}
@@ -243,11 +390,10 @@ export default function PortalViewPage() {
 
 function StatusBadge({ status }: { status: string }) {
     switch (status) {
-        case 'APROBADA': return <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">Aprobada</Badge>;
-        case 'PENDIENTE': return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200">Pendiente</Badge>;
-        case 'NO_APROBADA': return <Badge variant="destructive">Rechazada</Badge>;
-        case 'EN_EJECUCION': return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200">En Ejecución</Badge>;
-        case 'FINALIZADA': return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200">Finalizada</Badge>;
+        case 'ACEPTADA': return <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">Aceptada</Badge>;
+        case 'RECHAZADA': return <Badge variant="destructive">Rechazada</Badge>;
+        case 'EN_REVISION': return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200">En Revisión</Badge>;
+        case 'MODIFICACION': return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200">Modificación</Badge>;
         default: return <Badge variant="outline">{status}</Badge>;
     }
 }

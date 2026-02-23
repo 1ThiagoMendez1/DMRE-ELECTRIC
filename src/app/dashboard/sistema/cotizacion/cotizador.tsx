@@ -23,7 +23,9 @@ import { formatCurrency } from "@/lib/utils";
 import { ProductSelectorDialog } from "@/components/erp/product-selector-dialog";
 import { Checkbox as CheckboxUI } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { generateQuotePDF } from "@/utils/pdf-generator";
+import { RefreshCw } from "lucide-react";
 interface CotizadorProps {
     clientes: Cliente[];
     inventario: InventarioItem[];
@@ -43,10 +45,14 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
     const [fechaCotizacion, setFechaCotizacion] = useState<string>(new Date().toISOString().split('T')[0]);
     const [descripcionTrabajo, setDescripcionTrabajo] = useState("");
     const [tipoOferta, setTipoOferta] = useState<Cotizacion['tipo']>('NORMAL');
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [activeTab, setActiveTab] = useState("editor");
 
     // Global AIU & Tax State
     const [globalDiscountPct, setGlobalDiscountPct] = useState(0);
     const [globalIvaPct, setGlobalIvaPct] = useState(19);
+    const [esAiu, setEsAiu] = useState(false);
     const [aiuAdminPct, setAiuAdminPct] = useState(0);
     const [aiuImprevistoPct, setAiuImprevistoPct] = useState(0);
     const [aiuUtilidadPct, setAiuUtilidadPct] = useState(0);
@@ -69,9 +75,9 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
             descuentoGlobal: descuento,
             descuentoGlobalPorcentaje: globalDiscountPct,
             impuestoGlobalPorcentaje: globalIvaPct,
-            aiuAdminGlobalPorcentaje: aiuAdminPct,
-            aiuImprevistoGlobalPorcentaje: aiuImprevistoPct,
-            aiuUtilidadGlobalPorcentaje: aiuUtilidadPct,
+            aiuAdminGlobalPorcentaje: esAiu ? aiuAdminPct : 0,
+            aiuImprevistoGlobalPorcentaje: esAiu ? aiuImprevistoPct : 0,
+            aiuUtilidadGlobalPorcentaje: esAiu ? aiuUtilidadPct : 0,
             ivaUtilidadGlobalPorcentaje: ivaUtilidadPct,
             aiuAdmin: aiuAdminVal,
             aiuImprevistos: aiuImprevistoVal,
@@ -106,29 +112,23 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
             setAiuImprevistoPct(initialData.aiuImprevistoGlobalPorcentaje || 0);
             setAiuUtilidadPct(initialData.aiuUtilidadGlobalPorcentaje || 0);
             setIvaUtilidadPct(initialData.ivaUtilidadGlobalPorcentaje || 19);
+
+            const hasAiu = (initialData.aiuAdminGlobalPorcentaje || 0) > 0 || (initialData.aiuImprevistoGlobalPorcentaje || 0) > 0 || (initialData.aiuUtilidadGlobalPorcentaje || 0) > 0;
+            setEsAiu(hasAiu);
         }
     }, [initialData]);
 
-    const handleExportPDF = () => {
-        console.log("Exportando PDF...", {
-            cliente: selectedCliente,
-            items: showProductsInPdf ? items : "Ocultos en PDF",
-            total
-        });
-        alert(`Generando PDF... \n¿Incluir Productos?: ${showProductsInPdf ? "Sí" : "No"}`);
-    };
 
-    // Totales
     const { subtotal, descuento, aiuAdminVal, aiuImprevistoVal, aiuUtilidadVal, iva, total } = useMemo(() => {
         const sub = items.reduce((acc, item) => acc + (item.cantidad * item.valorUnitario), 0);
         const discountVal = sub * (globalDiscountPct / 100);
         const subAfterDiscount = sub - discountVal;
 
-        const aiuAdmin = subAfterDiscount * (aiuAdminPct / 100);
-        const aiuImprevisto = subAfterDiscount * (aiuImprevistoPct / 100);
-        const aiuUtilidad = subAfterDiscount * (aiuUtilidadPct / 100);
+        const aiuAdmin = esAiu ? subAfterDiscount * (aiuAdminPct / 100) : 0;
+        const aiuImprevisto = esAiu ? subAfterDiscount * (aiuImprevistoPct / 100) : 0;
+        const aiuUtilidad = esAiu ? subAfterDiscount * (aiuUtilidadPct / 100) : 0;
 
-        const taxableBase = subAfterDiscount + (aiuUtilidad); // Usually IVA is on Utility
+        const taxableBase = esAiu ? aiuUtilidad : subAfterDiscount;
         const totalIva = taxableBase * (globalIvaPct / 100);
 
         return {
@@ -140,7 +140,80 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
             iva: totalIva,
             total: subAfterDiscount + aiuAdmin + aiuImprevisto + aiuUtilidad + totalIva
         };
-    }, [items, globalDiscountPct, globalIvaPct, aiuAdminPct, aiuImprevistoPct, aiuUtilidadPct]);
+    }, [items, globalDiscountPct, globalIvaPct, aiuAdminPct, aiuImprevistoPct, aiuUtilidadPct, esAiu]);
+
+    const getCurrentQuoteObj = (): Cotizacion => ({
+        id: initialData?.id || `COT-TEMPORAL`,
+        numero: initialData?.numero || `COT-TEMPORAL`,
+        tipo: tipoOferta,
+        fecha: new Date(fechaCotizacion),
+        cliente: selectedCliente || {
+            id: 'temp', nombre: 'Cliente de Prueba', documento: '000000',
+            direccion: 'No definida', correo: '', telefono: '',
+            contactoPrincipal: '', fechaCreacion: new Date()
+        },
+        clienteId: selectedCliente?.id || 'temp',
+        descripcionTrabajo: descripcionTrabajo,
+        items: items,
+        subtotal: subtotal,
+        iva: iva,
+        descuentoGlobal: descuento,
+        descuentoGlobalPorcentaje: globalDiscountPct,
+        impuestoGlobalPorcentaje: globalIvaPct,
+        aiuAdminGlobalPorcentaje: esAiu ? aiuAdminPct : 0,
+        aiuImprevistoGlobalPorcentaje: esAiu ? aiuImprevistoPct : 0,
+        aiuUtilidadGlobalPorcentaje: esAiu ? aiuUtilidadPct : 0,
+        ivaUtilidadGlobalPorcentaje: ivaUtilidadPct,
+        aiuAdmin: aiuAdminVal,
+        aiuImprevistos: aiuImprevistoVal,
+        aiuUtilidad: aiuUtilidadVal,
+        total: total,
+        estado: initialData?.estado || 'BORRADOR'
+    });
+
+    const handleGeneratePreview = () => {
+        setIsGeneratingPdf(true);
+        setTimeout(() => {
+            try {
+                const quoteObj = getCurrentQuoteObj();
+                // Depending on settings, we might want to hide products or respect the checkbox
+                const visibilityMode = showProductsInPdf ? 'MOSTRAR_TODO' : 'OCULTAR_PRODUCTOS';
+                const url = generateQuotePDF(
+                    quoteObj,
+                    visibilityMode as any, // type cast if needed
+                    undefined, // default company
+                    undefined, // default style
+                    'bloburl'
+                ) as string;
+
+                setPdfUrl(url);
+            } catch (err) {
+                console.error("Error generating PDF preview", err);
+            } finally {
+                setIsGeneratingPdf(false);
+            }
+        }, 100);
+    };
+
+    // Generate PDF automatically when switching to the preview tab if it's not generated yet
+    useEffect(() => {
+        if (activeTab === "preview") {
+            handleGeneratePreview();
+        }
+    }, [activeTab]);
+
+    const handleExportPDF = () => {
+        if (!selectedCliente) return;
+        const quoteObj = getCurrentQuoteObj();
+        const visibilityMode = showProductsInPdf ? 'MOSTRAR_TODO' : 'OCULTAR_PRODUCTOS';
+        generateQuotePDF(
+            quoteObj,
+            visibilityMode as any,
+            undefined,
+            undefined,
+            'save'
+        );
+    };
 
     // Handlers
     const handleSelectClient = (cliente: Cliente) => {
@@ -186,194 +259,229 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
     return (
         <div className="flex flex-col h-full">
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
-                {/* Left Column: Quote Details */}
+                {/* Left Column: Quote Details / PDF Preview */}
                 <div className="lg:col-span-2 space-y-4 flex flex-col h-full overflow-hidden">
-                    {/* Header Info Section */}
-                    <Card className="shrink-0">
-                        <CardHeader className="py-3">
-                            <CardTitle className="text-sm font-medium">Información General</CardTitle>
-                        </CardHeader>
-                        <CardContent className="py-2 grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="fecha" className="text-xs">Fecha de Emisión</Label>
-                                <Input
-                                    id="fecha"
-                                    type="date"
-                                    value={fechaCotizacion}
-                                    onChange={(e) => setFechaCotizacion(e.target.value)}
-                                    className="h-8 text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="tipo" className="text-xs">Tipo de Oferta</Label>
-                                <Select value={tipoOferta} onValueChange={(v: any) => setTipoOferta(v)}>
-                                    <SelectTrigger className="h-8 text-sm">
-                                        <SelectValue placeholder="Tipo" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="NORMAL">Normal</SelectItem>
-                                        <SelectItem value="SIMPLIFICADA">Simplificada</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="col-span-2 space-y-1">
-                                <Label htmlFor="descripcion" className="text-xs">Descripción del Trabajo</Label>
-                                <Input
-                                    id="descripcion"
-                                    value={descripcionTrabajo}
-                                    onChange={(e) => setDescripcionTrabajo(e.target.value)}
-                                    placeholder="Ej: Instalación eléctrica trifásica..."
-                                    className="h-8 text-sm"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Client Section */}
-                    <Card className="shrink-0">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 py-3">
-                            <CardTitle className="text-sm font-medium">Cliente</CardTitle>
-                            <Button variant="outline" size="sm" onClick={() => setIsClientModalOpen(true)}>
-                                <User className="mr-2 h-3 w-3" />
-                                {selectedCliente ? "Cambiar" : "Seleccionar"}
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="py-2">
-                            {selectedCliente ? (
-                                <div className="text-sm">
-                                    <p className="font-semibold">{selectedCliente.nombre}</p>
-                                    <p className="text-muted-foreground">{selectedCliente.documento} - {selectedCliente.telefono}</p>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">Ningún cliente seleccionado</p>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+                        <div className="flex justify-between items-center shrink-0 mb-4">
+                            <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+                                <TabsTrigger value="editor">Editor</TabsTrigger>
+                                <TabsTrigger value="preview">Vista Previa PDF</TabsTrigger>
+                            </TabsList>
+                            {activeTab === "preview" && (
+                                <Button variant="outline" size="sm" onClick={handleGeneratePreview} disabled={isGeneratingPdf}>
+                                    <RefreshCw className={`mr-2 h-4 w-4 ${isGeneratingPdf ? 'animate-spin' : ''}`} />
+                                    Actualizar
+                                </Button>
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
 
-                    {/* Items Section */}
-                    <Card className="flex-1 flex flex-col overflow-hidden">
-                        <CardHeader className="flex flex-row items-center justify-between py-3 shrink-0">
-                            <CardTitle className="text-sm font-medium">Items</CardTitle>
-                            <Button size="sm" onClick={() => setIsInventoryModalOpen(true)} disabled={!selectedCliente}>
-                                <Plus className="mr-2 h-3 w-3" /> Agregar
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="flex-1 overflow-auto p-0">
-                            <Table>
-                                <TableHeader className="sticky top-0 bg-background z-10">
-                                    <TableRow>
-                                        <TableHead>Descripción</TableHead>
-                                        <TableHead className="w-[80px]">Cant.</TableHead>
-                                        <TableHead className="text-right w-[100px]">Precio Prov.</TableHead>
-                                        <TableHead className="text-right w-[100px]">Precio Venta</TableHead>
-                                        <TableHead className="text-right w-[100px]">Total</TableHead>
-                                        <TableHead className="w-[40px]"></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {items.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                                Sin items.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : items.map((item, index) => {
-                                        const finalTotal = item.cantidad * item.valorUnitario;
+                        <TabsContent value="editor" className="flex-1 flex-col space-y-4 overflow-auto m-0 outline-none pb-4">
+                            {/* Header Info Section */}
+                            <Card className="shrink-0">
+                                <CardHeader className="py-3">
+                                    <CardTitle className="text-sm font-medium">Información General</CardTitle>
+                                </CardHeader>
+                                <CardContent className="py-2 grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="fecha" className="text-xs">Fecha de Emisión</Label>
+                                        <Input
+                                            id="fecha"
+                                            type="date"
+                                            value={fechaCotizacion}
+                                            onChange={(e) => setFechaCotizacion(e.target.value)}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="tipo" className="text-xs">Tipo de Oferta</Label>
+                                        <Select value={tipoOferta} onValueChange={(v: any) => setTipoOferta(v)}>
+                                            <SelectTrigger className="h-8 text-sm">
+                                                <SelectValue placeholder="Tipo" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="NORMAL">Normal</SelectItem>
+                                                <SelectItem value="SIMPLIFICADA">Simplificada</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="col-span-2 space-y-1">
+                                        <Label htmlFor="descripcion" className="text-xs">Descripción del Trabajo</Label>
+                                        <Input
+                                            id="descripcion"
+                                            value={descripcionTrabajo}
+                                            onChange={(e) => setDescripcionTrabajo(e.target.value)}
+                                            placeholder="Ej: Instalación eléctrica trifásica..."
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
 
-                                        return (
-                                            <Fragment key={item.id}>
+                            {/* Client Section */}
+                            <Card className="shrink-0">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 py-3">
+                                    <CardTitle className="text-sm font-medium">Cliente</CardTitle>
+                                    <Button variant="outline" size="sm" onClick={() => setIsClientModalOpen(true)}>
+                                        <User className="mr-2 h-3 w-3" />
+                                        {selectedCliente ? "Cambiar" : "Seleccionar"}
+                                    </Button>
+                                </CardHeader>
+                                <CardContent className="py-2">
+                                    {selectedCliente ? (
+                                        <div className="text-sm">
+                                            <p className="font-semibold">{selectedCliente.nombre}</p>
+                                            <p className="text-muted-foreground">{selectedCliente.documento} - {selectedCliente.telefono}</p>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Ningún cliente seleccionado</p>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Items Section */}
+                            <Card className="flex-1 flex flex-col overflow-hidden">
+                                <CardHeader className="flex flex-row items-center justify-between py-3 shrink-0">
+                                    <CardTitle className="text-sm font-medium">Items</CardTitle>
+                                    <Button size="sm" onClick={() => setIsInventoryModalOpen(true)} disabled={!selectedCliente}>
+                                        <Plus className="mr-2 h-3 w-3" /> Agregar
+                                    </Button>
+                                </CardHeader>
+                                <CardContent className="flex-1 overflow-auto p-0">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-background z-10">
+                                            <TableRow>
+                                                <TableHead>Descripción</TableHead>
+                                                <TableHead className="w-[80px]">Cant.</TableHead>
+                                                <TableHead className="text-right w-[100px]">Precio Prov.</TableHead>
+                                                <TableHead className="text-right w-[100px]">Precio Venta</TableHead>
+                                                <TableHead className="text-right w-[100px]">Total</TableHead>
+                                                <TableHead className="w-[40px]"></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {items.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell className="text-xs">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2">
-                                                                {item.tipo === 'SERVICIO' ? <Wrench className="h-3 w-3 text-blue-500" /> : <Package className="h-3 w-3 text-green-500" />}
-                                                                <span className="font-medium">{item.descripcion}</span>
-                                                            </div>
-                                                            {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && (
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    <CheckboxUI
-                                                                        id={`hide-details-${item.id}`}
-                                                                        checked={!!item.ocultarDetalles}
-                                                                        onCheckedChange={(checked) => {
-                                                                            const updated = [...items];
-                                                                            updated[index].ocultarDetalles = !!checked;
-                                                                            setItems(updated);
-                                                                        }}
-                                                                        className="h-3 w-3"
-                                                                    />
-                                                                    <Label htmlFor={`hide-details-${item.id}`} className="text-[10px] text-muted-foreground cursor-pointer flex items-center gap-1">
-                                                                        <EyeOff className="h-3 w-3" /> Ocultar detalles
-                                                                    </Label>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Input
-                                                            type="number"
-                                                            value={item.cantidad}
-                                                            onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
-                                                            className="h-7 w-14 text-xs"
-                                                            min={1}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Input
-                                                            type="number"
-                                                            value={item.costoUnitario}
-                                                            onChange={(e) => {
-                                                                const updated = [...items];
-                                                                updated[index].costoUnitario = parseFloat(e.target.value) || 0;
-                                                                setItems(updated);
-                                                            }}
-                                                            className="h-7 w-20 text-xs text-right"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Input
-                                                            type="number"
-                                                            value={item.valorUnitario}
-                                                            onChange={(e) => {
-                                                                const updated = [...items];
-                                                                updated[index].valorUnitario = parseFloat(e.target.value) || 0;
-                                                                setItems(updated);
-                                                            }}
-                                                            className="h-7 w-20 text-xs text-right"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="text-right text-xs font-bold">
-                                                        {formatCurrency(finalTotal)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(item.id)}>
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </Button>
+                                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                                        Sin items.
                                                     </TableCell>
                                                 </TableRow>
-                                                {/* Subitems Render */}
-                                                {item.tipo === 'SERVICIO' && item.subItems && !item.ocultarDetalles && (
-                                                    item.subItems.map((sub, subIdx) => (
-                                                        <TableRow key={`${item.id}-sub-${subIdx}`} className="bg-muted/10 border-0 hover:bg-transparent">
-                                                            <TableCell colSpan={2} className="pl-8 py-1">
-                                                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                                                    <span>↳</span>
-                                                                    <span>{sub.nombre}</span>
+                                            ) : items.map((item, index) => {
+                                                const finalTotal = item.cantidad * item.valorUnitario;
+
+                                                return (
+                                                    <Fragment key={item.id}>
+                                                        <TableRow>
+                                                            <TableCell className="text-xs">
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {item.tipo === 'SERVICIO' ? <Wrench className="h-3 w-3 text-blue-500" /> : <Package className="h-3 w-3 text-green-500" />}
+                                                                        <span className="font-medium">{item.descripcion}</span>
+                                                                    </div>
+                                                                    {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && (
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <CheckboxUI
+                                                                                id={`hide-details-${item.id}`}
+                                                                                checked={!!item.ocultarDetalles}
+                                                                                onCheckedChange={(checked) => {
+                                                                                    const updated = [...items];
+                                                                                    updated[index].ocultarDetalles = !!checked;
+                                                                                    setItems(updated);
+                                                                                }}
+                                                                                className="h-3 w-3"
+                                                                            />
+                                                                            <Label htmlFor={`hide-details-${item.id}`} className="text-[10px] text-muted-foreground cursor-pointer flex items-center gap-1">
+                                                                                <EyeOff className="h-3 w-3" /> Ocultar detalles
+                                                                            </Label>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell className="text-center py-1 text-[10px] text-muted-foreground">
-                                                                {sub.cantidad * item.cantidad} un.
+                                                            <TableCell>
+                                                                <Input
+                                                                    type="number"
+                                                                    value={item.cantidad}
+                                                                    onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                                                                    className="h-7 w-14 text-xs"
+                                                                    min={1}
+                                                                />
                                                             </TableCell>
-                                                            <TableCell colSpan={2}></TableCell>
+                                                            <TableCell>
+                                                                <Input
+                                                                    type="number"
+                                                                    value={item.costoUnitario}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...items];
+                                                                        updated[index].costoUnitario = parseFloat(e.target.value) || 0;
+                                                                        setItems(updated);
+                                                                    }}
+                                                                    className="h-7 w-20 text-xs text-right"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <Input
+                                                                    type="number"
+                                                                    value={item.valorUnitario}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...items];
+                                                                        updated[index].valorUnitario = parseFloat(e.target.value) || 0;
+                                                                        setItems(updated);
+                                                                    }}
+                                                                    className="h-7 w-20 text-xs text-right"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell className="text-right text-xs font-bold">
+                                                                {formatCurrency(finalTotal)}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(item.id)}>
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </Button>
+                                                            </TableCell>
                                                         </TableRow>
-                                                    ))
-                                                )}
-                                            </Fragment>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
+                                                        {/* Subitems Render */}
+                                                        {item.tipo === 'SERVICIO' && item.subItems && !item.ocultarDetalles && (
+                                                            item.subItems.map((sub, subIdx) => (
+                                                                <TableRow key={`${item.id}-sub-${subIdx}`} className="bg-muted/10 border-0 hover:bg-transparent">
+                                                                    <TableCell colSpan={2} className="pl-8 py-1">
+                                                                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                                                            <span>↳</span>
+                                                                            <span>{sub.nombre}</span>
+                                                                        </div>
+                                                                    </TableCell>
+                                                                    <TableCell className="text-center py-1 text-[10px] text-muted-foreground">
+                                                                        {sub.cantidad * item.cantidad} un.
+                                                                    </TableCell>
+                                                                    <TableCell colSpan={2}></TableCell>
+                                                                </TableRow>
+                                                            ))
+                                                        )}
+                                                    </Fragment>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="preview" className="flex-1 h-full m-0 outline-none">
+                            <Card className="h-full flex flex-col items-center justify-center p-0 overflow-hidden border">
+                                {isGeneratingPdf ? (
+                                    <div className="flex flex-col items-center text-muted-foreground animate-pulse">
+                                        <RefreshCw className="h-8 w-8 mb-4 animate-spin" />
+                                        <p>Generando vista previa...</p>
+                                    </div>
+                                ) : pdfUrl ? (
+                                    <iframe src={`${pdfUrl}#toolbar=0`} className="w-full h-full rounded-md" title="PDF Preview" />
+                                ) : (
+                                    <div className="text-center text-muted-foreground">
+                                        <p>No se pudo generar el PDF o no hay datos suficientes.</p>
+                                        <Button variant="outline" className="mt-4" onClick={handleGeneratePreview}>Intentar de nuevo</Button>
+                                    </div>
+                                )}
+                            </Card>
+                        </TabsContent>
+                    </Tabs>
                 </div>
 
                 {/* Right Column: Summary & Actions */}
@@ -405,27 +513,45 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
 
                                 <Separator className="my-2" />
 
-                                <div className="space-y-2">
-                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase">Desglose AIU</p>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div className="space-y-1">
-                                            <Label className="text-[9px]">Admin %</Label>
-                                            <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct} onChange={e => setAiuAdminPct(Number(e.target.value))} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-[9px]">Impr. %</Label>
-                                            <Input type="number" className="h-6 text-[10px] p-1" value={aiuImprevistoPct} onChange={e => setAiuImprevistoPct(Number(e.target.value))} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-[9px]">Util. %</Label>
-                                            <Input type="number" className="h-6 text-[10px] p-1" value={aiuUtilidadPct} onChange={e => setAiuUtilidadPct(Number(e.target.value))} />
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                                        <span>Total Amortización:</span>
-                                        <span className="font-mono">{formatCurrency(aiuAdminVal + aiuImprevistoVal + aiuUtilidadVal)}</span>
-                                    </div>
+                                <div className="flex items-center space-x-2 py-1">
+                                    <CheckboxUI
+                                        id="es-aiu"
+                                        checked={esAiu}
+                                        onCheckedChange={(checked) => setEsAiu(!!checked)}
+                                        className="h-4 w-4"
+                                    />
+                                    <Label htmlFor="es-aiu" className="text-xs cursor-pointer font-medium">
+                                        Cotización con AIU
+                                    </Label>
                                 </div>
+
+                                {esAiu && (
+                                    <>
+                                        <Separator className="my-2" />
+
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-semibold text-muted-foreground uppercase">Desglose AIU</p>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px]">Admin %</Label>
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct} onChange={e => setAiuAdminPct(Number(e.target.value))} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px]">Impr. %</Label>
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuImprevistoPct} onChange={e => setAiuImprevistoPct(Number(e.target.value))} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px]">Util. %</Label>
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuUtilidadPct} onChange={e => setAiuUtilidadPct(Number(e.target.value))} />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                <span>Total Amortización:</span>
+                                                <span className="font-mono">{formatCurrency(aiuAdminVal + aiuImprevistoVal + aiuUtilidadVal)}</span>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
 
                                 <Separator className="my-2" />
                                 <div className="flex justify-between font-bold text-base">

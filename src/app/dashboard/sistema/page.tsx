@@ -58,13 +58,13 @@ export default function SistemaPage() {
     // --- Derived Data ---
     const registros = useMemo(() => {
         return cotizaciones
-            .filter(q => q.estado === 'EN_EJECUCION' || q.estado === 'FINALIZADA')
+            .filter(q => q.estado === 'EN_REVISION' || q.estado === 'ACEPTADA')
             .map(q => ({
                 id: `REG-${q.id}`,
                 cotizacionId: q.id,
                 cotizacion: q,
                 fechaInicio: q.fecha,
-                estado: q.estado === 'FINALIZADA' ? 'FINALIZADO' : 'EN_PROCESO',
+                estado: q.estado === 'ACEPTADA' ? 'FINALIZADO' : 'EN_PROCESO',
                 anticipos: [],
                 saldoPendiente: q.total,
                 nombreObra: q.descripcionTrabajo?.substring(0, 30) + "..." || "Obra sin nombre",

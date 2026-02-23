@@ -223,12 +223,11 @@ function FinancialTabContent({ trabajoId, totalTrabajo }: { trabajoId: string, t
 const getStatusColor = (estado: EstadoCotizacion): string => {
     switch (estado) {
         case 'BORRADOR': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-        case 'ENVIADA': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
         case 'EN_REVISION': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-        case 'APROBADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-        case 'EN_EJECUCION': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
-        case 'FINALIZADA': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400';
+        case 'ENVIADA': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+        case 'ACEPTADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
         case 'RECHAZADA': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+        case 'MODIFICACION': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
         default: return '';
     }
 };
@@ -854,16 +853,16 @@ export function TrabajoHistoryDialog({
             descripcion: `Progreso actualizado a ${progressPercent}% y datos de ejecución actualizados`,
             usuario: 'Usuario Actual',
             valorAnterior: `Estado: ${trabajo.estado}`,
-            valorNuevo: `Estado: ${progressPercent === 100 ? 'FINALIZADA' : (progressPercent > 0 ? 'EN_EJECUCION' : trabajo.estado)}`,
+            valorNuevo: `Estado: ${progressPercent === 100 ? 'ACEPTADA' : (progressPercent > 0 ? 'EN_REVISION' : trabajo.estado)}`,
         };
 
         setHistorial([entry, ...historial]);
 
         // We use the status from the dropdown/manual selection OR force it if progress is 100
-        // FIXED: Only override with FINALIZADA if progress is 100, otherwise ALWAYS respect newProgress selected by user
+        // FIXED: Only override with ACEPTADA if progress is 100, otherwise ALWAYS respect newProgress selected by user
         let finalEstado = newProgress;
         if (progressPercent === 100) {
-            finalEstado = 'FINALIZADA';
+            finalEstado = 'ACEPTADA';
         }
 
         const updated: Cotizacion = {
@@ -1082,13 +1081,11 @@ export function TrabajoHistoryDialog({
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="BORRADOR">Borrador</SelectItem>
-                                                    <SelectItem value="ENVIADA">Enviada</SelectItem>
                                                     <SelectItem value="EN_REVISION">En Revisión</SelectItem>
-                                                    <SelectItem value="APROBADA">Aprobada</SelectItem>
+                                                    <SelectItem value="ENVIADA">Enviada</SelectItem>
+                                                    <SelectItem value="ACEPTADA">Aceptada</SelectItem>
                                                     <SelectItem value="RECHAZADA">Rechazada</SelectItem>
-                                                    <SelectItem value="EN_EJECUCION">En Ejecución</SelectItem>
-                                                    <SelectItem value="FINALIZADA">Finalizada</SelectItem>
-                                                    <SelectItem value="NO_APROBADA">No Aprobada</SelectItem>
+                                                    <SelectItem value="MODIFICACION">Modificación</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>

@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const formSchema = z.object({
     nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -108,67 +109,95 @@ export function CreateClientDialog({ onClientCreated }: CreateClientDialogProps)
                         Ingrese los datos de la empresa o persona natural.
                     </DialogDescription>
                 </DialogHeader>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="nombre"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Razón Social / Nombre</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Ej: TechSol S.A.S" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                <ScrollArea className="max-h-[75vh] pr-4">
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="nombre"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Razón Social / Nombre</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ej: TechSol S.A.S" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
 
 
-                        <div className="flex flex-col space-y-2 mt-2 mb-2">
-                            <div className="flex items-center space-x-2">
-                                <FormLabel className="text-sm font-medium">Código del Cliente</FormLabel>
+                            <div className="flex flex-col space-y-2 mt-2 mb-2">
+                                <div className="flex items-center space-x-2">
+                                    <FormLabel className="text-sm font-medium">Código del Cliente</FormLabel>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id="manual-code"
+                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                        checked={isManualCode}
+                                        onChange={(e) => handleModeChange(e.target.checked)}
+                                    />
+                                    <label htmlFor="manual-code" className="text-sm text-muted-foreground">
+                                        Asignar código manualmente
+                                    </label>
+                                </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="manual-code"
-                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    checked={isManualCode}
-                                    onChange={(e) => handleModeChange(e.target.checked)}
+
+                            <FormField
+                                control={form.control}
+                                name="codigo"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder={isManualCode ? "Ej: PERSONAL-001" : "Autogenerado (CLI-XXX)"}
+                                                {...field}
+                                                disabled={!isManualCode}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="documento"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>NIT / CC</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="900.123.456-1" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
                                 />
-                                <label htmlFor="manual-code" className="text-sm text-muted-foreground">
-                                    Asignar código manualmente
-                                </label>
+                                <FormField
+                                    control={form.control}
+                                    name="telefono"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Teléfono</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="300 123 4567" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
                             </div>
-                        </div>
-
-                        <FormField
-                            control={form.control}
-                            name="codigo"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormControl>
-                                        <Input
-                                            placeholder={isManualCode ? "Ej: PERSONAL-001" : "Autogenerado (CLI-XXX)"}
-                                            {...field}
-                                            disabled={!isManualCode}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
-                                name="documento"
+                                name="correo"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>NIT / CC</FormLabel>
+                                        <FormLabel>Correo Electrónico</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="900.123.456-1" {...field} />
+                                            <Input placeholder="contacto@cliente.com" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -176,88 +205,62 @@ export function CreateClientDialog({ onClientCreated }: CreateClientDialogProps)
                             />
                             <FormField
                                 control={form.control}
-                                name="telefono"
+                                name="direccion"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Teléfono</FormLabel>
+                                        <FormLabel>Dirección Física</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="300 123 4567" {...field} />
+                                            <Input placeholder="Calle 123 # 45-67" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        </div>
-                        <FormField
-                            control={form.control}
-                            name="correo"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Correo Electrónico</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="contacto@cliente.com" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="direccion"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Dirección Física</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Calle 123 # 45-67" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="ciudad"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Ciudad</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Ej: Bogotá" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="contacto"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Contacto Principal</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Nombre del encargado" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="notas"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Notas Adicionales</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Observaciones..." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <DialogFooter>
-                            <Button type="submit">Guardar Cliente</Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                            <FormField
+                                control={form.control}
+                                name="ciudad"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Ciudad</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ej: Bogotá" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contacto"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Contacto Principal</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Nombre del encargado" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="notas"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Notas Adicionales</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Observaciones..." {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <DialogFooter className="mt-4">
+                                <Button type="submit">Guardar Cliente</Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </ScrollArea>
             </DialogContent>
         </Dialog >
     );

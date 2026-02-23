@@ -38,12 +38,12 @@ interface FacturarTrabajosDialogProps {
 
 function getEstadoBadge(estado: EstadoCotizacion) {
     switch (estado) {
-        case 'APROBADA':
-            return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px]">Aprobada</Badge>;
-        case 'EN_EJECUCION':
-            return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 text-[10px]">En Ejecución</Badge>;
-        case 'FINALIZADA':
-            return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]">Finalizada</Badge>;
+        case 'ACEPTADA':
+            return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px]">Aceptada</Badge>;
+        case 'EN_REVISION':
+            return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 text-[10px]">En Revisión</Badge>;
+        case 'MODIFICACION':
+            return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]">Modificación</Badge>;
         default:
             return <Badge variant="outline" className="text-[10px]">{estado}</Badge>;
     }
@@ -59,7 +59,7 @@ export function FacturarTrabajosDialog({ onFacturaCreated, nextId }: FacturarTra
 
     // Filter only approved/in-execution/finalized cotizaciones
     const trabajosAprobados = useMemo(() => {
-        const estadosValidos: EstadoCotizacion[] = ['APROBADA', 'EN_EJECUCION', 'FINALIZADA'];
+        const estadosValidos: EstadoCotizacion[] = ['ACEPTADA', 'EN_REVISION', 'MODIFICACION'];
         return cotizaciones
             .filter(c => estadosValidos.includes(c.estado))
             .map(c => {

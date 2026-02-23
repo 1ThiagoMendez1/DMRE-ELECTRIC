@@ -100,7 +100,7 @@ export interface CotizacionItem {
     notas?: string;
 }
 
-export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'APROBADA' | 'RECHAZADA' | 'PENDIENTE' | 'NO_APROBADA' | 'EN_EJECUCION' | 'FINALIZADA';
+export type EstadoCotizacion = 'BORRADOR' | 'EN_REVISION' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'MODIFICACION';
 export type TipoOferta = 'NORMAL' | 'SIMPLIFICADA';
 
 export interface Cotizacion {

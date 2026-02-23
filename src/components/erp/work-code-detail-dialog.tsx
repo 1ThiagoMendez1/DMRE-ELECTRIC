@@ -76,7 +76,7 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
 
             if (matchedItems.length > 0) {
                 totalQuotations++;
-                if (quote.estado === 'APROBADA' || quote.estado === 'FINALIZADA') {
+                if (quote.estado === 'ACEPTADA') {
                     wonQuotations++;
                 }
 
@@ -281,7 +281,7 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                                                         <TableCell className="text-xs">{new Date(q.fecha).toLocaleDateString()}</TableCell>
                                                         <TableCell className="text-xs truncate max-w-[100px]">{q.cliente}</TableCell>
                                                         <TableCell>
-                                                            <Badge variant={q.estado === 'APROBADA' ? 'default' : 'secondary'} className="text-[10px]">
+                                                            <Badge variant={q.estado === 'ACEPTADA' ? 'default' : 'secondary'} className="text-[10px]">
                                                                 {q.estado}
                                                             </Badge>
                                                         </TableCell>

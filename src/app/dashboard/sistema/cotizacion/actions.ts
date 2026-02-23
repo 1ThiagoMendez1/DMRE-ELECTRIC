@@ -419,3 +419,122 @@ export async function addHistorialEntryAction(entry: Omit<HistorialCotizacion, "
         console.error("Error adding historial entry:", error);
     }
 }
+
+export async function getPublicCotizacionAction(trackingCode: string): Promise<Cotizacion | null> {
+    const supabase = await createClient(); // Uses Service Role usually in this project
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trackingCode);
+    const identifierFilter = isUUID ? `numero.eq.${trackingCode},id.eq.${trackingCode}` : `numero.eq.${trackingCode}`;
+
+    const { data: cotizacion, error } = await supabase
+        .from("cotizaciones")
+        .select(`
+            *,
+            clientes (id, nombre, documento, direccion, correo, telefono, contacto_principal, created_at)
+        `)
+        .or(identifierFilter)
+        .in('estado', ['ENVIADA', 'ACEPTADA', 'EN_REVISION', 'PENDIENTE'])
+        .single();
+
+    if (error) {
+        console.error("DEBUG Portal Fetch Error:", error.message, error.details, error.hint);
+    }
+
+    if (error || !cotizacion) {
+        return null;
+    }
+
+    const { data: allItems } = await supabase
+        .from("cotizacion_items")
+        .select("*")
+        .eq("cotizacion_id", cotizacion.id);
+
+    return mapToUI(cotizacion, allItems || [], cotizacion.clientes);
+}
+
+// Securely fetches documents only if the quotation has reached an approved or execution state.
+// This enforces RLS equivalent logic on the server side since the portal user is unauthenticated.
+export async function getSecureCotizacionDocumentsAction(trackingCode: string) {
+    const supabase = await createClient(); // Service role
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trackingCode);
+    const identifierFilter = isUUID ? `numero.eq.${trackingCode},id.eq.${trackingCode}` : `numero.eq.${trackingCode}`;
+
+    // First, verify the quotation exists AND is strictly in an allowed state
+    const { data: cotizacion, error } = await supabase
+        .from("cotizaciones")
+        .select("id, estado")
+        .or(identifierFilter)
+        .in('estado', ['ACEPTADA'])
+        .single();
+
+    if (error || !cotizacion) {
+        return null;
+    }
+
+    const formatFile = (f: any, categoryPath: string) => {
+        const { data: { publicUrl } } = supabase.storage
+            .from('Documentost_rabajos')
+            .getPublicUrl(`${categoryPath}/${f.name}`);
+
+        return {
+            id: f.id || `${Date.now()}-${f.name}`,
+            name: f.name.replace(/^\d+_/, ''), // Remove timestamp prefix
+            size: f.metadata?.size ? `${(f.metadata.size / 1024 / 1024).toFixed(2)} MB` : 'Desconocido',
+            secureUrl: publicUrl
+        };
+    };
+
+    const fetchFolder = async (folderPath: string) => {
+        const { data } = await supabase.storage.from('Documentost_rabajos').list(folderPath, { limit: 100 });
+        return (data || []).filter(f => f.name !== '.emptyFolderPlaceholder').map(f => formatFile(f, folderPath));
+    };
+
+    const legalDocs = await fetchFolder(`Documentacion/${cotizacion.id}`);
+    const polizas = await fetchFolder(`Polizasyseguros/${cotizacion.id}`);
+
+    return {
+        cotizacionId: cotizacion.id,
+        legalDocs,
+        polizas
+    };
+}
+
+// Securely allows a client to upload a document to their specific quotation folder via the Portal
+export async function uploadPublicCotizacionDocumentAction(trackingCode: string, category: 'Documentacion' | 'Polizasyseguros', formData: FormData) {
+    const supabase = await createClient(); // Service role bypasses RLS
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trackingCode);
+    const identifierFilter = isUUID ? `numero.eq.${trackingCode},id.eq.${trackingCode}` : `numero.eq.${trackingCode}`;
+
+    // Verify the quotation exists AND is in an allowed state BEFORE permitting upload
+    const { data: cotizacion, error: quoteError } = await supabase
+        .from("cotizaciones")
+        .select("id, estado")
+        .or(identifierFilter)
+        .in('estado', ['ACEPTADA'])
+        .single();
+
+    if (quoteError || !cotizacion) {
+        throw new Error("Su cotización no autoriza la carga de documentos en este estado.");
+    }
+
+    const file = formData.get('file') as File;
+    if (!file) {
+        throw new Error("No se proporcionó ningún archivo válido.");
+    }
+
+    const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const filePath = `${category}/${cotizacion.id}/${safeFileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('Documentost_rabajos')
+        .upload(filePath, file);
+
+    if (uploadError) {
+        console.error("Portal Upload Error:", uploadError);
+        throw new Error("Ocurrió un error al subir el archivo.");
+    }
+
+    return true;
+}

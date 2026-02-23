@@ -186,7 +186,7 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                                             {(() => {
                                                 // Calculate Reserved Stock from Quotes
                                                 const reserved = cotizaciones
-                                                    .filter(c => c.estado !== 'NO_APROBADA' && c.estado !== 'RECHAZADA' && c.estado !== 'BORRADOR') // Descontar si está en proceso
+                                                    .filter(c => c.estado !== 'RECHAZADA' && c.estado !== 'BORRADOR') // Descontar si está en proceso
                                                     .flatMap(c => c.items)
                                                     .filter(quoteItem => quoteItem.inventarioId === item.id)
                                                     .reduce((sum, quoteItem) => sum + quoteItem.cantidad, 0);

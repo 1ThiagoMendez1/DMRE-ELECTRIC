@@ -76,7 +76,7 @@ export function CreateObraDialog({ onObraCreated }: CreateObraDialogProps) {
                 cliente: cliente,
                 items: [],
                 total: Number(values.valorTotal),
-                estado: 'EN_EJECUCION',
+                estado: 'EN_REVISION',
                 descripcionTrabajo: values.nombreObra
             } as any
         };

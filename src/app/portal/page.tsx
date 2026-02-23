@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Search, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
-import { initialQuotes } from "@/lib/mock-data";
+import { getPublicCotizacionAction } from "@/app/dashboard/sistema/cotizacion/actions";
 
 export default function PortalLoginPage() {
     const router = useRouter();
@@ -19,33 +19,36 @@ export default function PortalLoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [targetQuote, setTargetQuote] = useState<string | null>(null);
 
-    const handleTrackingSubmit = (e: React.FormEvent) => {
+    const handleTrackingSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        // Simulate API check
-        setTimeout(() => {
-            const quote = initialQuotes.find(q =>
-                q.numero.toLowerCase() === trackingCode.toLowerCase() ||
-                q.id.toLowerCase() === trackingCode.toLowerCase()
-            );
+        try {
+            const quote = await getPublicCotizacionAction(trackingCode);
 
             if (quote) {
                 setTargetQuote(quote.id);
                 setStep('VERIFICATION');
                 toast({
                     title: "Cotización Encontrada",
-                    description: `Hemos enviado un código de verificación al número registrado de ${quote.cliente}.`,
+                    description: `Hemos enviado un código de verificación al número registrado de ${typeof quote.cliente === 'string' ? quote.cliente : quote.cliente?.nombre}.`,
                 });
             } else {
                 toast({
                     variant: "destructive",
-                    title: "No encontrado",
-                    description: "No encontramos una cotización con ese número o documento.",
+                    title: "No encontrada o No Disponible",
+                    description: "No encontramos una cotización con ese número, o aún no ha sido marcada como 'Enviada'.",
                 });
             }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error de conexión",
+                description: "Ocurrió un error al consultar el estado de la cotización.",
+            });
+        } finally {
             setIsLoading(false);
-        }, 1500);
+        }
     };
 
     const handleVerificationSubmit = (e: React.FormEvent) => {

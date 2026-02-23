@@ -113,8 +113,9 @@ export default function CotizacionPage() {
                                         <Badge
                                             variant="outline"
                                             className={cn({
-                                                "border-green-500 text-green-500 bg-green-500/10": quote.estado === 'APROBADA',
+                                                "border-green-500 text-green-500 bg-green-500/10": quote.estado === 'ACEPTADA',
                                                 "border-yellow-500 text-yellow-500 bg-yellow-500/10": quote.estado === 'ENVIADA',
+                                                "border-blue-500 text-blue-500 bg-blue-500/10": quote.estado === 'EN_REVISION' || quote.estado === 'MODIFICACION',
                                                 "border-muted text-muted-foreground": quote.estado === 'BORRADOR',
                                                 "border-red-500 text-red-500 bg-red-500/10": quote.estado === 'RECHAZADA'
                                             })}

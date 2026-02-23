@@ -140,6 +140,7 @@ const generateInventario = (count: number, proveedores: Proveedor[]): Inventario
             fechaCreacion: randomDate(2023, 2024),
             tipo: isCompuesto ? 'COMPUESTO' : 'SIMPLE',
             proveedorId: proveedor.id,
+            precioProveedor: precioBase, // Added missing property
             materiales: isCompuesto ? Array.from({ length: randomInt(2, 4) }, (_, j) => ({
                 id: `MAT-${i}-${j}`,
                 inventarioId: `INV-MOCK-${j}`,
@@ -201,7 +202,7 @@ const generateCotizaciones = (count: number, clientes: Cliente[], inventario: In
             aiuUtilidad,
             iva,
             total,
-            estado: randomItem(['BORRADOR', 'ENVIADA', 'EN_REVISION', 'APROBADA', 'PENDIENTE', 'RECHAZADA', 'EN_EJECUCION', 'FINALIZADA']) as EstadoCotizacion,
+            estado: randomItem(['BORRADOR', 'EN_REVISION', 'ENVIADA', 'ACEPTADA', 'RECHAZADA', 'MODIFICACION']) as EstadoCotizacion,
             fechaActualizacion: randomDate(2024, 2025),
             evidencia: Array.from({ length: randomInt(0, 3) }, (_, k) => ({
                 id: `EVID-${i}-${k}`,
@@ -222,7 +223,7 @@ const generateCotizaciones = (count: number, clientes: Cliente[], inventario: In
 
 const generateFacturas = (cotizaciones: Cotizacion[]): Factura[] => {
     return cotizaciones
-        .filter(c => c.estado === 'FINALIZADA' || c.estado === 'EN_EJECUCION' || c.estado === 'APROBADA')
+        .filter(c => c.estado === 'ACEPTADA' || c.estado === 'EN_REVISION' || c.estado === 'MODIFICACION')
         .map((c, i) => {
             const valorFacturado = c.total;
             const anticipo = valorFacturado * 0.3;
@@ -243,7 +244,7 @@ const generateFacturas = (cotizaciones: Cotizacion[]): Factura[] => {
                 retencionIca: rIca,
                 retencionIva: rIva,
                 saldoPendiente: saldo,
-                estado: randomItem(['PENDIENTE', 'PARCIAL', 'CANCELADA'])
+                estado: randomItem(['PENDIENTE', 'PARCIAL', 'ANULADA']) // Changed CANCELADA to ANULADA
             };
         });
 };
@@ -268,7 +269,7 @@ const generateRegistros = (count: number, clientes: Cliente[]): RegistroObra[] =
                 subtotal: total,
                 aiuAdmin: 0, aiuImprevistos: 0, aiuUtilidad: 0, iva: 0,
                 total: total,
-                estado: 'APROBADA'
+                estado: 'ACEPTADA'
             },
             fechaInicio: new Date(),
             estado: 'EN_PROCESO',
@@ -792,6 +793,6 @@ export const initialTrabajos: Cotizacion[] = [
         items: [],
         subtotal: 5000000,
         aiuAdmin: 0, aiuImprevistos: 0, aiuUtilidad: 0, iva: 950000, total: 5950000,
-        estado: "APROBADA"
+        estado: "ACEPTADA"
     }
 ];

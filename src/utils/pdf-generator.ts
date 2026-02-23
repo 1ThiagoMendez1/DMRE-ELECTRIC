@@ -20,7 +20,8 @@ export const generateQuotePDF = (
     cotizacion: Cotizacion,
     materialVisibilityMode: MaterialVisibilityMode = 'MOSTRAR_TODO',
     companyInfo?: CompanyInfo,
-    selectedStyle?: PDFStyleConfig
+    selectedStyle?: PDFStyleConfig,
+    action: 'save' | 'bloburl' | 'dataurlstring' = 'save'
 ) => {
     // 1. Setup Style & Document
     const style = selectedStyle || PDF_STYLES[0];
@@ -518,5 +519,12 @@ export const generateQuotePDF = (
         doc.text("Gracias por su confianza.", pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 
+    if (action === 'bloburl') {
+        return doc.output('bloburl');
+    } else if (action === 'dataurlstring') {
+        return doc.output('datauristring');
+    }
+
     doc.save(`Cotizacion_${cotizacion.numero}_${style.name}.pdf`);
+    return null;
 };

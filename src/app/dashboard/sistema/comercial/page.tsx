@@ -107,6 +107,7 @@ export default function CommercialPage() {
     const handleCreateQuote = (newQuote: any) => {
         addCotizacion(newQuote);
         toast({ title: "Cotización Creada", description: `Oferta ${newQuote.numero} generada exitosamente.` });
+        setActiveTab("ofertas");
     };
 
     const handleQuoteUpdated = (updatedQuote: any) => {
@@ -120,6 +121,7 @@ export default function CommercialPage() {
     };
 
     // --- DASHBOARD STATE ---
+    const [activeTab, setActiveTab] = useState("resumen");
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: startOfYear(new Date()),
         to: endOfYear(new Date()),
@@ -152,7 +154,7 @@ export default function CommercialPage() {
     const revenueData = useMemo(() => {
         const agg: Record<string, number> = {};
         dashboardFilteredQuotes.forEach(q => {
-            if (q.estado !== 'APROBADA' && q.estado !== 'FINALIZADA') return;
+            if (q.estado !== 'ACEPTADA') return;
             const dateStr = new Date(q.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
             agg[dateStr] = (agg[dateStr] || 0) + q.total;
         });
@@ -195,11 +197,10 @@ export default function CommercialPage() {
 
     const getStatusColor = (status: EstadoCotizacion) => {
         switch (status) {
-            case 'APROBADA':
-            case 'FINALIZADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-            case 'RECHAZADA':
-            case 'NO_APROBADA': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-            case 'EN_EJECUCION': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+            case 'ACEPTADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+            case 'RECHAZADA': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+            case 'EN_REVISION':
+            case 'MODIFICACION': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
             default: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
         }
     };
@@ -208,12 +209,10 @@ export default function CommercialPage() {
         switch (status) {
             case 'BORRADOR': return 10;
             case 'ENVIADA': return 30;
-            case 'PENDIENTE': return 30;
-            case 'APROBADA': return 50;
-            case 'EN_EJECUCION': return 75;
-            case 'FINALIZADA': return 100;
+            case 'EN_REVISION': return 50;
+            case 'MODIFICACION': return 75;
+            case 'ACEPTADA': return 100;
             case 'RECHAZADA': return 100; // Finished but failed
-            case 'NO_APROBADA': return 100;
             default: return 0;
         }
     };
@@ -238,7 +237,7 @@ export default function CommercialPage() {
 
     const filteredProjects = useMemo(() => {
         return cotizaciones.filter(q =>
-            ['APROBADA', 'EN_EJECUCION', 'FINALIZADA'].includes(q.estado) &&
+            ['ACEPTADA', 'MODIFICACION', 'EN_REVISION'].includes(q.estado) &&
             (q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
         );
@@ -260,7 +259,7 @@ export default function CommercialPage() {
             </div>
 
             {/* Main Tabs */}
-            <Tabs defaultValue="resumen" className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="resumen" className="gap-2"><LayoutDashboardIcon className="h-4 w-4" /> Resumen</TabsTrigger>
                     <TabsTrigger value="clientes" className="gap-2"><Users className="h-4 w-4" /> Clientes</TabsTrigger>
@@ -446,7 +445,9 @@ export default function CommercialPage() {
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
                                     </div>
-                                    <CreateProjectDialog clientes={clientes} onProjectCreated={handleCreateQuote} />
+                                    <Button onClick={() => setActiveTab("cotizaciones")}>
+                                        <Plus className="mr-2 h-4 w-4" /> Nuevo Proyecto
+                                    </Button>
                                 </div>
                             </div>
                         </CardHeader>
@@ -567,7 +568,9 @@ export default function CommercialPage() {
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
                                     </div>
-                                    <CreateProjectDialog clientes={clientes} onProjectCreated={handleCreateQuote} />
+                                    <Button onClick={() => setActiveTab("cotizaciones")}>
+                                        <Plus className="mr-2 h-4 w-4" /> Nuevo Proyecto
+                                    </Button>
                                 </div>
                             </div>
                         </CardHeader>
@@ -683,7 +686,7 @@ export default function CommercialPage() {
                                 inventario={inventario}
                                 codigosTrabajo={codigosTrabajo}
                                 onSave={handleCreateQuote}
-                                onClose={() => { }}
+                                onClose={() => setActiveTab("ofertas")}
                             />
                         </CardContent>
                     </Card>
