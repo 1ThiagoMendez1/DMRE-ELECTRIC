@@ -31,15 +31,17 @@ import { EditWorkCodeDialog } from "./edit-work-code-dialog";
 import { WorkCodeDetailDialog } from "./work-code-detail-dialog";
 
 export function WorkCodesTable() {
-    const { codigosTrabajo, deleteCodigoTrabajo, inventario } = useErp();
+    const { codigosTrabajo, addCodigoTrabajo, deleteCodigoTrabajo, inventario } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCode, setSelectedCode] = useState<any>(null);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-    const filteredCodes = codigosTrabajo.filter(code =>
-        code.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        code.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredCodes = codigosTrabajo.filter(code => {
+        const searchMatch = code.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            code.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
+        return searchMatch;
+    });
 
     // Helper to calculate cost
     const calculateCost = (code: any) => {
@@ -68,9 +70,9 @@ export function WorkCodesTable() {
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
                 <div className="space-y-1">
-                    <CardTitle className="text-2xl font-bold">Códigos de Trabajo</CardTitle>
+                    <CardTitle className="text-2xl font-bold">Suministros</CardTitle>
                     <CardDescription>
-                        Administración de APUs y Kits de Instalación
+                        Administración de Suministros
                     </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -83,7 +85,15 @@ export function WorkCodesTable() {
                             className="pl-8 w-[250px]"
                         />
                     </div>
-                    <CreateWorkCodeDialog />
+                    <Button onClick={() => setIsCreateOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Crear Código
+                    </Button>
+                    <CreateWorkCodeDialog
+                        open={isCreateOpen}
+                        onOpenChange={setIsCreateOpen}
+                        codigosExistentes={codigosTrabajo}
+                        onSave={addCodigoTrabajo}
+                    />
                 </div>
             </CardHeader>
             <CardContent>

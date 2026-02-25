@@ -98,6 +98,7 @@ export interface CotizacionItem {
     ivaUtilidadPorcentaje?: number; // IVA specific to Utility portion
     // Extended
     notas?: string;
+    porcentaje?: number;
 }
 
 export type EstadoCotizacion = 'BORRADOR' | 'EN_REVISION' | 'ENVIADA' | 'APROBADA' | 'RECHAZADA' | 'MODIFICACION';
@@ -144,6 +145,9 @@ export interface Cotizacion {
     responsableId?: string;
     progreso?: number; // New: Percentage 0-100
     notas?: string; // New: General notes for the quotation/job
+    alcance?: string; // New: Scope of work
+    formaPago?: string; // New: Payment terms
+    notaFinal?: string; // New: Additional terms below scope
     historial?: HistorialCotizacion[]; // New: Persistent history
 }
 
@@ -679,13 +683,23 @@ export interface MaterialAsociado {
 
 export interface CodigoTrabajo {
     id: string;
-    codigo: string; // COD-001
+    codigo: string;
     nombre: string;
     descripcion: string;
-    manoDeObra: number;
-    valorManoObra?: number; // Alias for consistency with new components
+    valorManoObra?: number; // Base estimada Mo
+    manoDeObra: number;     // Mo Calculada Final
     materiales: MaterialAsociado[];
     costoTotalMateriales: number;
-    costoTotal: number; // manoDeObra + costoTotalMateriales
+    costoTotal: number;
     fechaCreacion: Date;
+}
+
+export interface Instalacion {
+    id: string;
+    codigo: string;
+    descripcion: string;
+    valorCalculado: number;
+    creadoPor?: string;
+    fechaCreacion?: Date;
+    activo?: boolean;
 }

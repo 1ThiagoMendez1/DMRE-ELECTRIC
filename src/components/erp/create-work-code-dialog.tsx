@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useErp } from "@/components/providers/erp-provider";
+import { CodigoTrabajo } from "@/types/sistema";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -39,19 +40,31 @@ const formSchema = z.object({
     valorManoObra: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, { message: "Inválido" }),
 });
 
-export function CreateWorkCodeDialog() {
-    const [open, setOpen] = useState(false);
-    const { addCodigoTrabajo, inventario, codigosTrabajo } = useErp();
+type FormValues = z.infer<typeof formSchema>;
+
+interface CreateWorkCodeDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    codigosExistentes: CodigoTrabajo[];
+    onSave: (codigo: CodigoTrabajo) => void;
+}
+
+export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, onSave }: CreateWorkCodeDialogProps) {
+    const { inventario, addInstalacion } = useErp(); // Removed codigosTrabajo from here
     const { toast } = useToast();
 
     // Materials Selection State
     const [selectedMaterials, setSelectedMaterials] = useState<any[]>([]); // { inventarioId, subCodigoId, cantidad, itemRef, type }
     const [comboOpen, setComboOpen] = useState(false);
 
+    // Profit Margins State
+    const [margenMateriales, setMargenMateriales] = useState<number>(0);
+    const [margenManoObra, setMargenManoObra] = useState<number>(0);
+
     // Combine Inventory and Work Codes for selection
     const availableItems = [
         ...inventario.map(i => ({ ...i, type: 'MATERIAL', label: i.descripcion, value: i.descripcion })),
-        ...codigosTrabajo.map(c => ({
+        ...codigosExistentes.map(c => ({ // Use codigosExistentes instead of codigosTrabajo
             ...c,
             type: 'APU',
             label: `(APU) ${c.nombre}`,
@@ -60,13 +73,18 @@ export function CreateWorkCodeDialog() {
         }))
     ];
 
-    const form = useForm<z.infer<typeof formSchema>>({
+    // Initialize form with generated code prefix
+    const numApus = codigosExistentes.length;
+    const consecutivo = numApus + 1;
+    const prefijo = 'ELEC-';
+
+    const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            codigo: "",
+            codigo: `${prefijo}${consecutivo.toString().padStart(3, '0')}`,
             descripcion: "",
-            valorManoObra: "0",
-        },
+            valorManoObra: "0"
+        }
     });
 
     const handleAddMaterial = (item: any) => {
@@ -97,48 +115,90 @@ export function CreateWorkCodeDialog() {
     };
 
     function onSubmit(values: z.infer<typeof formSchema>) {
+        // Sub Totals Calculation
         const materialsTotal = selectedMaterials.reduce((acc, curr) => acc + (curr.itemRef.valorUnitario * curr.cantidad), 0);
-        const total = materialsTotal + Number(values.valorManoObra);
+        const materialsAiu = materialsTotal * (margenMateriales / 100);
+        const materialsConMargen = materialsTotal + materialsAiu;
 
-        const newCode = {
-            id: crypto.randomUUID(),
+        const baseMo = Number(values.valorManoObra);
+        const moAiu = baseMo * (margenManoObra / 100);
+        const moConMargen = baseMo + moAiu;
+
+        const total = materialsConMargen + moConMargen;
+
+        const newCodigo: CodigoTrabajo = {
+            id: `COD-${Date.now()}`,
             codigo: values.codigo,
+            nombre: values.descripcion, // Fallback if nombre is missing in simplistic form
             descripcion: values.descripcion,
-            nombre: values.descripcion, // Unified field
-            valorManoObra: Number(values.valorManoObra),
-            manoDeObra: Number(values.valorManoObra), // Unified field
-            costoTotalMateriales: materialsTotal,
-            costoTotal: total,
+            manoDeObra: moWithProfit,
+            valorManoObra: Number(values.valorManoObra || 0),
             materiales: selectedMaterials.map(m => ({
-                inventarioId: m.inventarioId,
-                subCodigoId: m.subCodigoId,
-                nombre: m.itemRef.descripcion || m.itemRef.nombre,
+                id: m.itemRef.id,
+                nombre: m.type === 'APU' ? `(Sub-APU) ${m.itemRef.descripcion || m.itemRef.nombre}` : m.itemRef.descripcion,
                 cantidad: m.cantidad,
                 valorUnitario: m.itemRef.valorUnitario
-            }))
+            })),
+            costoTotalMateriales: materialsWithProfit,
+            costoTotal: grandTotalEstimated,
+            fechaCreacion: new Date()
         };
 
-        addCodigoTrabajo(newCode as any); // Casting since mock types might differ slightly in strictness
-        toast({ title: "Código Creado", description: "El código de trabajo se ha guardado correctamente." });
-        setOpen(false);
+        onSave(newCodigo);
+
+        // CREACIÓN DOBLE AUTOMÁTICA
+        try {
+            if (addInstalacion) {
+                addInstalacion({
+                    codigo: values.codigo,
+                    descripcion: values.descripcion,
+                    valorCalculado: grandTotalEstimated,
+                    activo: true
+                });
+            }
+        } catch (e) {
+            console.error("No se pudo crear la instalación clonada:", e);
+        }
+
+        toast({ title: "Código Creado", description: "El código de trabajo se ha guardado y replicado como Instalación correctamente." });
+        onOpenChange(false); // Close dialog using prop
         form.reset();
         setSelectedMaterials([]);
     }
 
-    // Calculate Estimated Cost
+    // Calculate Estimated Cost Display
     const totalMaterialsCost = selectedMaterials.reduce((acc, curr) => acc + (curr.itemRef.valorUnitario * curr.cantidad), 0);
-    const moCost = Number(form.watch("valorManoObra") || 0);
+    const profitMaterials = totalMaterialsCost * (margenMateriales / 100);
+    const materialsWithProfit = totalMaterialsCost + profitMaterials;
+
+    // Auto-sync materials total into mano de obra if materials exist
+    useEffect(() => {
+        if (materialsWithProfit >= 0) {
+            // we sync the Subtotal into the Form so the user sees it visually populate
+            // use a small timeout to avoid hook conflicts on mount or state spam
+            const t = setTimeout(() => {
+                const currentMo = Number(form.getValues("valorManoObra") || 0);
+                if (currentMo !== materialsWithProfit) {
+                    form.setValue("valorManoObra", materialsWithProfit.toString(), { shouldValidate: true });
+                }
+            }, 50);
+            return () => clearTimeout(t);
+        }
+    }, [materialsWithProfit, form]);
+
+    const moBaseCost = Number(form.watch("valorManoObra") || 0);
+    const profitMo = moBaseCost * (margenManoObra / 100);
+    const moWithProfit = moBaseCost + profitMo;
+
+    const grandTotalEstimated = materialsWithProfit + moWithProfit;
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" /> Crear Código
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>Nuevo Código de Trabajo</DialogTitle>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[700px] h-[90vh] flex flex-col p-0 overflow-hidden bg-background">
+                <DialogHeader className="px-6 py-4 border-b shrink-0">
+                    <DialogTitle className="text-xl font-bold font-headline">
+                        Nuevo Código de Trabajo
+                    </DialogTitle>
                     <DialogDescription>
                         Define un APU o Kit con materiales, mano de obra u otros APUs (anidados).
                     </DialogDescription>
@@ -163,22 +223,9 @@ export function CreateWorkCodeDialog() {
                                 />
                                 <FormField
                                     control={form.control}
-                                    name="valorManoObra"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Valor Mano de Obra</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
                                     name="descripcion"
                                     render={({ field }) => (
-                                        <FormItem className="col-span-2">
+                                        <FormItem>
                                             <FormLabel>Descripción</FormLabel>
                                             <FormControl>
                                                 <Input placeholder="Descripción detallada del trabajo" {...field} />
@@ -187,6 +234,42 @@ export function CreateWorkCodeDialog() {
                                         </FormItem>
                                     )}
                                 />
+                                <FormField
+                                    control={form.control}
+                                    name="valorManoObra"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Valor Base Estimado / Mano de Obra</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" {...field} />
+                                            </FormControl>
+                                            <div className="flex justify-between items-center text-xs text-muted-foreground mt-1 px-1">
+                                                <span>Valor importado de materiales</span>
+                                            </div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormItem>
+                                    <FormLabel>Ganancia M.O (%)</FormLabel>
+                                    <div className="flex items-center gap-2">
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                className="w-24 text-right"
+                                                value={margenManoObra === 0 ? '' : margenManoObra}
+                                                onChange={(e) => setMargenManoObra(Number(e.target.value) || 0)}
+                                                placeholder="0"
+                                            />
+                                        </FormControl>
+                                        <span className="text-sm">%</span>
+                                        {profitMo > 0 && <span className="text-sm font-semibold text-green-500 ml-2">+ {formatCurrency(profitMo)}</span>}
+                                    </div>
+                                    <div className="text-xs text-right mt-1 px-1 bg-primary/10 rounded-md py-1 space-x-2">
+                                        <span className="text-muted-foreground">Calculado:</span>
+                                        <span className="text-primary font-bold">{formatCurrency(moWithProfit)}</span>
+                                    </div>
+                                </FormItem>
                             </div>
 
                             <Separator />
@@ -261,14 +344,36 @@ export function CreateWorkCodeDialog() {
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="p-2 border-t bg-muted/20 flex justify-between items-center text-sm font-medium">
-                                        <span>Costo Materiales: {formatCurrency(totalMaterialsCost)}</span>
-                                        <span className="text-primary">Costo Total Estimado: {formatCurrency(totalMaterialsCost + moCost)}</span>
+                                    <div className="p-3 border-t bg-muted/20 text-sm rounded-b-md">
+                                        <div className="flex justify-between items-center mb-2 text-muted-foreground">
+                                            <span>Costo Neto Materiales:</span>
+                                            <span>{formatCurrency(totalMaterialsCost)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-muted-foreground">% Ganancia Materiales:</span>
+                                                <Input
+                                                    type="number"
+                                                    className="h-7 w-16 text-right"
+                                                    value={margenMateriales === 0 ? '' : margenMateriales}
+                                                    onChange={(e) => setMargenMateriales(Number(e.target.value) || 0)}
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-xs">%</span>
+                                            </div>
+                                            {profitMaterials > 0 && <span className="text-xs text-green-500 font-medium">+ {formatCurrency(profitMaterials)}</span>}
+                                        </div>
+                                        <div className="flex justify-between items-center font-bold text-base pt-2 border-t">
+                                            <span>Subtotal Materiales (+%):</span>
+                                            <span className="text-primary">{formatCurrency(materialsWithProfit)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <DialogFooter>
+                            <Separator />
+
+                            <DialogFooter className="mt-4">
                                 <Button type="submit">Guardar Código</Button>
                             </DialogFooter>
                         </form>

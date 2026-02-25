@@ -7,7 +7,7 @@ import {
     GastoVehiculo, CodigoTrabajo, OrdenCompra,
     CuentaBancaria, MovimientoFinanciero, NovedadNomina, Empleado,
     ObligacionFinanciera, LiquidacionNomina,
-    TareaAgenda, Role, Permission
+    TareaAgenda, Role, Permission, Instalacion
 } from "@/types/sistema";
 
 // Import Server Actions
@@ -15,6 +15,7 @@ import { getClientsAction, createClientAction, updateClientAction, deleteClientA
 import { getProveedoresAction, createProveedorAction, updateProveedorAction, deleteProveedorAction } from "@/app/dashboard/sistema/suministro/actions";
 import { getInventarioAction, createInventarioAction, updateInventarioAction, deleteInventarioAction, deductInventoryAction } from "@/app/dashboard/sistema/inventario/actions";
 import { getCodigosTrabajoAction, createCodigoTrabajoAction, updateCodigoTrabajoAction, deleteCodigoTrabajoAction } from "@/app/dashboard/sistema/codigos-trabajo/actions";
+import { createInstalacionAction, updateInstalacionAction, deleteInstalacionAction } from "@/app/dashboard/sistema/codigos-trabajo/instalaciones-actions";
 import { getVehiculosAction, createVehiculoAction, updateVehiculoAction, deleteVehiculoAction, getGastosVehiculosAction, createGastoVehiculoAction, updateGastoVehiculoAction, deleteGastoVehiculoAction } from "@/app/dashboard/sistema/activos/actions";
 import { getCotizacionesAction, createCotizacionAction, updateCotizacionAction, deleteCotizacionAction } from "@/app/dashboard/sistema/cotizacion/actions";
 import { getFacturasAction, createFacturaAction, updateFacturaAction } from "@/app/dashboard/sistema/financiera/actions";
@@ -52,6 +53,7 @@ interface ErpContextType {
     cuentasPorPagar: CuentaPorPagar[];
     gastosVehiculos: GastoVehiculo[];
     codigosTrabajo: CodigoTrabajo[];
+    instalaciones: Instalacion[];
     ordenesCompra: OrdenCompra[];
     cuentasBancarias: CuentaBancaria[];
     movimientosFinancieros: MovimientoFinanciero[];
@@ -123,6 +125,11 @@ interface ErpContextType {
     updateCodigoTrabajo: (updated: CodigoTrabajo) => void;
     deleteCodigoTrabajo: (id: string) => void;
 
+    // Instalaciones Actions
+    addInstalacion: (inst: Omit<Instalacion, "id" | "fechaCreacion">) => void;
+    updateInstalacion: (updated: Instalacion) => void;
+    deleteInstalacion: (id: string) => void;
+
     // New Actions (Financiera, TH, etc.)
     addCuentaBancaria: (cta: CuentaBancaria) => void;
     updateCuentaBancaria: (updated: CuentaBancaria) => void;
@@ -191,6 +198,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const [cuentasPorPagar, setCuentasPorPagar] = useState<CuentaPorPagar[]>([]);
     const [gastosVehiculos, setGastosVehiculos] = useState<GastoVehiculo[]>([]);
     const [codigosTrabajo, setCodigosTrabajo] = useState<CodigoTrabajo[]>([]);
+    const [instalaciones, setInstalaciones] = useState<Instalacion[]>([]);
     const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([]);
     const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
     const [movimientosFinancieros, setMovimientosFinancieros] = useState<MovimientoFinanciero[]>([]);
@@ -230,6 +238,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setNovedadesNomina(data.novedadesNomina);
             setEmpleados(data.empleados);
             setOrdenesCompra(data.ordenesCompra);
+            setInstalaciones(data.instalaciones);
 
             // Fetch Control System Data
             const [agendaData, rolesData, permsData] = await Promise.all([
@@ -535,14 +544,14 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     // CODIGOS TRABAJO ACTIONS
     const addCodigoTrabajo = async (codigo: CodigoTrabajo) => {
         try {
-            const { id, fechaCreacion, ...rest } = codigo;
+            const { id, created_at, updated_at, ...rest } = codigo as any;
             const saved = await createCodigoTrabajoAction(rest);
             setCodigosTrabajo(prev => [saved, ...prev]);
         } catch (error) { console.error("Failed to add codigo trabajo:", error); }
     };
     const updateCodigoTrabajo = async (updated: CodigoTrabajo) => {
         try {
-            const saved = await updateCodigoTrabajoAction(updated.id, updated);
+            const saved = await updateCodigoTrabajoAction(updated.id, updated as any);
             setCodigosTrabajo(prev => prev.map(c => c.id === saved.id ? saved : c));
         } catch (error) { console.error("Failed to update codigo trabajo:", error); }
     };
@@ -551,6 +560,26 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             await deleteCodigoTrabajoAction(id);
             setCodigosTrabajo(prev => prev.filter(c => c.id !== id));
         } catch (error) { console.error("Failed to delete codigo trabajo:", error); }
+    };
+
+    // INSTALACIONES ACTIONS
+    const addInstalacion = async (inst: Omit<Instalacion, "id" | "fechaCreacion">) => {
+        try {
+            const saved = await createInstalacionAction(inst);
+            setInstalaciones(prev => [saved, ...prev]);
+        } catch (error) { console.error("Failed to add instalacion:", error); }
+    };
+    const updateInstalacion = async (updated: Instalacion) => {
+        try {
+            const saved = await updateInstalacionAction(updated.id, updated);
+            setInstalaciones(prev => prev.map(i => i.id === saved.id ? saved : i));
+        } catch (error) { console.error("Failed to update instalacion:", error); }
+    };
+    const deleteInstalacion = async (id: string) => {
+        try {
+            await deleteInstalacionAction(id);
+            setInstalaciones(prev => prev.filter(i => i.id !== id));
+        } catch (error) { console.error("Failed to delete instalacion:", error); }
     };
 
     // BANCOS & NOVEDADES ACTIONS
@@ -815,7 +844,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             facturas, cotizaciones, clientes, users, currentUser,
             inventario, proveedores, vehiculos, dotacionItems,
             entregasDotacion, cuentasPorPagar, gastosVehiculos,
-            codigosTrabajo, ordenesCompra,
+            codigosTrabajo, instalaciones, ordenesCompra,
             cuentasBancarias, movimientosFinancieros, obligacionesFinancieras, novedadesNomina, empleados,
 
             // Loading
@@ -838,7 +867,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addCuentaPorPagar,
             deleteCuentaPorPagar,
             addCodigoTrabajo, updateCodigoTrabajo, deleteCodigoTrabajo,
-
+            addInstalacion, updateInstalacion, deleteInstalacion,
             // New Actions
             addCuentaBancaria, updateCuentaBancaria, addMovimientoFinanciero, updateMovimientoFinanciero,
             addObligacionFinanciera, updateObligacionFinanciera, deleteObligacionFinanciera,

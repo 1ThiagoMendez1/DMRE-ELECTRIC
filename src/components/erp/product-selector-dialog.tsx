@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Package, Wrench, Check, Plus } from "lucide-react";
+import { Search, Package, Code, Bolt, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,7 +22,31 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { CotizacionItem, InventarioItem, CodigoTrabajo } from "@/types/sistema";
+import { CotizacionItem, InventarioItem, CodigoTrabajo, Instalacion } from "@/types/sistema";
+
+interface ItemOptions {
+    id: string;
+    tipo: 'PRODUCTO' | 'SERVICIO';
+    subTipo?: 'INSTALACION' | 'APU'; // Se añade este tipado opcional
+    codigo: string;
+    descripcion: string;
+    valorUnitario: number;
+    _extraText?: string;
+    // Add other properties that might be needed from InventarioItem or CodigoTrabajo
+    // For products
+    sku?: string;
+    cantidad?: number; // stock
+    precio_proveedor?: number;
+    precioProveedor?: number;
+    costoMateriales?: number;
+    categoria?: string;
+    // For services
+    materiales?: any[];
+    valorManoObra?: number;
+    manoDeObra?: number;
+    costoTotal?: number; // Original costTotal from CodigoTrabajo
+    searchStr?: string; // Mapeo de búsqueda indexada
+}
 
 interface ProductSelectorDialogProps {
     open: boolean;
@@ -30,41 +54,79 @@ interface ProductSelectorDialogProps {
     onItemSelected: (item: CotizacionItem) => void;
     inventario: InventarioItem[];
     codigosTrabajo: CodigoTrabajo[];
+    instalaciones: Instalacion[];
 }
 
-export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inventario, codigosTrabajo }: ProductSelectorDialogProps) {
+export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inventario, codigosTrabajo, instalaciones }: ProductSelectorDialogProps) {
     const [searchTerm, setSearchTerm] = useState("");
-    const [activeFilter, setActiveFilter] = useState<'ALL' | 'PRODUCTO' | 'SERVICIO'>('ALL');
+    const [activeFilter, setActiveFilter] = useState<'ALL' | 'PRODUCTO' | 'SUMINISTRO' | 'INSTALACION'>('ALL');
 
     const filteredItems = useMemo(() => {
-        const products = inventario.map(p => ({
-            ...p,
-            sourceType: 'PRODUCTO' as const,
+        const products: ItemOptions[] = (inventario || []).map(p => ({
+            id: p.id,
+            tipo: 'PRODUCTO',
+            codigo: p.sku || '', // Use SKU as code for products
+            descripcion: p.descripcion,
+            valorUnitario: p.valorUnitario || 0,
+            sku: p.sku,
+            cantidad: p.cantidad,
+            precioProveedor: p.precioProveedor,
+            costoMateriales: p.costoMateriales,
+            _extraText: p.categoria,
             searchStr: `${p.descripcion} ${p.sku} ${p.categoria}`.toLowerCase()
         }));
 
-        const services = codigosTrabajo.map(s => ({
-            ...s,
-            sourceType: 'SERVICIO' as const,
+        const services: ItemOptions[] = (codigosTrabajo || []).map(s => ({
+            id: s.id,
+            tipo: 'SERVICIO',
+            subTipo: 'APU',
+            codigo: s.codigo,
+            descripcion: s.nombre,
+            valorUnitario: s.costoTotal || 0, // Use costoTotal as the reference price
+            _extraText: s.descripcion,
+            materiales: s.materiales,
+            valorManoObra: s.valorManoObra,
+            manoDeObra: s.manoDeObra,
+            costoTotal: s.costoTotal, // Keep original costTotal for calculation if needed
             searchStr: `${s.nombre} ${s.codigo} ${s.descripcion}`.toLowerCase()
         }));
 
-        let all = [...products, ...services];
+        const installs: ItemOptions[] = (instalaciones || []).map(i => ({
+            id: i.id,
+            tipo: 'SERVICIO',
+            subTipo: 'INSTALACION',
+            codigo: i.codigo,
+            descripcion: i.descripcion,
+            valorUnitario: i.valorCalculado || 0,
+            _extraText: 'Instalación Básica',
+            valorManoObra: i.valorCalculado,
+            manoDeObra: i.valorCalculado,
+            costoTotal: i.valorCalculado,
+            searchStr: `${i.descripcion} ${i.codigo}`.toLowerCase()
+        }));
+
+        let all = [...products, ...services, ...installs];
 
         if (activeFilter !== 'ALL') {
-            all = all.filter(item => item.sourceType === activeFilter);
+            if (activeFilter === 'PRODUCTO') {
+                all = all.filter(item => item.tipo === 'PRODUCTO');
+            } else if (activeFilter === 'SUMINISTRO') {
+                all = all.filter(item => item.subTipo === 'APU');
+            } else if (activeFilter === 'INSTALACION') {
+                all = all.filter(item => item.subTipo === 'INSTALACION');
+            }
         }
 
         if (searchTerm) {
             const lowerDate = searchTerm.toLowerCase();
-            all = all.filter(item => item.searchStr.includes(lowerDate));
+            all = all.filter(item => item.searchStr?.includes(lowerDate));
         }
 
         return all;
-    }, [searchTerm, activeFilter]);
+    }, [searchTerm, activeFilter, inventario, codigosTrabajo, instalaciones]);
 
-    const handleSelect = (item: any) => {
-        const isService = item.sourceType === 'SERVICIO';
+    const handleSelect = (item: ItemOptions) => {
+        const isService = item.tipo === 'SERVICIO';
 
         // Robust calculation for services that might have been saved with cost 0
         let servicePrice = isService ? (item.costoTotal || 0) : 0;
@@ -77,8 +139,8 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             id: crypto.randomUUID(), // Temp ID for the quote item
             inventarioId: isService ? undefined : item.id,
             codigoTrabajoId: isService ? item.id : undefined,
-            tipo: isService ? 'SERVICIO' : 'PRODUCTO',
-            descripcion: isService ? item.nombre : item.descripcion,
+            tipo: item.tipo,
+            descripcion: item.descripcion,
             cantidad: 1,
             valorUnitario: isService ? servicePrice : (item.valorUnitario || 0),
             valorTotal: isService ? servicePrice : (item.valorUnitario || 0),
@@ -131,68 +193,77 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                             <Package className="mr-2 h-3 w-3" /> Productos
                         </Button>
                         <Button
-                            variant={activeFilter === 'SERVICIO' ? 'secondary' : 'ghost'}
+                            variant={activeFilter === 'SUMINISTRO' ? 'secondary' : 'ghost'}
                             size="sm"
-                            onClick={() => setActiveFilter('SERVICIO')}
+                            onClick={() => setActiveFilter('SUMINISTRO')}
                         >
-                            <Wrench className="mr-2 h-3 w-3" /> Servicios
+                            <Code className="mr-2 h-3 w-3" /> Suministros
+                        </Button>
+                        <Button
+                            variant={activeFilter === 'INSTALACION' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setActiveFilter('INSTALACION')}
+                        >
+                            <Bolt className="mr-2 h-3 w-3" /> Instalaciones
                         </Button>
                     </div>
                 </div>
 
                 <div className="flex-1 border rounded-md overflow-hidden relative">
                     <div className="absolute inset-0 overflow-auto">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-secondary z-10">
-                                <TableRow>
-                                    <TableHead>Descripión</TableHead>
-                                    <TableHead>Tipo</TableHead>
-                                    <TableHead className="text-right">Precio Ref.</TableHead>
-                                    <TableHead className="w-[100px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredItems.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
-                                            No se encontraron items
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    filteredItems.map((item: any) => (
-                                        <TableRow key={!!item.sku ? item.sku : item.codigo} className="hover:bg-muted/50">
-                                            <TableCell>
-                                                <div className="font-medium">
-                                                    {item.sourceType === 'PRODUCTO' ? item.descripcion : item.nombre}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {item.sourceType === 'PRODUCTO' ? `SKU: ${item.sku} • Stock: ${item.cantidad}` : `COD: ${item.codigo} • ${item.descripcion}`}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                {item.sourceType === 'PRODUCTO' ? (
-                                                    <Badge variant="outline" className="gap-1">
-                                                        <Package className="h-3 w-3" /> Producto
-                                                    </Badge>
+                        {filteredItems.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground flex flex-col items-center">
+                                <Search className="h-8 w-8 mb-4 text-muted-foreground/50" />
+                                <p>No se encontraron items que coincidan con la búsqueda.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 p-2">
+                                {filteredItems.map(item => (
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-default"
+                                    >
+                                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                                            <div className="mt-1 flex-shrink-0">
+                                                {item.tipo === 'PRODUCTO' ? (
+                                                    <Package className="h-5 w-5 text-blue-500" />
+                                                ) : item.subTipo === 'INSTALACION' ? (
+                                                    <Bolt className="h-5 w-5 text-orange-500" />
                                                 ) : (
-                                                    <Badge variant="secondary" className="gap-1">
-                                                        <Wrench className="h-3 w-3" /> Servicio
-                                                    </Badge>
+                                                    <Code className="h-5 w-5 text-green-500" />
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">
-                                                {formatCurrency(item.sourceType === 'PRODUCTO' ? item.valorUnitario : item.costoTotal)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button size="sm" className="w-full" onClick={() => handleSelect(item)}>
-                                                    <Plus className="h-4 w-4 mr-1" /> Agregar
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-semibold truncate">{item.descripcion}</span>
+                                                    <Badge variant={item.tipo === 'PRODUCTO' ? 'outline' : item.subTipo === 'INSTALACION' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
+                                                        {item.tipo === 'PRODUCTO' ? 'Producto' : item.subTipo === 'INSTALACION' ? 'Instalación' : 'APU'}
+                                                    </Badge>
+                                                </div>
+                                                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                                    <span className="font-mono text-xs px-1.5 py-0.5 bg-muted rounded">
+                                                        {item.codigo}
+                                                    </span>
+                                                    {item._extraText && (
+                                                        <span className="truncate max-w-[250px]">{item._extraText}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4 ml-4 shrink-0">
+                                            <div className="text-right">
+                                                <div className="font-bold text-primary font-mono">
+                                                    {formatCurrency(item.valorUnitario)}
+                                                </div>
+                                            </div>
+                                            <Button size="sm" onClick={() => handleSelect(item)} className="shrink-0 flex items-center gap-1">
+                                                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Agregar</span>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </DialogContent>

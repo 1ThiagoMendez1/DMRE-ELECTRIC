@@ -16,7 +16,8 @@ import {
     Wrench,
     Fuel,
     Search,
-    ListOrdered
+    ListOrdered,
+    Bolt
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -65,6 +66,7 @@ import { differenceInDays } from "date-fns";
 import { AlertConfigDialog } from "@/components/erp/alert-config-dialog";
 import { AlertsBanner } from "@/components/erp/alerts-banner";
 import { WorkCodesTable } from "@/components/erp/work-codes-table";
+import { InstalacionesTable } from "@/components/erp/instalaciones-table";
 import { CuentasPorPagarDashboard } from "@/components/erp/cuentas-por-pagar-dashboard";
 import { MaterialDetailConsumoDialog } from "@/components/erp/material-detail-consumo-dialog";
 import { getTrabajosListAction } from "@/app/dashboard/sistema/inventario/trabajos-list-action";
@@ -203,6 +205,7 @@ export default function LogisticaPage() {
                     <TabsTrigger value="catalogo" className="gap-2"><ListOrdered className="h-4 w-4" /> Materiales</TabsTrigger>
                     <TabsTrigger value="inventario" className="gap-2"><Package className="h-4 w-4" /> Suministro</TabsTrigger>
                     <TabsTrigger value="servicios" className="gap-2"><Wrench className="h-4 w-4" /> Servicios</TabsTrigger>
+                    <TabsTrigger value="instalaciones" className="gap-2"><Bolt className="h-4 w-4" /> Instalaciones</TabsTrigger>
                     <TabsTrigger value="suministro" className="gap-2"><Truck className="h-4 w-4" /> Proveedores</TabsTrigger>
                     <TabsTrigger value="dotacion" className="gap-2"><HardHat className="h-4 w-4" /> Dotación</TabsTrigger>
                     <TabsTrigger value="activos" className="gap-2"><Car className="h-4 w-4" /> Activos</TabsTrigger>
@@ -413,6 +416,11 @@ export default function LogisticaPage() {
                             />
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* INSTALACIONES TAB */}
+                <TabsContent value="instalaciones" className="space-y-4">
+                    <InstalacionesTable />
                 </TabsContent>
 
                 {/* PROVEEDORES TAB - WITH SUB-TABS */}

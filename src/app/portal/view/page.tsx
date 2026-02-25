@@ -10,13 +10,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Download, MessageSquare, Send, CheckCircle2, Clock, MapPin, Calendar, ArrowLeft, Printer, Lock, ShieldAlert, Upload, Loader2, Eye } from "lucide-react";
-import { getPublicCotizacionAction, getSecureCotizacionDocumentsAction, uploadPublicCotizacionDocumentAction } from "@/app/dashboard/sistema/cotizacion/actions";
+import { getPublicCotizacionAction, getSecureCotizacionDocumentsAction, uploadPublicCotizacionDocumentAction, addPublicCotizacionCommentAction } from "@/app/dashboard/sistema/cotizacion/actions";
 import { Cotizacion, ComentarioCotizacion } from "@/types/sistema";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import { createClient } from "@/utils/supabase/client";
 
-// Mock comments
+// Mock comments keep for backwards compatibility with COT-001
 const initialComments: Record<string, ComentarioCotizacion[]> = {
     'COT-001': [
         { id: 'c1', fecha: new Date(2024, 6, 22), autor: 'DMRE', mensaje: 'Adjuntamos la cotización solicitada. Quedamos atentos.', leido: true },
@@ -38,6 +39,30 @@ function PortalViewContent() {
 
     const docLegalInputRef = useRef<HTMLInputElement>(null);
     const docPolizaInputRef = useRef<HTMLInputElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const shouldAutoScrollRef = useRef(true);
+
+    // Initial load auto-scroll or when we forcibly want to scroll down (new message sent)
+    useEffect(() => {
+        if (shouldAutoScrollRef.current && messagesEndRef.current) {
+            const viewport = messagesEndRef.current.closest('[data-radix-scroll-area-viewport]') as HTMLElement;
+            if (viewport) {
+                viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+            } else {
+                messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    }, [comments]);
+
+    // Check if user is scrolled up
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.target as HTMLDivElement;
+        // In a flex-col-reverse or normal list, if we are near bottom:
+        const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+        // If they scroll up, stop auto-scrolling on new polls. If they go to bottom, re-enable.
+        shouldAutoScrollRef.current = isNearBottom;
+    };
 
     const loadSecureDocs = async (quoteId: string) => {
         const docs = await getSecureCotizacionDocumentsAction(quoteId);
@@ -47,15 +72,25 @@ function PortalViewContent() {
     };
 
     useEffect(() => {
+        let isFirstLoad = true;
         async function fetchQuote() {
             if (id) {
                 try {
                     const found = await getPublicCotizacionAction(id);
                     if (found) {
                         setQuote(found);
-                        setComments(initialComments[found.numero] || []); // Mock comments support
 
-                        if (['APROBADA'].includes(found.estado)) {
+                        if (found.comentarios && found.comentarios.length > 0) {
+                            if (comments.length === 0) { // Initial load only
+                                setComments(found.comentarios);
+                                shouldAutoScrollRef.current = true;
+                            }
+                        } else if (comments.length === 0) {
+                            setComments(initialComments[found.numero] || []); // Mock comments support
+                            shouldAutoScrollRef.current = true;
+                        }
+
+                        if (isFirstLoad && ['APROBADA'].includes(found.estado)) {
                             await loadSecureDocs(id);
                         }
                     }
@@ -63,9 +98,33 @@ function PortalViewContent() {
                     console.error("Failed to load quote", e);
                 }
             }
-            setLoading(false);
+            if (isFirstLoad) {
+                setLoading(false);
+                isFirstLoad = false;
+            }
         }
+
+        // Initial fetch
         fetchQuote();
+
+        // Setup polling every 4 seconds
+        const pollInterval = setInterval(async () => {
+            if (id) {
+                try {
+                    const freshQuote = await getPublicCotizacionAction(id);
+                    if (freshQuote && freshQuote.comentarios) {
+                        setComments(prev => {
+                            if (freshQuote.comentarios!.length > prev.length) {
+                                return freshQuote.comentarios as ComentarioCotizacion[];
+                            }
+                            return prev;
+                        });
+                    }
+                } catch (e) { }
+            }
+        }, 4000);
+
+        return () => clearInterval(pollInterval);
     }, [id]);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros') => {
@@ -100,8 +159,8 @@ function PortalViewContent() {
         }
     };
 
-    const handleSendComment = () => {
-        if (!newComment.trim()) return;
+    const handleSendComment = async () => {
+        if (!newComment.trim() || !quote) return;
 
         const newMsg: ComentarioCotizacion = {
             id: `new-${Date.now()}`,
@@ -111,10 +170,19 @@ function PortalViewContent() {
             leido: false
         };
 
-        setComments([...comments, newMsg]);
+        const updatedComments = [...comments, newMsg];
+        shouldAutoScrollRef.current = true; // Always scroll down on my own message
+        setComments(updatedComments);
         setNewComment("");
 
-        toast({ title: "Mensaje Enviado", description: "Su comentario ha sido registrado." });
+        try {
+            await addPublicCotizacionCommentAction(quote.numero, newMsg);
+            toast({ title: "Mensaje Enviado", description: "Su comentario ha sido registrado." });
+        } catch (error) {
+            console.error("Failed to save comment:", error);
+            // Revert state if we want strictness, but here we just warn
+            toast({ title: "Error", description: "No se pudo guardar el mensaje.", variant: "destructive" });
+        }
     };
 
     const handleDownloadPDF = () => {
@@ -326,7 +394,7 @@ function PortalViewContent() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="flex-1 p-0 overflow-hidden relative">
-                            <ScrollArea className="h-full p-4">
+                            <ScrollArea className="h-full p-4" onScrollCapture={handleScroll}>
                                 <div className="space-y-4">
                                     <div className="flex justify-center">
                                         <span className="text-[10px] text-muted-foreground bg-secondary/50 px-2 py-1 rounded-full">
@@ -343,6 +411,7 @@ function PortalViewContent() {
                                             </span>
                                         </div>
                                     ))}
+                                    <div ref={messagesEndRef} />
                                 </div>
                             </ScrollArea>
                         </CardContent>

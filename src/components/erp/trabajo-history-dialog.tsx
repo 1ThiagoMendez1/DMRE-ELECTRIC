@@ -121,7 +121,7 @@ function FinancialTabContent({ trabajoId, totalTrabajo }: { trabajoId: string, t
 
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Total Trabajo</CardTitle></CardHeader>
                     <CardContent><div className="text-2xl font-bold">{formatCurrency(totalTrabajo)}</div></CardContent>
@@ -1008,19 +1008,19 @@ export function TrabajoHistoryDialog({
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'historial')} className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className={`grid w-full ${showExecution ? (trabajo.estado === 'APROBADA' ? 'grid-cols-5' : 'grid-cols-5') : (trabajo.estado === 'APROBADA' ? 'grid-cols-4' : 'grid-cols-4')}`}>
-                        <TabsTrigger value="detalles">Detalles</TabsTrigger>
-                        {trabajo.estado !== 'APROBADA' && <TabsTrigger value="items">Items & Edición</TabsTrigger>}
-                        {showExecution && <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>}
-                        <TabsTrigger value="preview">Vista PDF</TabsTrigger>
-                        {trabajo.estado === 'APROBADA' && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
-                        <TabsTrigger value="historial">Historial</TabsTrigger>
+                    <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1 p-1">
+                        <TabsTrigger value="detalles" className="flex-1 sm:flex-none">Detalles</TabsTrigger>
+                        {trabajo.estado !== 'APROBADA' && <TabsTrigger value="items" className="flex-1 sm:flex-none">Items & Edición</TabsTrigger>}
+                        {showExecution && <TabsTrigger value="ejecucion" className="flex-1 sm:flex-none">Ejecución</TabsTrigger>}
+                        <TabsTrigger value="preview" className="flex-1 sm:flex-none">Vista PDF</TabsTrigger>
+                        {trabajo.estado === 'APROBADA' && <TabsTrigger value="documentos" className="flex-1 sm:flex-none">Documentos</TabsTrigger>}
+                        <TabsTrigger value="historial" className="flex-1 sm:flex-none">Historial</TabsTrigger>
                     </TabsList>
 
                     {/* DETALLES TAB */}
                     <TabsContent value="detalles" className="flex-1 overflow-auto space-y-4 mt-4">
                         {/* ... Existing Details Content ... */}
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Client Info */}
                             <Card>
                                 <CardHeader className="pb-2">
@@ -1146,9 +1146,9 @@ export function TrabajoHistoryDialog({
                                         <span className="text-2xl font-bold text-primary">{progressPercent}%</span>
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <Progress value={progressPercent} className="flex-1 h-3 mr-4" />
-                                    <Button size="sm" onClick={handleUpdateProgress}>
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <Progress value={progressPercent} className="w-full sm:flex-1 h-3 sm:mr-4" />
+                                    <Button size="sm" onClick={handleUpdateProgress} className="w-full sm:w-auto">
                                         <Save className="mr-2 h-4 w-4" />
                                         Guardar Progreso
                                     </Button>
@@ -1805,6 +1805,12 @@ export function TrabajoHistoryDialog({
                                         <span className="font-mono text-red-500">-{formatCurrency(descuento)}</span>
                                     </div>
                                 </div>
+                                {descuento > 0 && (
+                                    <div className="flex justify-between items-center text-sm font-semibold mt-1">
+                                        <span>Subt. c/ descuento</span>
+                                        <span className="font-mono text-primary">{formatCurrency(subtotal - descuento)}</span>
+                                    </div>
+                                )}
                                 {/* We hide general IVA if AIU is checked since AIU uses IVA on Utility */}
                                 {!esAiu && (
                                     <div className="flex justify-between items-center text-sm mt-1">
@@ -2221,6 +2227,20 @@ export function TrabajoHistoryDialog({
                                                         return (
                                                             <>
                                                                 <div className="flex justify-between text-sm text-black"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(subVisible)}</span></div>
+
+                                                                {discountVisible > 0 && (
+                                                                    <>
+                                                                        <div className="flex justify-between text-sm text-red-600">
+                                                                            <span>Descuento ({globalDiscountPct}%):</span>
+                                                                            <span className="font-mono">-{formatCurrency(discountVisible)}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between text-sm text-black font-bold">
+                                                                            <span>Subt. c/ descuento:</span>
+                                                                            <span className="font-mono">{formatCurrency(baseVisible)}</span>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+
                                                                 {esAiu ? (
                                                                     <>
                                                                         <div className="flex justify-between text-sm text-black"><span>Admin:</span> <span className="font-mono">{formatCurrency(aiuAdminVisible)}</span></div>

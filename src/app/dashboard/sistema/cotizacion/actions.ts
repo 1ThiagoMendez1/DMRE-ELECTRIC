@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { Cotizacion, CotizacionItem, Cliente, HistorialCotizacion } from "@/types/sistema";
+import { Cotizacion, CotizacionItem, Cliente, HistorialCotizacion, ComentarioCotizacion } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
 
 // ... (previous helper functions remain effectively the same, just not repeated here for brevity if replace_file_content handles partials well, but I will provide full file content or targeted replacement to be safe. Since I'm using replace_file_content with range, I'll target the end of file for new functions and the top for imports)
@@ -545,6 +545,43 @@ export async function uploadPublicCotizacionDocumentAction(trackingCode: string,
         console.error("Portal Upload Error:", uploadError);
         throw new Error("Ocurrió un error al subir el archivo.");
     }
+
+    return true;
+}
+
+// Allows an unauthenticated client to add a comment to their quotation
+export async function addPublicCotizacionCommentAction(trackingCode: string, comment: ComentarioCotizacion): Promise<boolean> {
+    const supabase = await createClient(); // Service role
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trackingCode);
+    const identifierFilter = isUUID ? `numero.eq.${trackingCode},id.eq.${trackingCode}` : `numero.eq.${trackingCode}`;
+
+    const { data: cotizacion, error } = await supabase
+        .from("cotizaciones")
+        .select("id, comentarios")
+        .or(identifierFilter)
+        .single();
+
+    if (error || !cotizacion) {
+        console.error("Error finding quote for comment:", error);
+        return false;
+    }
+
+    const currentComments = cotizacion.comentarios || [];
+    const updatedComments = [...currentComments, comment];
+
+    const { error: updateError } = await supabase
+        .from("cotizaciones")
+        .update({ comentarios: updatedComments })
+        .eq("id", cotizacion.id);
+
+    if (updateError) {
+        console.error("Error saving public comment:", updateError);
+        return false;
+    }
+
+    revalidatePath("/portal/view");
+    revalidatePath("/dashboard/sistema/comercial");
 
     return true;
 }

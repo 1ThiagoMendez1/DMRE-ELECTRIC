@@ -432,6 +432,18 @@ export interface CodigoTrabajo {
 export type CodigoTrabajoInsert = Omit<CodigoTrabajo, 'id' | 'created_at' | 'updated_at'>
 export type CodigoTrabajoUpdate = Partial<CodigoTrabajoInsert>
 
+export interface Instalacion {
+    id: string;
+    codigo: string;
+    descripcion: string;
+    valorCalculado: number;
+    creadoPor?: string;
+    fechaCreacion?: Date;
+    activo?: boolean;
+}
+export type InstalacionInsert = Omit<Instalacion, 'id' | 'fechaCreacion'>
+export type InstalacionUpdate = Partial<InstalacionInsert>
+
 export interface MaterialAsociado {
     id: string
     codigo_trabajo_id: string

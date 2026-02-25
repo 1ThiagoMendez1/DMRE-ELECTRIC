@@ -148,8 +148,8 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         },
         fonts: { header: 'helvetica', body: 'helvetica' },
         components: {
-            clientBoxStyle: 'clean',
-            tableTheme: 'plain',
+            clientBoxStyle: 'box',
+            tableTheme: 'grid',
             headerStyle: 'clean',
             footerStyle: 'minimal'
         }

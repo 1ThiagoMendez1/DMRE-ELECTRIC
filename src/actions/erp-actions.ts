@@ -15,6 +15,7 @@ import { getNovedadesNominaAction } from "@/app/dashboard/sistema/talento-humano
 import { getEmpleadosAction } from "@/app/dashboard/sistema/talento-humano/actions";
 import { getUsers } from "@/actions/auth-actions";
 import { getOrdenesCompraAction } from "@/app/dashboard/sistema/suministro/ordenes-actions";
+import { getInstalacionesAction } from "@/app/dashboard/sistema/codigos-trabajo/instalaciones-actions";
 
 export async function getInitialErpDataAction() {
     try {
@@ -37,6 +38,7 @@ export async function getInitialErpDataAction() {
             novedadesNomina,
             empleados,
             ordenesCompra,
+            instalaciones,
         ] = await Promise.all([
             getUsers().catch(() => []),
             getCotizacionesAction().catch(() => []),
@@ -56,6 +58,7 @@ export async function getInitialErpDataAction() {
             getNovedadesNominaAction().catch(() => []),
             getEmpleadosAction().catch(() => []),
             getOrdenesCompraAction().catch(() => []),
+            getInstalacionesAction().catch(() => []),
         ]);
 
         return {
@@ -77,6 +80,7 @@ export async function getInitialErpDataAction() {
             novedadesNomina,
             empleados,
             ordenesCompra,
+            instalaciones,
         };
     } catch (error) {
         console.error("Error in getInitialErpDataAction:", error);

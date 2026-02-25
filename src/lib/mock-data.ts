@@ -36,7 +36,8 @@ import {
     MaterialAsociado,
     OrdenCompra,
     DetalleCompra,
-    EstadoOrdenCompra
+    EstadoOrdenCompra,
+    Instalacion
 } from "@/types/sistema";
 import { addDays, subDays } from "date-fns";
 
@@ -769,6 +770,27 @@ export const initialCodigosTrabajo: CodigoTrabajo[] = [
         costoTotalMateriales: 330000,
         costoTotal: 580000,
         fechaCreacion: new Date(2024, 2, 5)
+    }
+];
+
+export const initialInstalaciones: Instalacion[] = [
+    {
+        id: "INST-001",
+        codigo: "IN-001",
+        descripcion: "Punto Eléctrico Básico (Sin Regata)",
+        valorCalculado: 45000,
+        creadoPor: "USR-001",
+        fechaCreacion: new Date(2024, 3, 10),
+        activo: true
+    },
+    {
+        id: "INST-002",
+        codigo: "IN-002",
+        descripcion: "Instalación de Luminaria LED Sobrepuesta",
+        valorCalculado: 35000,
+        creadoPor: "USR-001",
+        fechaCreacion: new Date(2024, 3, 11),
+        activo: true
     }
 ];
 

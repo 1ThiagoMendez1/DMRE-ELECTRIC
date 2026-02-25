@@ -159,6 +159,56 @@ export const generateQuotePDF = (
 
         currentY = 80;
     }
+    // E. MINIMAL (Structured Order of Purchase Style)
+    else if (style.layout === 'minimal') {
+        const primaryColor = [0, 0, 0] as [number, number, number]; // Black for this strict style
+
+        // 1. Top Left Box (Document Type & Number)
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+
+        // Outer Box
+        doc.roundedRect(14, 15, 60, 16, 1, 1);
+        // Header fill inside the box
+        doc.setFillColor(220, 220, 220); // Light gray
+        doc.roundedRect(14, 15, 60, 8, 1, 1, 'F');
+        // Redraw top border over fill
+        doc.roundedRect(14, 15, 60, 16, 1, 1, 'S');
+        // Separator line
+        doc.line(14, 23, 74, 23);
+
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(10);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("COTIZACIÓN", 44, 20.5, { align: 'center' });
+
+        doc.setFontSize(11);
+        doc.text(`No. ${cotizacion.numero}`, 44, 29, { align: 'center' });
+
+        // 2. Top Center (Company Info)
+        doc.setFontSize(10);
+        doc.text(company.nombre, pageWidth / 2, 18, { align: 'center' });
+        doc.setFontSize(8);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(`NIT: ${company.nit}`, pageWidth / 2, 23, { align: 'center' });
+        doc.text(company.direccion, pageWidth / 2, 28, { align: 'center' });
+        doc.text(`Tel: ${company.telefono}`, pageWidth / 2, 33, { align: 'center' });
+        doc.text(company.email, pageWidth / 2, 38, { align: 'center' });
+
+        // 3. Top Right (Logo)
+        try {
+            const logoImg = new Image();
+            logoImg.src = '/logo.png';
+            doc.addImage(logoImg, 'PNG', pageWidth - 55, 12, 40, 18);
+        } catch (e) { }
+
+        // Below the logo text
+        doc.setFontSize(8);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text(company.descripcion, pageWidth - 35, 34, { align: 'center' });
+
+        currentY = 48; // Ready for boxes
+    }
 
     // D. STANDARD & TECHNICAL (Left Align)
     else {
@@ -202,47 +252,37 @@ export const generateQuotePDF = (
     let titleY = currentY;
 
     // In Standard layout, title is often top right
-    if (style.layout === 'standard' || style.layout === 'technical' || style.layout === 'minimal') {
+    if (style.layout === 'standard' || style.layout === 'technical') {
         // Floating box top right
         const boxX = pageWidth - 80;
         const boxY = 15;
 
-        // Minimalist: Just text
-        if (style.components.clientBoxStyle === 'clean') {
-            doc.setFontSize(16);
-            doc.setFont(style.fonts.header, 'bold');
-            doc.setTextColor(...secondary);
-            doc.text("COTIZACIÓN", pageWidth - 14, 25, { align: 'right' });
-            doc.setFontSize(12);
-            doc.setTextColor(...text);
-            doc.text(`# ${cotizacion.numero}`, pageWidth - 14, 32, { align: 'right' });
-            doc.setFontSize(10);
-            doc.text(format(new Date(cotizacion.fecha), "dd MMM yyyy", { locale: es }), pageWidth - 14, 38, { align: 'right' });
-        }
         // Boxed Standard
-        else {
-            doc.setDrawColor(...accent);
-            doc.setFillColor(255, 255, 255);
-            if (style.components.clientBoxStyle === 'box') {
-                doc.roundedRect(boxX, boxY, 66, 30, 2, 2, 'FD');
-            } else {
-                // Just fill
-                // doc.rect(...)
-            }
-
-            doc.setFontSize(14);
-            doc.setFont(style.fonts.header, 'bold');
-            doc.setTextColor(...primary);
-            doc.text("COTIZACIÓN", boxX + 33, boxY + 8, { align: 'center' });
-
-            doc.setTextColor(...secondary); // Use selected secondary color instead of hardcoded red
-            doc.text(`${cotizacion.numero}`, boxX + 33, boxY + 16, { align: 'center' });
-
-            doc.setFontSize(9);
-            doc.setFont(style.fonts.body, 'normal');
-            doc.setTextColor(...text); // Use black text
-            doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd/MM/yyyy")}`, boxX + 33, boxY + 24, { align: 'center' });
+        doc.setDrawColor(...accent);
+        doc.setFillColor(255, 255, 255);
+        if (style.components.clientBoxStyle === 'box') {
+            doc.roundedRect(boxX, boxY, 66, 30, 2, 2, 'FD');
+        } else {
+            // Just fill
+            // doc.rect(...)
         }
+
+        doc.setFontSize(14);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.setTextColor(...primary);
+        doc.text("COTIZACIÓN", boxX + 33, boxY + 8, { align: 'center' });
+
+        doc.setTextColor(...secondary); // Use selected secondary color instead of hardcoded red
+        doc.text(`${cotizacion.numero}`, boxX + 33, boxY + 16, { align: 'center' });
+
+        doc.setFontSize(9);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.setTextColor(...text); // Use black text
+        doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd/MM/yyyy")}`, boxX + 33, boxY + 24, { align: 'center' });
+    }
+    // Minimal layout does not need this secondary title box
+    else if (style.layout === 'minimal') {
+        // Title was already drawn in the header
     }
     // In Bold layout, title box overlaps header
     else if (style.layout === 'bold') {
@@ -294,7 +334,95 @@ export const generateQuotePDF = (
 
     const clientBoxY = currentY > 0 ? currentY + 5 : 60; // fallback
 
-    if (style.components.clientBoxStyle === 'filled') {
+    // Override specifically for the minimal "Order of Purchase" layout
+    if (style.layout === 'minimal') {
+        const leftBoxWidth = 85;
+        const rightBoxWidth = 85;
+        const boxHeight = 28;
+        const gap = 12;
+
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.3);
+
+        // LEFT BOX (Dates & Roles)
+        doc.roundedRect(14, currentY, leftBoxWidth, boxHeight, 2, 2);
+
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Fecha:", 16, currentY + 6);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(format(new Date(cotizacion.fecha), "dd/MM/yyyy"), 35, currentY + 6);
+
+        if (cotizacion.estado) {
+            doc.setFont(style.fonts.header, 'bold');
+            doc.text("Estado:", 16, currentY + 11);
+            doc.setFont(style.fonts.body, 'normal');
+            doc.text(cotizacion.estado, 35, currentY + 11);
+        }
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Tipo Oferta:", 16, currentY + 16);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(cotizacion.tipo === 'NORMAL' ? 'Normal' : 'Simplificada', 35, currentY + 16);
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Vendedor:", 16, currentY + 21);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text("DMRE", 35, currentY + 21);
+
+        // RIGHT BOX (Client Info)
+        const rightBoxX = 14 + leftBoxWidth + gap;
+        doc.roundedRect(rightBoxX, currentY, rightBoxWidth, boxHeight, 2, 2);
+
+        // Overlapping Title
+        doc.setFillColor(255, 255, 255);
+        doc.rect(rightBoxX + 10, currentY - 2, 35, 4, 'F'); // Mask line
+        doc.setFont(style.fonts.header, 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 50, 100); // Brand color for title
+        doc.text("COTIZACIÓN DE SERVICIO", rightBoxX + 12, currentY + 1);
+
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Cliente", rightBoxX + 2, currentY + 6);
+
+        // Split data inside right box
+        doc.setFontSize(7.5);
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Cliente:", rightBoxX + 2, currentY + 11);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(cotizacion.cliente.nombre, rightBoxX + 20, currentY + 11);
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("NIT/CC:", rightBoxX + 2, currentY + 15);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(cotizacion.cliente.documento, rightBoxX + 20, currentY + 15);
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Dirección:", rightBoxX + 2, currentY + 19);
+        doc.setFont(style.fonts.body, 'normal');
+        // Truncate address if too long
+        let addr = cotizacion.cliente.direccion || "";
+        if (addr.length > 40) addr = addr.substring(0, 40) + "...";
+        doc.text(addr, rightBoxX + 20, currentY + 19);
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Teléfono:", rightBoxX + 2, currentY + 23);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(cotizacion.cliente.telefono || "", rightBoxX + 20, currentY + 23);
+
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Email:", rightBoxX + 2, currentY + 27);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(cotizacion.cliente.correo || "", rightBoxX + 20, currentY + 27);
+
+        currentY += boxHeight;
+    }
+    // Existing Client Box Styles for other layouts
+    else if (style.components.clientBoxStyle === 'filled') {
         // Gray background block - increased height for all info
         doc.setFillColor(...accent);
         doc.rect(contentStartX, clientBoxY, contentWidth, 35, 'F');
@@ -405,12 +533,14 @@ export const generateQuotePDF = (
 
         if (showItem) {
             const showDetails = !isProduct || materialVisibilityMode === 'MOSTRAR_TODO';
+            const unitValue = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
+
             tableBody.push([
                 index + 1,
                 item.descripcion,
                 showDetails ? item.cantidad : '-',
                 "UND",
-                showDetails ? currencyFmt.format(item.valorUnitario) : '-',
+                showDetails ? currencyFmt.format(unitValue) : '-',
                 showDetails ? currencyFmt.format(item.valorTotal) : '-'
             ]);
 
@@ -431,25 +561,58 @@ export const generateQuotePDF = (
         }
     });
 
+    // Minimal Style Table Config override
+    const isMinimal = style.layout === 'minimal';
+
+    // Add additional headers config based on minimal layout
+    let headHeaders = ["Descripción", "U.M.", "Cantidad", "Precio unitario", "Descuentos", "Impuestos", "Valor total"];
+    if (!isMinimal) {
+        headHeaders = ["#", "DESCRIPCIÓN", "CANT", "UNIDAD", "VALOR UNIT.", "TOTAL"];
+    }
+
+    const customTableBody = tableBody.map((row) => {
+        if (isMinimal) {
+            // Re-order and pad with 0s for missing features
+            const desc = row[1];
+            const qty = row[2];
+            const unit = row[3];
+            const unitPrice = row[4];
+            const total = row[5];
+            return [desc, unit, qty, unitPrice, "$0", "$0", total];
+        }
+        return row;
+    });
+
     autoTable(doc, {
         startY: currentY,
-        head: [["#", "DESCRIPCIÓN", "CANT", "UNIDAD", "VALOR UNIT.", "TOTAL"]],
-        body: tableBody,
-        theme: style.components.tableTheme === 'plain' ? 'plain' : (style.components.tableTheme === 'grid' ? 'grid' : 'striped'),
+        head: [headHeaders],
+        body: customTableBody,
+        theme: isMinimal ? 'grid' : (style.components.tableTheme === 'plain' ? 'plain' : (style.components.tableTheme === 'grid' ? 'grid' : 'striped')),
         styles: {
             font: style.fonts.body,
-            fontSize: 9,
+            fontSize: isMinimal ? 7 : 9,
             cellPadding: 4,
-            textColor: [40, 40, 40]
+            textColor: [40, 40, 40],
+            lineColor: [40, 40, 40],
+            lineWidth: isMinimal ? 0.3 : 0.1
         },
         headStyles: {
-            fillColor: style.components.tableTheme === 'plain' ? [255, 255, 255] : primary,
-            textColor: style.components.tableTheme === 'plain' ? primary : [255, 255, 255],
+            fillColor: isMinimal ? [230, 230, 230] : (style.components.tableTheme === 'plain' ? [255, 255, 255] : primary),
+            textColor: isMinimal ? [0, 0, 0] : (style.components.tableTheme === 'plain' ? primary : [255, 255, 255]),
             fontStyle: 'bold',
             halign: 'center',
-            lineWidth: style.components.tableTheme === 'plain' ? 0 : 0
+            lineWidth: isMinimal ? 0.3 : (style.components.tableTheme === 'plain' ? 0 : 0.1),
+            lineColor: [40, 40, 40]
         },
-        columnStyles: {
+        columnStyles: isMinimal ? {
+            0: { cellWidth: 70, halign: 'left' },
+            1: { halign: 'center' },
+            2: { halign: 'center' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' },
+            6: { halign: 'right', fontStyle: 'bold' }
+        } : {
             0: { cellWidth: 10, halign: 'center' },
             2: { cellWidth: 15, halign: 'center' },
             3: { cellWidth: 15, halign: 'center' },
@@ -486,52 +649,239 @@ export const generateQuotePDF = (
     let currentTotalsY = finalY + 4;
     const lineSpacing = 5;
 
-    doc.text("Subtotal:", totalsX, currentTotalsY);
-    doc.text(currencyFmt.format(cotizacion.subtotal), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+    // IF MINIMAL: Draw Notes Bottom Box & Totals Bottom Box side by side
+    if (isMinimal) {
+        currentTotalsY = finalY + 5;
 
-    if (hasAiu) {
-        currentTotalsY += lineSpacing;
-        doc.text("Admin:", totalsX, currentTotalsY);
-        doc.text(currencyFmt.format(cotizacion.aiuAdmin || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+        // Notes Box
+        const notesWidth = contentWidth - 85;
+        doc.roundedRect(contentStartX, currentTotalsY, notesWidth, 34, 1, 1);
+        doc.setFillColor(255, 255, 255);
+        doc.rect(contentStartX + 8, currentTotalsY - 2, 12, 4, 'F');
+        doc.setFontSize(9);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Notas", contentStartX + 10, currentTotalsY + 1);
 
-        currentTotalsY += lineSpacing;
-        doc.text("Imprevistos:", totalsX, currentTotalsY);
-        doc.text(currencyFmt.format(cotizacion.aiuImprevistos || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+        doc.setFontSize(7.5);
+        doc.setFont(style.fonts.body, 'normal');
+        const notesLines = doc.splitTextToSize(cotizacion.descripcionTrabajo || "Sin notas adicionales", notesWidth - 4);
+        doc.text(notesLines, contentStartX + 2, currentTotalsY + 6);
 
-        currentTotalsY += lineSpacing;
-        doc.text("Utilidad:", totalsX, currentTotalsY);
-        doc.text(currencyFmt.format(cotizacion.aiuUtilidad || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
 
-        currentTotalsY += lineSpacing;
-        doc.text("IVA s/ Util.:", totalsX, currentTotalsY);
-        doc.text(currencyFmt.format(cotizacion.iva || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+        // Totals Box
+        const totalsBoxX = contentStartX + notesWidth + 5;
+        const tbWidth = 80;
+        doc.roundedRect(totalsBoxX, currentTotalsY, tbWidth, 34, 1, 1);
+        doc.setFillColor(255, 255, 255);
+        doc.rect(totalsBoxX + 6, currentTotalsY - 2, 15, 4, 'F');
+        doc.setFontSize(9);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Totales", totalsBoxX + 8, currentTotalsY + 1);
+
+        doc.setFontSize(8);
+        doc.setFont(style.fonts.body, 'normal');
+        let tY = currentTotalsY + 6;
+
+        doc.text("Total bruto", totalsBoxX + 2, tY);
+        doc.text(currencyFmt.format(cotizacion.subtotal), totalsBoxX + tbWidth - 2, tY, { align: 'right' });
+
+        tY += 4.5;
+        doc.text("Dscto por línea", totalsBoxX + 2, tY);
+        doc.text("$0", totalsBoxX + tbWidth - 2, tY, { align: 'right' });
+
+        tY += 4.5;
+        doc.text("Dscto global", totalsBoxX + 2, tY);
+        doc.text(cotizacion.descuentoGlobal ? currencyFmt.format(cotizacion.descuentoGlobal) : "$0", totalsBoxX + tbWidth - 2, tY, { align: 'right' });
+
+        tY += 4.5;
+        doc.text("Subtotal", totalsBoxX + 2, tY);
+        doc.text(currencyFmt.format(cotizacion.subtotal - (cotizacion.descuentoGlobal || 0)), totalsBoxX + tbWidth - 2, tY, { align: 'right' });
+
+        tY += 4.5;
+        doc.text("Vlr. Impuestos", totalsBoxX + 2, tY);
+        doc.text(currencyFmt.format(cotizacion.iva), totalsBoxX + tbWidth - 2, tY, { align: 'right' });
+
+        tY += 6;
+        doc.setFontSize(9);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Total", totalsBoxX + 2, tY);
+        doc.text(currencyFmt.format(cotizacion.total), totalsBoxX + tbWidth - 2, tY, { align: 'right' });
+
+        currentTotalsY += 45; // Move down for footer
+
     } else {
+        // STANDARD TOTALS RENDERER
+        doc.text("Subtotal:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.subtotal), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+        if (cotizacion.descuentoGlobal && cotizacion.descuentoGlobal > 0) {
+            currentTotalsY += lineSpacing;
+            doc.setTextColor(220, 38, 38);
+            doc.text(`Descuento (${cotizacion.descuentoGlobalPorcentaje}%):`, totalsX, currentTotalsY);
+            doc.text("-" + currencyFmt.format(cotizacion.descuentoGlobal), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+            doc.setTextColor(...text);
+
+            currentTotalsY += lineSpacing;
+            doc.setFont(style.fonts.body, 'bold');
+            doc.text("Subt. c/ descuento:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.subtotal - cotizacion.descuentoGlobal), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+            doc.setFont(style.fonts.body, 'normal');
+        }
+
+        if (hasAiu) {
+            currentTotalsY += lineSpacing;
+            doc.text("Admin:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.aiuAdmin || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+            currentTotalsY += lineSpacing;
+            doc.text("Imprevistos:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.aiuImprevistos || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+            currentTotalsY += lineSpacing;
+            doc.text("Utilidad:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.aiuUtilidad || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+            currentTotalsY += lineSpacing;
+            doc.text("IVA s/ Util.:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.iva || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+        } else {
+            currentTotalsY += lineSpacing;
+            // Normal IVA
+            doc.text("IVA:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.iva), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+        }
+
+        // GRAND TOTAL
+        doc.setFontSize(12);
+        doc.setFont(style.fonts.header, 'bold');
+
         currentTotalsY += lineSpacing;
-        // Normal IVA
-        doc.text("IVA:", totalsX, currentTotalsY);
-        doc.text(currencyFmt.format(cotizacion.iva), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+        // Colored Box for Total if Bold style
+        if (style.layout === 'bold') {
+            doc.setFillColor(...secondary);
+            doc.rect(totalsX - 5, currentTotalsY - 7, 70, 10, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.text("TOTAL:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+        } else {
+            doc.setTextColor(...primary);
+            doc.text("TOTAL:", totalsX, currentTotalsY);
+            doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+        }
+        currentTotalsY += 10;
     }
 
-    // GRAND TOTAL
-    doc.setFontSize(12);
+    // --- 7. EXTERNAL COMMERCIAL TERMS BLOCK ---
+    // Drawn at the bottom of the document, calculating remaining space or adding a new page if necessary
+
+    // We need approx 40 units of height for the commercial terms block
+    if (currentTotalsY > pageHeight - 60) {
+        doc.addPage();
+        currentTotalsY = 20;
+    } else {
+        currentTotalsY += 5; // Little gap after totals
+    }
+
+    // Determine values to print
+    const alcanceText = cotizacion.alcance || 'Todos los ítems consignados en esta oferta se ciñen a los criterios y parámetros técnicos vigentes.';
+    const formaPagoText = cotizacion.formaPago || 'A convenir.';
+    const notaFinalText = cotizacion.notaFinal || 'Documento generado automáticamente. Válido por 30 días.';
+
+    // Left Column (Alcance)
+    const termsLeftWidth = contentWidth * 0.65;
+    const termsRightWidth = contentWidth * 0.35;
+
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+
+    const titleWidth = 20; // Width for the bold labels 'ALCANCE:'
+
+    // Split texts to calculate heights
+    doc.setFontSize(8);
+    doc.setFont(style.fonts.body, 'normal');
+    // We leave space for the 'ALCANCE:' label on the left
+    const alcanceLines = doc.splitTextToSize(alcanceText, termsLeftWidth - titleWidth - 5);
+    const formaPagoLines = doc.splitTextToSize(formaPagoText, termsRightWidth - 4);
+
+    // Calculate required height for top section
+    const topSectionHeight = Math.max(
+        (alcanceLines.length * 4) + 10,
+        (formaPagoLines.length * 4) + 15,
+        25 // minimum height
+    );
+
+    // Notas Finales text span full width
+    const notaLines = doc.splitTextToSize(`NOTA: ${notaFinalText}`, contentWidth - 4);
+    const bottomSectionHeight = (notaLines.length * 4) + 6;
+
+    const blockTotalHeight = topSectionHeight + bottomSectionHeight;
+
+    // Outer Box for Terms Block
+    doc.rect(contentStartX, currentTotalsY, contentWidth, blockTotalHeight);
+
+    // Inner lines
+    // Vertical line separating Alcance and Forma de Pago
+    doc.line(
+        contentStartX + termsLeftWidth,
+        currentTotalsY,
+        contentStartX + termsLeftWidth,
+        currentTotalsY + topSectionHeight
+    );
+    // Vertical line separating ALCANCE title and text
+    doc.line(
+        contentStartX + titleWidth,
+        currentTotalsY,
+        contentStartX + titleWidth,
+        currentTotalsY + topSectionHeight
+    );
+    // Horizontal line separating top section from notes
+    doc.line(
+        contentStartX,
+        currentTotalsY + topSectionHeight,
+        contentStartX + contentWidth,
+        currentTotalsY + topSectionHeight
+    );
+    // Horizontal line separating "FORMA DE PAGO" title and its content
+    doc.line(
+        contentStartX + termsLeftWidth,
+        currentTotalsY + 8,
+        contentStartX + contentWidth,
+        currentTotalsY + 8
+    );
+
+    // Render Texts
+    doc.setTextColor(0, 0, 0);
+
+    // 'ALCANCE:' Label
+    doc.setFontSize(8);
     doc.setFont(style.fonts.header, 'bold');
+    doc.text("ALCANCE:", contentStartX + (titleWidth / 2), currentTotalsY + (topSectionHeight / 2), { align: 'center', baseline: 'middle' });
 
-    currentTotalsY += lineSpacing;
+    // Alcance Content
+    doc.setFont(style.fonts.body, 'normal');
+    // Render lines slightly down
+    doc.text(alcanceLines, contentStartX + titleWidth + 2, currentTotalsY + 6);
 
-    // Colored Box for Total if Bold style
-    if (style.layout === 'bold') {
-        doc.setFillColor(...secondary);
-        doc.rect(totalsX - 5, currentTotalsY - 7, 70, 10, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.text("TOTAL:", totalsX, currentTotalsY);
-        doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
-    } else {
-        doc.setTextColor(...primary);
-        doc.text("TOTAL:", totalsX, currentTotalsY);
-        doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
-    }
+    // 'FORMA DE PAGO' Label
+    doc.setFont(style.fonts.header, 'bold');
+    doc.text("FORMA DE PAGO PARA ESTA OFERTA:", contentStartX + termsLeftWidth + (termsRightWidth / 2), currentTotalsY + 5.5, { align: 'center' });
 
-    currentTotalsY += 10; // Give some space before footer
+    // Forma de Pago Content
+    doc.setFont(style.fonts.body, 'normal');
+    doc.text(formaPagoLines, contentStartX + termsLeftWidth + (termsRightWidth / 2), currentTotalsY + 14 + ((topSectionHeight - 8 - (formaPagoLines.length * 4)) / 2), { align: 'center' });
+
+    // 'NOTA:' Content (bottom section)
+    doc.setFont(style.fonts.header, 'bold');
+    const notaLabel = "NOTA: ";
+    const notaLabelWidth = doc.getTextWidth(notaLabel);
+    doc.text(notaLabel, contentStartX + 2, currentTotalsY + topSectionHeight + 5);
+
+    doc.setFont(style.fonts.body, 'normal');
+    doc.text(notaFinalText, contentStartX + 2 + notaLabelWidth, currentTotalsY + topSectionHeight + 5, { maxWidth: contentWidth - 4 - notaLabelWidth });
+
+    // Adjust bottom padding
+    currentTotalsY += blockTotalHeight + 10;
 
     // FOOTERS
     // Branded footer bar?

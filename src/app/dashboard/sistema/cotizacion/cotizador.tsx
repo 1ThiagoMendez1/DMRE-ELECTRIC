@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment } from "react";
-import { Cliente, InventarioItem, CotizacionItem, Cotizacion, CodigoTrabajo } from "@/types/sistema";
+import { Cliente, InventarioItem, CotizacionItem, Cotizacion, CodigoTrabajo, Instalacion } from "@/types/sistema";
+import { useErp } from "@/components/providers/erp-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,17 +26,19 @@ import { Checkbox as CheckboxUI } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { generateQuotePDF } from "@/utils/pdf-generator";
+import { Textarea } from "@/components/ui/textarea";
 import { RefreshCw } from "lucide-react";
 interface CotizadorProps {
     clientes: Cliente[];
     inventario: InventarioItem[];
     codigosTrabajo: CodigoTrabajo[];
+    instalaciones?: Instalacion[];
     initialData?: Cotizacion | null;
     onClose: () => void;
     onSave?: (quote: Cotizacion) => void;
 }
 
-export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, onClose, onSave }: CotizadorProps) {
+export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones: propInstalaciones, initialData, onClose, onSave }: CotizadorProps) {
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
     const [items, setItems] = useState<CotizacionItem[]>([]);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -49,6 +52,11 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [activeTab, setActiveTab] = useState("editor");
+
+    // Terms
+    const [alcance, setAlcance] = useState("");
+    const [formaPago, setFormaPago] = useState("");
+    const [notaFinal, setNotaFinal] = useState("");
 
     // Global AIU & Tax State
     const [globalDiscountPct, setGlobalDiscountPct] = useState(0);
@@ -91,7 +99,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
         onClose();
     };
 
-    // Removal of old global state as we moved it up
+    // Extraction of global items for the modals
+    const globalContext = useErp();
+    const globalInstalaciones = globalContext.instalaciones;
+
+    // Determine final instalaciones to use (props override global if provided)
+    const activeInstalaciones = propInstalaciones || globalInstalaciones || [];
 
     // Cargar datos iniciales si existen (Modo Edición/Visualización)
     useEffect(() => {
@@ -106,6 +119,9 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
             })));
             setFechaCotizacion(new Date(initialData.fecha).toISOString().split('T')[0]);
             setDescripcionTrabajo(initialData.descripcionTrabajo || "");
+            setAlcance(initialData.alcance || "");
+            setFormaPago(initialData.formaPago || "");
+            setNotaFinal(initialData.notaFinal || "");
             setTipoOferta(initialData.tipo || 'NORMAL');
             setGlobalDiscountPct(initialData.descuentoGlobalPorcentaje || 0);
             setGlobalIvaPct(initialData.impuestoGlobalPorcentaje || 19);
@@ -121,7 +137,10 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
 
 
     const { subtotal, descuento, aiuAdminVal, aiuImprevistoVal, aiuUtilidadVal, iva, total } = useMemo(() => {
-        const sub = items.reduce((acc, item) => acc + (item.cantidad * item.valorUnitario), 0);
+        const sub = items.reduce((acc, item) => {
+            const extra = item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0;
+            return acc + (item.cantidad * (item.valorUnitario + extra));
+        }, 0);
         const discountVal = sub * (globalDiscountPct / 100);
         const subAfterDiscount = sub - discountVal;
 
@@ -158,10 +177,19 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
         },
         clienteId: selectedCliente?.id || 'temp',
         descripcionTrabajo: descripcionTrabajo,
-        items: items,
+        items: items.map(item => {
+            const extra = item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0;
+            return {
+                ...item,
+                valorTotal: item.cantidad * (item.valorUnitario + extra)
+            };
+        }),
         subtotal: subtotal,
         iva: iva,
         descuentoGlobal: descuento,
+        alcance: alcance,
+        formaPago: formaPago,
+        notaFinal: notaFinal,
         descuentoGlobalPorcentaje: globalDiscountPct,
         impuestoGlobalPorcentaje: globalIvaPct,
         aiuAdminGlobalPorcentaje: esAiu ? aiuAdminPct : 0,
@@ -356,8 +384,9 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                             <TableRow>
                                                 <TableHead>Descripción</TableHead>
                                                 <TableHead className="w-[80px]">Cant.</TableHead>
-                                                <TableHead className="text-right w-[100px]">Precio Prov.</TableHead>
                                                 <TableHead className="text-right w-[100px]">Precio Venta</TableHead>
+                                                <TableHead className="text-center w-[80px]">%</TableHead>
+                                                <TableHead className="text-right w-[100px]">Precio %</TableHead>
                                                 <TableHead className="text-right w-[100px]">Total</TableHead>
                                                 <TableHead className="w-[40px]"></TableHead>
                                             </TableRow>
@@ -370,7 +399,8 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                                     </TableCell>
                                                 </TableRow>
                                             ) : items.map((item, index) => {
-                                                const finalTotal = item.cantidad * item.valorUnitario;
+                                                const extra = item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0;
+                                                const finalTotal = item.cantidad * (item.valorUnitario + extra);
 
                                                 return (
                                                     <Fragment key={item.id}>
@@ -410,19 +440,6 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                                                     min={1}
                                                                 />
                                                             </TableCell>
-                                                            <TableCell>
-                                                                <Input
-                                                                    type="number"
-                                                                    value={item.costoUnitario === 0 ? '' : item.costoUnitario}
-                                                                    onFocus={(e) => e.target.select()}
-                                                                    onChange={(e) => {
-                                                                        const updated = [...items];
-                                                                        updated[index].costoUnitario = parseFloat(e.target.value) || 0;
-                                                                        setItems(updated);
-                                                                    }}
-                                                                    className="h-7 w-20 text-xs text-right"
-                                                                />
-                                                            </TableCell>
                                                             <TableCell className="text-right">
                                                                 <Input
                                                                     type="number"
@@ -430,10 +447,42 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                                                     onFocus={(e) => e.target.select()}
                                                                     onChange={(e) => {
                                                                         const updated = [...items];
-                                                                        updated[index].valorUnitario = parseFloat(e.target.value) || 0;
+                                                                        const val = parseFloat(e.target.value) || 0;
+                                                                        updated[index].valorUnitario = val;
+                                                                        const ex = updated[index].porcentaje ? val * (updated[index].porcentaje / 100) : 0;
+                                                                        updated[index].valorTotal = updated[index].cantidad * (val + ex);
                                                                         setItems(updated);
                                                                     }}
                                                                     className="h-7 w-20 text-xs text-right"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell className="text-center">
+                                                                <div className="flex items-center justify-center">
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={item.porcentaje ?? ''}
+                                                                        onFocus={(e) => e.target.select()}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...items];
+                                                                            const val = e.target.value;
+                                                                            const newPct = val === '' ? undefined : parseFloat(val);
+                                                                            updated[index].porcentaje = newPct;
+                                                                            const ex = newPct ? updated[index].valorUnitario * (newPct / 100) : 0;
+                                                                            updated[index].valorTotal = updated[index].cantidad * (updated[index].valorUnitario + ex);
+                                                                            setItems(updated);
+                                                                        }}
+                                                                        className="h-7 w-16 text-xs text-center"
+                                                                        placeholder="%"
+                                                                    />
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <Input
+                                                                    type="number"
+                                                                    readOnly
+                                                                    value={item.porcentaje !== undefined ? (item.valorUnitario * (item.porcentaje / 100)) : ''}
+                                                                    className="h-7 w-20 text-xs text-right bg-muted/20"
+                                                                    placeholder="$"
                                                                 />
                                                             </TableCell>
                                                             <TableCell className="text-right text-xs font-bold">
@@ -467,6 +516,45 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                             })}
                                         </TableBody>
                                     </Table>
+                                </CardContent>
+                            </Card>
+
+                            {/* Terms Section */}
+                            <Card className="shrink-0">
+                                <CardHeader className="py-3">
+                                    <CardTitle className="text-sm font-medium">Condiciones Comerciales</CardTitle>
+                                </CardHeader>
+                                <CardContent className="py-2 space-y-4">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="alcance" className="text-xs">Alcance</Label>
+                                        <Textarea
+                                            id="alcance"
+                                            value={alcance}
+                                            onChange={(e) => setAlcance(e.target.value)}
+                                            placeholder="Describa el alcance de los trabajos..."
+                                            className="min-h-[60px] text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="formaPago" className="text-xs">Forma de Pago</Label>
+                                        <Textarea
+                                            id="formaPago"
+                                            value={formaPago}
+                                            onChange={(e) => setFormaPago(e.target.value)}
+                                            placeholder="Especificar anticipos, contraentregas..."
+                                            className="min-h-[40px] text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="notaFinal" className="text-xs">Nota Final (Condiciones)</Label>
+                                        <Textarea
+                                            id="notaFinal"
+                                            value={notaFinal}
+                                            onChange={(e) => setNotaFinal(e.target.value)}
+                                            placeholder="Información adicional e importante..."
+                                            className="min-h-[60px] text-sm"
+                                        />
+                                    </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -670,6 +758,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                 onItemSelected={handleAddItem}
                 inventario={inventario}
                 codigosTrabajo={codigosTrabajo}
+                instalaciones={activeInstalaciones}
             />
         </div>
     );
