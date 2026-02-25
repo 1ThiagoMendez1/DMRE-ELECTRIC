@@ -251,9 +251,14 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
         }
     }
 
+    const { data: dbItems } = await supabase
+        .from("cotizacion_items")
+        .select("*")
+        .eq("cotizacion_id", data.id);
+
     revalidatePath("/dashboard/sistema/cotizacion");
     revalidatePath("/dashboard/sistema/comercial");
-    return mapToUI(data, cotizacion.items || [], data.clientes);
+    return mapToUI(data, dbItems || [], data.clientes);
 }
 
 export async function updateCotizacionAction(id: string, cotizacion: Partial<Cotizacion>): Promise<Cotizacion> {
@@ -350,9 +355,14 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
         }
     }
 
+    const { data: dbItems } = await supabase
+        .from("cotizacion_items")
+        .select("*")
+        .eq("cotizacion_id", id);
+
     revalidatePath("/dashboard/sistema/cotizacion");
     revalidatePath("/dashboard/sistema/comercial");
-    return mapToUI(data, cotizacion.items || [], data.clientes);
+    return mapToUI(data, dbItems || [], data.clientes);
 }
 
 export async function deleteCotizacionAction(id: string): Promise<boolean> {
@@ -433,7 +443,7 @@ export async function getPublicCotizacionAction(trackingCode: string): Promise<C
             clientes (id, nombre, documento, direccion, correo, telefono, contacto_principal, created_at)
         `)
         .or(identifierFilter)
-        .in('estado', ['ENVIADA', 'ACEPTADA', 'EN_REVISION', 'PENDIENTE'])
+        .in('estado', ['ENVIADA', 'APROBADA', 'EN_REVISION', 'PENDIENTE'])
         .single();
 
     if (error) {
@@ -465,7 +475,7 @@ export async function getSecureCotizacionDocumentsAction(trackingCode: string) {
         .from("cotizaciones")
         .select("id, estado")
         .or(identifierFilter)
-        .in('estado', ['ACEPTADA'])
+        .in('estado', ['APROBADA'])
         .single();
 
     if (error || !cotizacion) {
@@ -512,7 +522,7 @@ export async function uploadPublicCotizacionDocumentAction(trackingCode: string,
         .from("cotizaciones")
         .select("id, estado")
         .or(identifierFilter)
-        .in('estado', ['ACEPTADA'])
+        .in('estado', ['APROBADA'])
         .single();
 
     if (quoteError || !cotizacion) {

@@ -4,32 +4,9 @@ import React, { useState, useMemo, Fragment, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
-    FileText,
-    Pencil,
-    Plus,
-    Clock,
-    User,
-    CheckCircle2,
-    AlertCircle,
-    TrendingUp,
-    Eye,
-    EyeOff,
-    Package,
-    Trash2,
-    Save,
-    Camera,
-    MapPin,
-    Image,
-    Share2,
-    Navigation, // For location
-    Wrench,
-    Video,
-    Settings,
-    Upload,
-    Download,
-    FolderOpen,
-    Shield,
-    Loader2
+    Plus, Search, FileText, CheckCircle, Package, Receipt, Copy, Download, Share2, Printer, Edit2, History, MapPin, Check, Truck, Settings, Hammer,
+    User, Mail, Phone, Calendar, Clock, Lock, ArrowRight, Eye, MoreHorizontal, MessageSquare, Briefcase, PlayCircle, StopCircle, RefreshCw, Star, ArrowUpRight, Wrench, Building2, UserCircle, PhoneCall, Trash2, Banknote, Save, FileSignature, Image, MonitorPlay, Zap, X, Map, LayoutTemplate, Palette, EyeOff, FilePlus, ChevronRight, Navigation, Camera, Video, AlertTriangle,
+    FolderOpen, CheckCircle2, TrendingUp, Pencil, AlertCircle, Loader2, Upload, Shield
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox as CheckboxUI } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import {
     Dialog,
@@ -225,7 +202,7 @@ const getStatusColor = (estado: EstadoCotizacion): string => {
         case 'BORRADOR': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
         case 'EN_REVISION': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
         case 'ENVIADA': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-        case 'ACEPTADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+        case 'APROBADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
         case 'RECHAZADA': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
         case 'MODIFICACION': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
         default: return '';
@@ -265,11 +242,16 @@ export function TrabajoHistoryDialog({
     const [globalDiscountPct, setGlobalDiscountPct] = useState(trabajo.descuentoGlobalPorcentaje || 0);
     const [globalIvaPct, setGlobalIvaPct] = useState(trabajo.impuestoGlobalPorcentaje || 19);
 
-    // AIU Global Defaults
     const [aiuAdminPct, setAiuAdminPct] = useState(trabajo.aiuAdminGlobalPorcentaje || 0);
     const [aiuImprevPct, setAiuImprevPct] = useState(trabajo.aiuImprevistoGlobalPorcentaje || 0);
     const [aiuUtilPct, setAiuUtilPct] = useState(trabajo.aiuUtilidadGlobalPorcentaje || 0);
     const [ivaUtilPct, setIvaUtilPct] = useState(trabajo.ivaUtilidadGlobalPorcentaje || 19);
+
+    const [esAiu, setEsAiu] = useState(
+        (trabajo.aiuAdminGlobalPorcentaje || 0) > 0 ||
+        (trabajo.aiuImprevistoGlobalPorcentaje || 0) > 0 ||
+        (trabajo.aiuUtilidadGlobalPorcentaje || 0) > 0
+    );
 
     const visibleItems = useMemo(() => items.filter(i => i.visibleEnPdf), [items]);
 
@@ -324,20 +306,12 @@ export function TrabajoHistoryDialog({
         descripcion: "Diseño y Montajes de Redes Eléctricas"
     });
 
-    // Helper to calculate item totals with AIU (Fix for Display Discrepancy)
+    // Helper to calculate item totals with the new simple Additional Margin logic
     const calculateItemDetails = (item: ItemConVisibilidad) => {
         const pVenta = item.valorUnitario || 0;
-        const admin = pVenta * ((item.aiuAdminPorcentaje || 0) / 100);
-        const imprev = pVenta * ((item.aiuImprevistoPorcentaje || 0) / 100);
-        const util = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
+        const margen = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
 
-        // Base for sale = P.Venta + AIU
-        const priceSale = pVenta + admin + imprev + util;
-
-        // IVA on utility
-        const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
-
-        const unitTotal = priceSale + ivaUtilVal;
+        const unitTotal = pVenta + margen;
         const lineTotal = unitTotal * item.cantidad;
 
         return { unitTotal, lineTotal };
@@ -400,6 +374,7 @@ export function TrabajoHistoryDialog({
     const [fechaFinReal, setFechaFinReal] = useState(trabajo.fechaFinReal ? new Date(trabajo.fechaFinReal).toISOString().split('T')[0] : "");
     const [costoReal, setCostoReal] = useState(trabajo.costoReal || 0);
     const [responsableId, setResponsableId] = useState(trabajo.responsableId || "");
+    const [editDescripcion, setEditDescripcion] = useState(trabajo.descripcionTrabajo || "");
 
     // Sync local state with prop changes (Real-time updates)
     useEffect(() => {
@@ -413,6 +388,15 @@ export function TrabajoHistoryDialog({
             setCostoReal(trabajo.costoReal || 0);
             setResponsableId(trabajo.responsableId || "");
             setNotas(trabajo.notas || "");
+
+            // Only update editDescripcion if the underlying ID changed (new modal opened) or if it's currently empty
+            if (!editDescripcion || editDescripcion === trabajo.descripcionTrabajo) {
+                setEditDescripcion(trabajo.descripcionTrabajo || "");
+            }
+
+            setGlobalIvaPct(trabajo.impuestoGlobalPorcentaje ?? 19);
+            setGlobalDiscountPct(trabajo.descuentoGlobalPorcentaje ?? 0);
+
             setLocalEvidence(trabajo.evidencia || []);
             setItems(trabajo.items.map(item => ({
                 ...item,
@@ -438,7 +422,38 @@ export function TrabajoHistoryDialog({
 
         const updatedEvidence = [newEvidence, ...localEvidence];
         setLocalEvidence(updatedEvidence);
-        onTrabajoUpdated({ ...trabajo, evidencia: updatedEvidence });
+
+        const updated: Cotizacion = {
+            ...trabajo,
+            items: items.map(({ visibleEnPdf, ...item }) => item), // Strip UI-only field
+            subtotal,
+            iva,
+            total,
+            aiuAdmin: totalAiuAdmin,
+            aiuImprevistos: totalAiuImprev,
+            aiuUtilidad: totalAiuUtil,
+            descuentoGlobal: descuento,
+            descuentoGlobalPorcentaje: globalDiscountPct,
+            impuestoGlobalPorcentaje: globalIvaPct,
+            aiuAdminGlobalPorcentaje: aiuAdminPct,
+            aiuImprevistoGlobalPorcentaje: aiuImprevPct,
+            aiuUtilidadGlobalPorcentaje: aiuUtilPct,
+            ivaUtilidadGlobalPorcentaje: ivaUtilPct,
+            estado: progressPercent === 100 ? 'APROBADA' : newProgress,
+            progreso: progressPercent,
+            descripcionTrabajo: editDescripcion,
+            notas: notas,
+            fechaActualizacion: new Date(),
+            direccionProyecto,
+            fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
+            fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
+            fechaFinReal: fechaFinReal ? new Date(fechaFinReal) : undefined,
+            costoReal,
+            responsableId,
+            evidencia: updatedEvidence
+        };
+
+        onTrabajoUpdated(updated);
         setEvidenceNote("");
 
         // Persist to History Table
@@ -712,70 +727,55 @@ export function TrabajoHistoryDialog({
 
 
 
-    // Calculate totals with AIU logic
+    // Calculate totals
     const { subtotal, descuento, iva, total, totalAiuAdmin, totalAiuImprev, totalAiuUtil } = useMemo(() => {
         let sub = 0;
-        let tAdmin = 0;
-        let tImprev = 0;
-        let tUtil = 0;
 
         // Sum up derived values from items
         const itemResults = items.map(item => {
             // P. Venta is the base sale price from inventory
             const pVenta = item.valorUnitario || 0;
-            const cost = item.costoUnitario || 0; // P. Prov (for reference/margin calculation)
 
-            // AIU is traditionally a percentage of the COST (P. Prov) added on top
-            // However, if the user wants P. Venta to be the "base price for final",
-            // we apply AIU as additional charges on top of P. Venta.
-            const admin = pVenta * ((item.aiuAdminPorcentaje || 0) / 100);
-            const imprev = pVenta * ((item.aiuImprevistoPorcentaje || 0) / 100);
-            const util = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
-
-            // Final Price = P. Venta + AIU components
-            const priceSale = pVenta + admin + imprev + util;
-
-            // IVA on Utility (if applicable)
-            const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
+            // Margen Adicional (Adicional %) applied on top of P. Venta
+            const margen = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
 
             // Item Final Total (Unitary)
-            const itemTotalUnit = priceSale + ivaUtilVal;
+            const itemTotalUnit = pVenta + margen;
 
             // Total Line
             const lineTotal = itemTotalUnit * item.cantidad;
 
             return {
-                lineTotal,
-                admin: admin * item.cantidad,
-                imprev: imprev * item.cantidad,
-                util: util * item.cantidad
+                lineTotal
             };
         });
 
         sub = itemResults.reduce((acc, r) => acc + r.lineTotal, 0);
-        tAdmin = itemResults.reduce((acc, r) => acc + r.admin, 0);
-        tImprev = itemResults.reduce((acc, r) => acc + r.imprev, 0);
-        tUtil = itemResults.reduce((acc, r) => acc + r.util, 0);
 
         // Apply Global Discount to the Subtotal
         const discountVal = sub * (globalDiscountPct / 100);
         const subAfterDiscount = sub - discountVal;
 
-        // Apply Global IVA (Standard Tax on the whole amount, if configured)
-        // Note: If IVA on Utility is used, usually Global IVA is 0 or specific logic. 
-        // We faithfully apply what the user asked: "Recuerda el IVA anterior" + AIU logic.
-        const totalIva = subAfterDiscount * (globalIvaPct / 100);
+        const aiuAdmin = esAiu ? subAfterDiscount * (aiuAdminPct / 100) : 0;
+        const aiuImprevisto = esAiu ? subAfterDiscount * (aiuImprevPct / 100) : 0;
+        const aiuUtilidad = esAiu ? subAfterDiscount * (aiuUtilPct / 100) : 0;
+
+        // If AIU is active, calculate IVA based on the `ivaUtilPct` input (usually 19%), over the 'Utilidad' value only.
+        // If AIU is inactive, apply `globalIvaPct` (usually 19%) over the full discounted subtotal.
+        const totalIva = esAiu
+            ? aiuUtilidad * (ivaUtilPct / 100)
+            : subAfterDiscount * (globalIvaPct / 100);
 
         return {
             subtotal: sub,
             descuento: discountVal,
             iva: totalIva,
-            total: subAfterDiscount + totalIva,
-            totalAiuAdmin: tAdmin,
-            totalAiuImprev: tImprev,
-            totalAiuUtil: tUtil
+            total: subAfterDiscount + aiuAdmin + aiuImprevisto + aiuUtilidad + totalIva,
+            totalAiuAdmin: aiuAdmin,
+            totalAiuImprev: aiuImprevisto,
+            totalAiuUtil: aiuUtilidad
         };
-    }, [items, globalDiscountPct, globalIvaPct]);
+    }, [items, globalDiscountPct, globalIvaPct, aiuAdminPct, aiuImprevPct, aiuUtilPct, ivaUtilPct, esAiu]);
 
     // Helper for recursive deduction of Work Codes (APUs)
     const [isDeducting, setIsDeducting] = useState(false);
@@ -789,7 +789,7 @@ export function TrabajoHistoryDialog({
                 if (mat.inventarioId) {
                     await addConsumoMaterial({
                         inventarioId: mat.inventarioId,
-                        descripcionMaterial: mat.descripcion,
+                        descripcionMaterial: mat.nombre,
                         cotizacionId: trabajo.id,
                         cantidad: qty,
                         unidad: 'UND',
@@ -816,7 +816,7 @@ export function TrabajoHistoryDialog({
                     if (mat.inventarioId) {
                         await addConsumoMaterial({
                             inventarioId: mat.inventarioId,
-                            descripcionMaterial: mat.descripcion,
+                            descripcionMaterial: mat.nombre,
                             cotizacionId: trabajo.id,
                             cantidad: qty,
                             unidad: 'UND',
@@ -853,16 +853,16 @@ export function TrabajoHistoryDialog({
             descripcion: `Progreso actualizado a ${progressPercent}% y datos de ejecución actualizados`,
             usuario: 'Usuario Actual',
             valorAnterior: `Estado: ${trabajo.estado}`,
-            valorNuevo: `Estado: ${progressPercent === 100 ? 'ACEPTADA' : (progressPercent > 0 ? 'EN_REVISION' : trabajo.estado)}`,
+            valorNuevo: `Estado: ${progressPercent === 100 ? 'APROBADA' : (progressPercent > 0 ? 'EN_REVISION' : trabajo.estado)}`,
         };
 
         setHistorial([entry, ...historial]);
 
         // We use the status from the dropdown/manual selection OR force it if progress is 100
-        // FIXED: Only override with ACEPTADA if progress is 100, otherwise ALWAYS respect newProgress selected by user
+        // FIXED: Only override with APROBADA if progress is 100, otherwise ALWAYS respect newProgress selected by user
         let finalEstado = newProgress;
         if (progressPercent === 100) {
-            finalEstado = 'ACEPTADA';
+            finalEstado = 'APROBADA';
         }
 
         const updated: Cotizacion = {
@@ -919,10 +919,10 @@ export function TrabajoHistoryDialog({
     const handleAddItem = (newItem: CotizacionItem) => {
         const itemWithVis: ItemConVisibilidad = {
             ...newItem,
-            aiuAdminPorcentaje: aiuAdminPct,
-            aiuImprevistoPorcentaje: aiuImprevPct,
-            aiuUtilidadPorcentaje: aiuUtilPct,
-            ivaUtilidadPorcentaje: ivaUtilPct,
+            aiuAdminPorcentaje: 0,
+            aiuImprevistoPorcentaje: 0,
+            aiuUtilidadPorcentaje: 0,
+            ivaUtilidadPorcentaje: 0,
             visibleEnPdf: true
         };
 
@@ -983,13 +983,14 @@ export function TrabajoHistoryDialog({
             case 'NOTA': return <AlertCircle className="h-4 w-4 text-gray-500" />;
             case 'ITEM_AGREGADO': return <Package className="h-4 w-4 text-green-500" />;
             case 'ITEM_OCULTO': return <EyeOff className="h-4 w-4 text-gray-500" />;
+            default: return null;
         }
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                {trigger || (
+                {trigger ? trigger : (
                     <span className="cursor-pointer hover:underline text-primary font-medium">
                         {trabajo.cliente.nombre}
                     </span>
@@ -1007,12 +1008,12 @@ export function TrabajoHistoryDialog({
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'historial')} className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className={`grid w-full ${showExecution ? 'grid-cols-6' : 'grid-cols-5'}`}>
+                    <TabsList className={`grid w-full ${showExecution ? (trabajo.estado === 'APROBADA' ? 'grid-cols-5' : 'grid-cols-5') : (trabajo.estado === 'APROBADA' ? 'grid-cols-4' : 'grid-cols-4')}`}>
                         <TabsTrigger value="detalles">Detalles</TabsTrigger>
-                        <TabsTrigger value="items">Items & Edición</TabsTrigger>
+                        {trabajo.estado !== 'APROBADA' && <TabsTrigger value="items">Items & Edición</TabsTrigger>}
                         {showExecution && <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>}
                         <TabsTrigger value="preview">Vista PDF</TabsTrigger>
-                        <TabsTrigger value="documentos">Documentos</TabsTrigger>
+                        {trabajo.estado === 'APROBADA' && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
                         <TabsTrigger value="historial">Historial</TabsTrigger>
                     </TabsList>
 
@@ -1047,8 +1048,8 @@ export function TrabajoHistoryDialog({
                                         <span className="text-xs text-muted-foreground">Descripción:</span>
                                         <div className="flex gap-2 items-center">
                                             <Input
-                                                value={trabajo.descripcionTrabajo}
-                                                onChange={(e) => onTrabajoUpdated({ ...trabajo, descripcionTrabajo: e.target.value })}
+                                                value={editDescripcion}
+                                                onChange={(e) => setEditDescripcion(e.target.value)}
                                                 className="h-8 text-sm"
                                             />
                                         </div>
@@ -1080,12 +1081,30 @@ export function TrabajoHistoryDialog({
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="BORRADOR">Borrador</SelectItem>
-                                                    <SelectItem value="EN_REVISION">En Revisión</SelectItem>
-                                                    <SelectItem value="ENVIADA">Enviada</SelectItem>
-                                                    <SelectItem value="ACEPTADA">Aceptada</SelectItem>
-                                                    <SelectItem value="RECHAZADA">Rechazada</SelectItem>
-                                                    <SelectItem value="MODIFICACION">Modificación</SelectItem>
+                                                    {trabajo.estado === 'ENVIADA' ? (
+                                                        <>
+                                                            <SelectItem value="ENVIADA" disabled className="hidden">Enviada</SelectItem>
+                                                            <SelectItem value="APROBADA">Aprobada</SelectItem>
+                                                            <SelectItem value="RECHAZADA">Rechazada</SelectItem>
+                                                            <SelectItem value="MODIFICACION">Modificación</SelectItem>
+                                                        </>
+                                                    ) : trabajo.estado === 'MODIFICACION' ? (
+                                                        <>
+                                                            <SelectItem value="MODIFICACION" disabled className="hidden">Modificación</SelectItem>
+                                                            <SelectItem value="BORRADOR">Borrador</SelectItem>
+                                                            <SelectItem value="EN_REVISION">En Revisión</SelectItem>
+                                                            <SelectItem value="ENVIADA">Enviada</SelectItem>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <SelectItem value="BORRADOR">Borrador</SelectItem>
+                                                            <SelectItem value="EN_REVISION">En Revisión</SelectItem>
+                                                            <SelectItem value="ENVIADA">Enviada</SelectItem>
+                                                            <SelectItem value="APROBADA">Aprobada</SelectItem>
+                                                            <SelectItem value="RECHAZADA">Rechazada</SelectItem>
+                                                            <SelectItem value="MODIFICACION">Modificación</SelectItem>
+                                                        </>
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -1173,8 +1192,8 @@ export function TrabajoHistoryDialog({
                                         <div className="space-y-1">
                                             <Label className="text-[10px]">Dirección del Proyecto</Label>
                                             <Input
-                                                value={direccionProyecto}
-                                                onChange={(e) => setDireccionProyecto(e.target.value)}
+                                                defaultValue={direccionProyecto}
+                                                onBlur={(e) => setDireccionProyecto(e.target.value)}
                                                 placeholder="Carrera 4 # 5-122..."
                                                 className="h-8 text-sm"
                                             />
@@ -1182,8 +1201,8 @@ export function TrabajoHistoryDialog({
                                         <div className="space-y-1">
                                             <Label className="text-[10px]">Responsable (ID)</Label>
                                             <Input
-                                                value={responsableId}
-                                                onChange={(e) => setResponsableId(e.target.value)}
+                                                defaultValue={responsableId}
+                                                onBlur={(e) => setResponsableId(e.target.value)}
                                                 placeholder="ID del Empleado"
                                                 className="h-8 text-sm"
                                             />
@@ -1192,16 +1211,16 @@ export function TrabajoHistoryDialog({
                                             <Label className="text-[10px]">Costo Real Ejecución</Label>
                                             <Input
                                                 type="number"
-                                                value={costoReal}
-                                                onChange={(e) => setCostoReal(Number(e.target.value))}
+                                                defaultValue={costoReal || ''}
+                                                onBlur={(e) => setCostoReal(Number(e.target.value))}
                                                 className="h-8 text-sm"
                                             />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-[10px]">Notas Generales Trabajo</Label>
                                             <Textarea
-                                                value={notas}
-                                                onChange={(e) => setNotas(e.target.value)}
+                                                defaultValue={notas}
+                                                onBlur={(e) => setNotas(e.target.value)}
                                                 placeholder="Notas generales sobre el trabajo..."
                                                 className="min-h-[60px] text-xs"
                                             />
@@ -1220,8 +1239,8 @@ export function TrabajoHistoryDialog({
                                             <Label className="text-[10px]">Fecha Inicio</Label>
                                             <Input
                                                 type="date"
-                                                value={fechaInicio}
-                                                onChange={(e) => setFechaInicio(e.target.value)}
+                                                defaultValue={fechaInicio}
+                                                onBlur={(e) => setFechaInicio(e.target.value)}
                                                 className="h-8 text-sm"
                                             />
                                         </div>
@@ -1229,8 +1248,8 @@ export function TrabajoHistoryDialog({
                                             <Label className="text-[10px]">Fin Estimado</Label>
                                             <Input
                                                 type="date"
-                                                value={fechaFinEstimada}
-                                                onChange={(e) => setFechaFinEstimada(e.target.value)}
+                                                defaultValue={fechaFinEstimada}
+                                                onBlur={(e) => setFechaFinEstimada(e.target.value)}
                                                 className="h-8 text-sm"
                                             />
                                         </div>
@@ -1238,8 +1257,8 @@ export function TrabajoHistoryDialog({
                                             <Label className="text-[10px]">Fin Real</Label>
                                             <Input
                                                 type="date"
-                                                value={fechaFinReal}
-                                                onChange={(e) => setFechaFinReal(e.target.value)}
+                                                defaultValue={fechaFinReal}
+                                                onBlur={(e) => setFechaFinReal(e.target.value)}
                                                 className="h-8 text-sm cursor-pointer border-green-200 focus:border-green-500 bg-green-50/30"
                                             />
                                         </div>
@@ -1303,7 +1322,7 @@ export function TrabajoHistoryDialog({
                                                                         return (
                                                                             <TableRow key={pItem.id} className={isUsed ? "bg-green-50 dark:bg-green-950/20" : ""}>
                                                                                 <TableCell>
-                                                                                    <Checkbox
+                                                                                    <CheckboxUI
                                                                                         checked={isUsed}
                                                                                         disabled={isUsed}
                                                                                         onCheckedChange={async (checked: boolean) => {
@@ -1356,7 +1375,7 @@ export function TrabajoHistoryDialog({
                                                             <div key={sItem.id} className="border rounded-lg overflow-hidden">
                                                                 <div className={`p-3 border-b flex justify-between items-center ${isUsed ? "bg-green-50 dark:bg-green-950/20" : "bg-muted/30"}`}>
                                                                     <div className="flex items-center gap-3">
-                                                                        <Checkbox
+                                                                        <CheckboxUI
                                                                             checked={isUsed}
                                                                             disabled={isUsed || isDeducting}
                                                                             onCheckedChange={async (checked: boolean) => {
@@ -1627,45 +1646,7 @@ export function TrabajoHistoryDialog({
                                 </Button>
                             </div>
                         </div>
-                        <div className="bg-muted p-2 rounded mb-4 grid grid-cols-4 gap-4">
-                            <div>
-                                <Label className="text-xs">AIU Admin %</Label>
-                                <Input
-                                    type="number"
-                                    value={aiuAdminPct}
-                                    onChange={e => updateGlobalAiu('ADMIN', Number(e.target.value))}
-                                    className="h-7 text-xs"
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">AIU Imprev %</Label>
-                                <Input
-                                    type="number"
-                                    value={aiuImprevPct}
-                                    onChange={e => updateGlobalAiu('IMPREV', Number(e.target.value))}
-                                    className="h-7 text-xs"
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">AIU Util %</Label>
-                                <Input
-                                    type="number"
-                                    value={aiuUtilPct}
-                                    onChange={e => updateGlobalAiu('UTIL', Number(e.target.value))}
-                                    className="h-7 text-xs"
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">IVA s/Util %</Label>
-                                <Input
-                                    type="number"
-                                    value={ivaUtilPct}
-                                    disabled={aiuUtilPct === 0} // "si agrega un % en utilidad automaticamente este tambien debe habilitarlo"
-                                    onChange={e => updateGlobalAiu('IVAUTIL', Number(e.target.value))}
-                                    className="h-7 text-xs"
-                                />
-                            </div>
-                        </div>
+                        {/* Global Settings removed automatically since they are no longer in use */}
 
                         <Card>
                             <CardContent className="p-0">
@@ -1676,10 +1657,7 @@ export function TrabajoHistoryDialog({
                                             <TableHead className="w-[60px]">Cant.</TableHead>
                                             <TableHead className="text-right w-[100px]">P. Prov.</TableHead>
                                             <TableHead className="text-right w-[100px]">P. Venta</TableHead>
-                                            <TableHead className="text-center w-[60px]">Adm %</TableHead>
-                                            <TableHead className="text-center w-[60px]">Imp %</TableHead>
-                                            <TableHead className="text-center w-[60px]">Util %</TableHead>
-                                            <TableHead className="text-center w-[60px]">IVA U%</TableHead>
+                                            <TableHead className="text-center w-[100px]">+ % Adic.</TableHead>
                                             <TableHead className="text-right w-[110px]">Total</TableHead>
                                             <TableHead className="w-[40px]"></TableHead>
                                         </TableRow>
@@ -1690,16 +1668,11 @@ export function TrabajoHistoryDialog({
                                             const cost = item.costoUnitario || 0; // P. Prov (for reference)
                                             const pVenta = item.valorUnitario || 0; // P. Venta - Base price
 
-                                            // AIU is calculated on top of P. Venta
-                                            const admin = pVenta * ((item.aiuAdminPorcentaje || 0) / 100);
-                                            const imprev = pVenta * ((item.aiuImprevistoPorcentaje || 0) / 100);
-                                            const util = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
+                                            // AIU represents the additional % on top of P. Venta
+                                            const margen = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
 
-                                            // Final Price = P. Venta + AIU components
-                                            const priceSale = pVenta + admin + imprev + util;
-
-                                            const ivaUtilVal = util * ((item.ivaUtilidadPorcentaje || 0) / 100);
-                                            const finalUnitTotal = priceSale + ivaUtilVal;
+                                            // Final Price
+                                            const finalUnitTotal = pVenta + margen;
                                             const rowTotal = finalUnitTotal * item.cantidad;
 
                                             return (
@@ -1744,7 +1717,8 @@ export function TrabajoHistoryDialog({
                                                         <TableCell className="text-right p-1">
                                                             <Input
                                                                 type="number"
-                                                                value={item.valorUnitario || 0}
+                                                                value={item.valorUnitario === 0 ? '' : item.valorUnitario}
+                                                                onFocus={(e) => e.target.select()}
                                                                 onChange={(e) => {
                                                                     const newVal = parseFloat(e.target.value) || 0;
                                                                     setItems(prev => prev.map((it, i) => i === index ? { ...it, valorUnitario: newVal } : it));
@@ -1752,11 +1726,16 @@ export function TrabajoHistoryDialog({
                                                                 className="h-7 w-24 text-xs text-right p-1 font-semibold text-primary"
                                                             />
                                                         </TableCell>
-                                                        {/* AIU Inputs per Item */}
-                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" value={item.aiuAdminPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, aiuAdminPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
-                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" value={item.aiuImprevistoPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, aiuImprevistoPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
-                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" value={item.aiuUtilidadPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, aiuUtilidadPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
-                                                        <TableCell className="p-1"><Input type="number" className="h-7 text-xs p-1 text-center" disabled={!item.aiuUtilidadPorcentaje} value={item.ivaUtilidadPorcentaje || 0} onChange={e => setItems(prev => prev.with(index, { ...item, ivaUtilidadPorcentaje: parseFloat(e.target.value) }))} /></TableCell>
+                                                        {/* Margen Adicional Input per Item */}
+                                                        <TableCell className="p-1">
+                                                            <Input
+                                                                type="number"
+                                                                className="h-7 w-20 text-xs p-1 mx-auto text-center font-bold text-primary bg-primary/5"
+                                                                value={item.aiuUtilidadPorcentaje === 0 ? '' : item.aiuUtilidadPorcentaje}
+                                                                onFocus={(e) => e.target.select()}
+                                                                onChange={e => setItems(prev => prev.map((it, i) => i === index ? { ...it, aiuUtilidadPorcentaje: parseFloat(e.target.value) || 0 } : it))}
+                                                            />
+                                                        </TableCell>
 
                                                         <TableCell className="text-right font-bold text-xs font-mono">
                                                             {formatCurrency(rowTotal)}
@@ -1782,7 +1761,7 @@ export function TrabajoHistoryDialog({
                                                             <TableCell className="text-center py-1 text-[10px] text-muted-foreground">
                                                                 x {sub.cantidad * item.cantidad}
                                                             </TableCell>
-                                                            <TableCell colSpan={6}></TableCell>
+                                                            <TableCell colSpan={3}></TableCell>
                                                         </TableRow>
                                                     ))}
                                                 </React.Fragment>
@@ -1816,8 +1795,9 @@ export function TrabajoHistoryDialog({
                                             <Input
                                                 type="number"
                                                 className="h-6 w-12 text-right text-xs p-1"
-                                                value={globalDiscountPct}
-                                                onChange={e => setGlobalDiscountPct(Number(e.target.value))}
+                                                value={globalDiscountPct === 0 ? '' : globalDiscountPct}
+                                                onFocus={(e) => e.target.select()}
+                                                onChange={e => setGlobalDiscountPct(parseFloat(e.target.value) || 0)}
                                                 placeholder="0"
                                             />
                                             <span className="text-xs ml-1">%</span>
@@ -1825,31 +1805,104 @@ export function TrabajoHistoryDialog({
                                         <span className="font-mono text-red-500">-{formatCurrency(descuento)}</span>
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center text-sm mt-1">
-                                    <span className="text-muted-foreground">IVA</span>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex items-center">
-                                            <Input
-                                                type="number"
-                                                className="h-6 w-12 text-right text-xs p-1"
-                                                value={globalIvaPct}
-                                                onChange={e => setGlobalIvaPct(Number(e.target.value))}
-                                                placeholder="19"
-                                            />
-                                            <span className="text-xs ml-1">%</span>
+                                {/* We hide general IVA if AIU is checked since AIU uses IVA on Utility */}
+                                {!esAiu && (
+                                    <div className="flex justify-between items-center text-sm mt-1">
+                                        <span className="text-muted-foreground">IVA</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center">
+                                                <Input
+                                                    type="number"
+                                                    className="h-6 w-12 text-right text-xs p-1"
+                                                    value={globalIvaPct === 0 ? '' : globalIvaPct}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={e => setGlobalIvaPct(parseFloat(e.target.value) || 0)}
+                                                    placeholder="19"
+                                                />
+                                                <span className="text-xs ml-1">%</span>
+                                            </div>
+                                            <span className="font-mono">{formatCurrency(iva)}</span>
                                         </div>
-                                        <span className="font-mono">{formatCurrency(iva)}</span>
-                                    </div>
-                                </div>
-                                <Separator className="my-2" />
-                                {/* AIU Breakdown Display (Informational) */}
-                                {(totalAiuAdmin > 0 || totalAiuImprev > 0 || totalAiuUtil > 0) && (
-                                    <div className="text-xs text-muted-foreground mb-2 space-y-1">
-                                        <div className="flex justify-between"><span>Admin:</span><span>{formatCurrency(totalAiuAdmin)}</span></div>
-                                        <div className="flex justify-between"><span>Imprev:</span><span>{formatCurrency(totalAiuImprev)}</span></div>
-                                        <div className="flex justify-between"><span>Util:</span><span>{formatCurrency(totalAiuUtil)}</span></div>
                                     </div>
                                 )}
+                                <Separator className="my-2" />
+
+                                <div className="flex items-center space-x-2 py-1">
+                                    <CheckboxUI
+                                        id="es-aiu-history"
+                                        checked={esAiu}
+                                        onCheckedChange={(checked) => setEsAiu(!!checked)}
+                                        className="h-4 w-4"
+                                    />
+                                    <Label htmlFor="es-aiu-history" className="text-xs cursor-pointer font-medium">
+                                        Cotización con AIU
+                                    </Label>
+                                </div>
+
+                                {esAiu && (
+                                    <>
+                                        <Separator className="my-2" />
+
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-semibold text-muted-foreground uppercase">Desglose AIU</p>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px]">Admin %</Label>
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct === 0 ? '' : aiuAdminPct} onFocus={(e) => e.target.select()} onChange={e => {
+                                                        const val = Number(e.target.value) || 0;
+                                                        setAiuAdminPct(val);
+                                                        updateGlobalAiu('ADMIN', val);
+                                                    }} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px]">Impr. %</Label>
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuImprevPct === 0 ? '' : aiuImprevPct} onFocus={(e) => e.target.select()} onChange={e => {
+                                                        const val = Number(e.target.value) || 0;
+                                                        setAiuImprevPct(val);
+                                                        updateGlobalAiu('IMPREV', val);
+                                                    }} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px]">Util. %</Label>
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuUtilPct === 0 ? '' : aiuUtilPct} onFocus={(e) => e.target.select()} onChange={e => {
+                                                        const val = Number(e.target.value) || 0;
+                                                        setAiuUtilPct(val);
+                                                        updateGlobalAiu('UTIL', val);
+                                                    }} />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-sm pt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-muted-foreground text-xs">IVA s/ Util.</span>
+                                                    <div className="flex items-center">
+                                                        <Input
+                                                            type="number"
+                                                            className="h-6 w-12 text-right text-xs p-1"
+                                                            value={ivaUtilPct === 0 ? '' : ivaUtilPct}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onChange={e => {
+                                                                const val = Number(e.target.value) || 0;
+                                                                setIvaUtilPct(val);
+                                                                updateGlobalAiu('IVAUTIL', val);
+                                                            }}
+                                                            placeholder="19"
+                                                        />
+                                                        <span className="text-xs ml-1">%</span>
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs">{formatCurrency(iva)}</span>
+                                            </div>
+
+                                            <div className="flex justify-between text-[10px] text-muted-foreground pt-1 border-t">
+                                                <span>Total Amortización:</span>
+                                                <span className="font-mono">{formatCurrency(totalAiuAdmin + totalAiuImprev + totalAiuUtil + iva)}</span>
+                                            </div>
+                                        </div>
+                                        <Separator className="my-2" />
+                                    </>
+                                )}
+                                {/* Additional breakdowns can be added here if necessary */}
                                 <div className="flex justify-between font-bold text-lg">
                                     <span>Total:</span>
                                     <span className="font-mono text-primary">{formatCurrency(total)}</span>
@@ -1983,13 +2036,21 @@ export function TrabajoHistoryDialog({
                                                 const subTotalPDF = itemsCalculados.reduce((a, b) => a + b.valorTotal, 0);
                                                 const descuentoPDF = subTotalPDF * (globalDiscountPct / 100);
                                                 const basePDF = subTotalPDF - descuentoPDF;
-                                                const ivaPDF = basePDF * (globalIvaPct / 100);
-                                                const totalPDF = basePDF + ivaPDF;
+
+                                                const aiuAdminPDF = esAiu ? basePDF * (aiuAdminPct / 100) : 0;
+                                                const aiuImprevPDF = esAiu ? basePDF * (aiuImprevPct / 100) : 0;
+                                                const aiuUtilPDF = esAiu ? basePDF * (aiuUtilPct / 100) : 0;
+
+                                                const ivaPDF = esAiu ? (aiuUtilPDF * (ivaUtilPct / 100)) : (basePDF * (globalIvaPct / 100));
+                                                const totalPDF = basePDF + aiuAdminPDF + aiuImprevPDF + aiuUtilPDF + ivaPDF;
 
                                                 const cotizacionFiltrada = {
                                                     ...trabajo,
                                                     items: itemsCalculados,
                                                     subtotal: subTotalPDF,
+                                                    aiuAdmin: aiuAdminPDF,
+                                                    aiuImprevistos: aiuImprevPDF,
+                                                    aiuUtilidad: aiuUtilPDF,
                                                     iva: ivaPDF,
                                                     total: totalPDF
                                                 };
@@ -2145,14 +2206,31 @@ export function TrabajoHistoryDialog({
                                             {/* TOTALS */}
                                             <div className="flex justify-end mb-12">
                                                 <div className="w-64 space-y-2">
+                                                    {/* Live preview calculations */}
                                                     {(() => {
                                                         const subVisible = visibleItems.reduce((a, i) => a + calculateItemDetails(i).lineTotal, 0);
-                                                        const ivaVisible = (subVisible * (100 - globalDiscountPct) / 100) * (globalIvaPct / 100);
-                                                        const totalVisible = subVisible + ivaVisible; // Simplification for preview
+                                                        const discountVisible = subVisible * (globalDiscountPct / 100);
+                                                        const baseVisible = subVisible - discountVisible;
+
+                                                        const aiuAdminVisible = esAiu ? baseVisible * (aiuAdminPct / 100) : 0;
+                                                        const aiuImprevVisible = esAiu ? baseVisible * (aiuImprevPct / 100) : 0;
+                                                        const aiuUtilVisible = esAiu ? baseVisible * (aiuUtilPct / 100) : 0;
+
+                                                        const ivaVisible = esAiu ? (aiuUtilVisible * (ivaUtilPct / 100)) : (baseVisible * (globalIvaPct / 100));
+                                                        const totalVisible = baseVisible + aiuAdminVisible + aiuImprevVisible + aiuUtilVisible + ivaVisible; // Simplification for preview
                                                         return (
                                                             <>
                                                                 <div className="flex justify-between text-sm text-black"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(subVisible)}</span></div>
-                                                                <div className="flex justify-between text-sm text-black"><span>IVA:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
+                                                                {esAiu ? (
+                                                                    <>
+                                                                        <div className="flex justify-between text-sm text-black"><span>Admin:</span> <span className="font-mono">{formatCurrency(aiuAdminVisible)}</span></div>
+                                                                        <div className="flex justify-between text-sm text-black"><span>Imprevistos:</span> <span className="font-mono">{formatCurrency(aiuImprevVisible)}</span></div>
+                                                                        <div className="flex justify-between text-sm text-black"><span>Utilidad:</span> <span className="font-mono">{formatCurrency(aiuUtilVisible)}</span></div>
+                                                                        <div className="flex justify-between text-sm text-black"><span>IVA s/ Util.:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
+                                                                    </>
+                                                                ) : (
+                                                                    <div className="flex justify-between text-sm text-black"><span>IVA:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
+                                                                )}
                                                                 <div className="border-t pt-2 flex justify-between text-lg font-bold" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>
                                                                     <span>TOTAL:</span>
                                                                     <span className="font-mono">{formatCurrency(totalVisible)}</span>

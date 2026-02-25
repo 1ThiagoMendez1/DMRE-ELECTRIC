@@ -39,6 +39,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
     const [items, setItems] = useState<CotizacionItem[]>([]);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+    const [clientSearchTerm, setClientSearchTerm] = useState("");
     const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [showProductsInPdf, setShowProductsInPdf] = useState(true);
@@ -128,8 +129,11 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
         const aiuImprevisto = esAiu ? subAfterDiscount * (aiuImprevistoPct / 100) : 0;
         const aiuUtilidad = esAiu ? subAfterDiscount * (aiuUtilidadPct / 100) : 0;
 
-        const taxableBase = esAiu ? aiuUtilidad : subAfterDiscount;
-        const totalIva = taxableBase * (globalIvaPct / 100);
+        // If AIU is active, calculate IVA based on the `ivaUtilidadPct` input (usually 19%), over the 'Utilidad' value only.
+        // If AIU is inactive, apply `globalIvaPct` (usually 19%) over the full discounted subtotal.
+        const totalIva = esAiu
+            ? aiuUtilidad * (ivaUtilidadPct / 100)
+            : subAfterDiscount * (globalIvaPct / 100);
 
         return {
             subtotal: sub,
@@ -140,7 +144,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
             iva: totalIva,
             total: subAfterDiscount + aiuAdmin + aiuImprevisto + aiuUtilidad + totalIva
         };
-    }, [items, globalDiscountPct, globalIvaPct, aiuAdminPct, aiuImprevistoPct, aiuUtilidadPct, esAiu]);
+    }, [items, globalDiscountPct, globalIvaPct, aiuAdminPct, aiuImprevistoPct, aiuUtilidadPct, ivaUtilidadPct, esAiu]);
 
     const getCurrentQuoteObj = (): Cotizacion => ({
         id: initialData?.id || `COT-TEMPORAL`,
@@ -399,8 +403,9 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                                             <TableCell>
                                                                 <Input
                                                                     type="number"
-                                                                    value={item.cantidad}
-                                                                    onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                                                                    value={item.cantidad === 0 ? '' : item.cantidad}
+                                                                    onFocus={(e) => e.target.select()}
+                                                                    onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 0)}
                                                                     className="h-7 w-14 text-xs"
                                                                     min={1}
                                                                 />
@@ -408,7 +413,8 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                                             <TableCell>
                                                                 <Input
                                                                     type="number"
-                                                                    value={item.costoUnitario}
+                                                                    value={item.costoUnitario === 0 ? '' : item.costoUnitario}
+                                                                    onFocus={(e) => e.target.select()}
                                                                     onChange={(e) => {
                                                                         const updated = [...items];
                                                                         updated[index].costoUnitario = parseFloat(e.target.value) || 0;
@@ -420,7 +426,8 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                                             <TableCell className="text-right">
                                                                 <Input
                                                                     type="number"
-                                                                    value={item.valorUnitario}
+                                                                    value={item.valorUnitario === 0 ? '' : item.valorUnitario}
+                                                                    onFocus={(e) => e.target.select()}
                                                                     onChange={(e) => {
                                                                         const updated = [...items];
                                                                         updated[index].valorUnitario = parseFloat(e.target.value) || 0;
@@ -496,20 +503,24 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                     <span className="text-muted-foreground">Subtotal</span>
                                     <span>{formatCurrency(subtotal)}</span>
                                 </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-muted-foreground">IVA</span>
-                                    <div className="flex items-center gap-1">
-                                        <Input
-                                            type="number"
-                                            className="h-6 w-12 text-right text-xs p-1"
-                                            value={globalIvaPct}
-                                            onChange={e => setGlobalIvaPct(Number(e.target.value))}
-                                            placeholder="19"
-                                        />
-                                        <span className="text-xs">%</span>
-                                        <span className="ml-2">{formatCurrency(iva)}</span>
+                                {/* We hide general IVA if AIU is checked since AIU uses IVA on Utility */}
+                                {!esAiu && (
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-muted-foreground">IVA</span>
+                                        <div className="flex items-center gap-1">
+                                            <Input
+                                                type="number"
+                                                className="h-6 w-12 text-right text-xs p-1"
+                                                value={globalIvaPct === 0 ? '' : globalIvaPct}
+                                                onFocus={(e) => e.target.select()}
+                                                onChange={e => setGlobalIvaPct(Number(e.target.value) || 0)}
+                                                placeholder="19"
+                                            />
+                                            <span className="text-xs">%</span>
+                                            <span className="ml-2">{formatCurrency(iva)}</span>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 <Separator className="my-2" />
 
@@ -534,20 +545,39 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                                             <div className="grid grid-cols-3 gap-2">
                                                 <div className="space-y-1">
                                                     <Label className="text-[9px]">Admin %</Label>
-                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct} onChange={e => setAiuAdminPct(Number(e.target.value))} />
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct === 0 ? '' : aiuAdminPct} onFocus={(e) => e.target.select()} onChange={e => setAiuAdminPct(Number(e.target.value) || 0)} />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Label className="text-[9px]">Impr. %</Label>
-                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuImprevistoPct} onChange={e => setAiuImprevistoPct(Number(e.target.value))} />
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuImprevistoPct === 0 ? '' : aiuImprevistoPct} onFocus={(e) => e.target.select()} onChange={e => setAiuImprevistoPct(Number(e.target.value) || 0)} />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Label className="text-[9px]">Util. %</Label>
-                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuUtilidadPct} onChange={e => setAiuUtilidadPct(Number(e.target.value))} />
+                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuUtilidadPct === 0 ? '' : aiuUtilidadPct} onFocus={(e) => e.target.select()} onChange={e => setAiuUtilidadPct(Number(e.target.value) || 0)} />
                                                 </div>
                                             </div>
-                                            <div className="flex justify-between text-[10px] text-muted-foreground">
+
+                                            <div className="flex justify-between items-center text-sm pt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-muted-foreground text-xs">IVA s/ Util.</span>
+                                                    <div className="flex items-center">
+                                                        <Input
+                                                            type="number"
+                                                            className="h-6 w-12 text-right text-xs p-1"
+                                                            value={ivaUtilidadPct === 0 ? '' : ivaUtilidadPct}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onChange={e => setIvaUtilidadPct(Number(e.target.value) || 0)}
+                                                            placeholder="19"
+                                                        />
+                                                        <span className="text-xs ml-1">%</span>
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs">{formatCurrency(iva)}</span>
+                                            </div>
+
+                                            <div className="flex justify-between text-[10px] text-muted-foreground pt-1 border-t">
                                                 <span>Total Amortización:</span>
-                                                <span className="font-mono">{formatCurrency(aiuAdminVal + aiuImprevistoVal + aiuUtilidadVal)}</span>
+                                                <span className="font-mono">{formatCurrency(aiuAdminVal + aiuImprevistoVal + aiuUtilidadVal + iva)}</span>
                                             </div>
                                         </div>
                                     </>
@@ -605,10 +635,18 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, initialData, o
                     <div className="space-y-4">
                         <div className="flex items-center border rounded-md px-3">
                             <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <Input className="border-0 focus-visible:ring-0" placeholder="Buscar cliente..." />
+                            <Input
+                                className="border-0 focus-visible:ring-0"
+                                placeholder="Buscar cliente por nombre o NIT..."
+                                value={clientSearchTerm}
+                                onChange={(e) => setClientSearchTerm(e.target.value)}
+                            />
                         </div>
                         <ScrollArea className="h-[300px]">
-                            {clientes.map(cliente => (
+                            {clientes.filter(c =>
+                                c.nombre.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+                                (c.documento && c.documento.toLowerCase().includes(clientSearchTerm.toLowerCase()))
+                            ).map(cliente => (
                                 <div
                                     key={cliente.id}
                                     className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg cursor-pointer transition-colors border mb-2"

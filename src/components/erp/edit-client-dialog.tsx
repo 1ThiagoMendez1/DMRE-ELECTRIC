@@ -83,8 +83,8 @@ export function EditClientDialog({ cliente, onClientUpdated }: EditClientDialogP
                     <Pencil className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[525px]">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-[525px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="px-6 py-4 border-b">
                     <DialogTitle>Editar Cliente</DialogTitle>
                     <DialogDescription>
                         Modifique la información del cliente.
@@ -92,7 +92,7 @@ export function EditClientDialog({ cliente, onClientUpdated }: EditClientDialogP
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 px-6 overflow-y-auto pb-6">
                         <FormField
                             control={form.control}
                             name="nombre"

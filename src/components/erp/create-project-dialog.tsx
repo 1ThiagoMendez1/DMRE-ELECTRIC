@@ -162,7 +162,14 @@ export function CreateProjectDialog({ clientes, onProjectCreated }: CreateProjec
                                 <FormItem>
                                     <FormLabel>Valor Estimado (COP)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="0" {...field} />
+                                        <Input
+                                            type="number"
+                                            placeholder="0"
+                                            {...field}
+                                            value={field.value === 0 ? '' : field.value}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => field.onChange(Number(e.target.value))}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

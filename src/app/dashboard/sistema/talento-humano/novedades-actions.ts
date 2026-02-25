@@ -19,7 +19,7 @@ function mapToUI(db: any, empleado?: any): NovedadNomina {
         cantidad: Number(db.cantidad) || 0,
         valorUnitario: Number(db.valor_unitario) || 0,
         valorTotal: Number(db.valor_total) || 0,
-        estado: db.estado || (db.aprobada ? "ACEPTADA" : "PENDIENTE"), // Fallback to 'aprobada' logic
+        estado: db.estado || (db.aprobada ? "APROBADA" : "PENDIENTE"), // Fallback to 'aprobada' logic
         observaciones: db.observaciones || "", // Match DB column
         descripcion: db.descripcion || "", // Match DB column
     };
@@ -37,7 +37,7 @@ function mapToDB(ui: Partial<NovedadNomina>) {
         observaciones: ui.observaciones, // Match DB column
         descripcion: ui.descripcion, // Match DB column
         // We also maintain 'aprobada' boolean based on state for backward compat or if needed by RLS policies
-        aprobada: ui.estado === 'ACEPTADA'
+        aprobada: ui.estado === 'APROBADA'
     };
 }
 

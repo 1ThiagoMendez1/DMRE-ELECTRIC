@@ -154,7 +154,7 @@ export default function CommercialPage() {
     const revenueData = useMemo(() => {
         const agg: Record<string, number> = {};
         dashboardFilteredQuotes.forEach(q => {
-            if (q.estado !== 'ACEPTADA') return;
+            if (q.estado !== 'APROBADA') return;
             const dateStr = new Date(q.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
             agg[dateStr] = (agg[dateStr] || 0) + q.total;
         });
@@ -197,7 +197,7 @@ export default function CommercialPage() {
 
     const getStatusColor = (status: EstadoCotizacion) => {
         switch (status) {
-            case 'ACEPTADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+            case 'APROBADA': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
             case 'RECHAZADA': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
             case 'EN_REVISION':
             case 'MODIFICACION': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
@@ -211,7 +211,7 @@ export default function CommercialPage() {
             case 'ENVIADA': return 30;
             case 'EN_REVISION': return 50;
             case 'MODIFICACION': return 75;
-            case 'ACEPTADA': return 100;
+            case 'APROBADA': return 100;
             case 'RECHAZADA': return 100; // Finished but failed
             default: return 0;
         }
@@ -237,7 +237,7 @@ export default function CommercialPage() {
 
     const filteredProjects = useMemo(() => {
         return cotizaciones.filter(q =>
-            ['ACEPTADA', 'MODIFICACION', 'EN_REVISION'].includes(q.estado) &&
+            q.estado === 'APROBADA' &&
             (q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
         );
@@ -321,7 +321,7 @@ export default function CommercialPage() {
                             <CardContent>
                                 <div className="text-2xl font-bold">
                                     {dashboardFilteredQuotes.length > 0
-                                        ? Math.round((dashboardFilteredQuotes.filter(q => q.estado === 'APROBADA' || q.estado === 'FINALIZADA').length / dashboardFilteredQuotes.length) * 100)
+                                        ? Math.round((dashboardFilteredQuotes.filter(q => q.estado === 'APROBADA').length / dashboardFilteredQuotes.length) * 100)
                                         : 0}%
                                 </div>
                                 <p className="text-xs text-muted-foreground">Cotizaciones aprobadas</p>
@@ -468,7 +468,7 @@ export default function CommercialPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {filteredQuotes.map((quote) => (
-                                        <TableRow key={quote.id}>
+                                        <TableRow key={quote.id} className={quote.estado === 'RECHAZADA' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
                                             <TableCell className="font-mono text-xs">{quote.numero}</TableCell>
                                             <TableCell>
                                                 <TrabajoHistoryDialog

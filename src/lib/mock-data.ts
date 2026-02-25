@@ -202,7 +202,7 @@ const generateCotizaciones = (count: number, clientes: Cliente[], inventario: In
             aiuUtilidad,
             iva,
             total,
-            estado: randomItem(['BORRADOR', 'EN_REVISION', 'ENVIADA', 'ACEPTADA', 'RECHAZADA', 'MODIFICACION']) as EstadoCotizacion,
+            estado: randomItem(['BORRADOR', 'EN_REVISION', 'ENVIADA', 'APROBADA', 'RECHAZADA', 'MODIFICACION']) as EstadoCotizacion,
             fechaActualizacion: randomDate(2024, 2025),
             evidencia: Array.from({ length: randomInt(0, 3) }, (_, k) => ({
                 id: `EVID-${i}-${k}`,
@@ -223,7 +223,7 @@ const generateCotizaciones = (count: number, clientes: Cliente[], inventario: In
 
 const generateFacturas = (cotizaciones: Cotizacion[]): Factura[] => {
     return cotizaciones
-        .filter(c => c.estado === 'ACEPTADA' || c.estado === 'EN_REVISION' || c.estado === 'MODIFICACION')
+        .filter(c => c.estado === 'APROBADA' || c.estado === 'EN_REVISION' || c.estado === 'MODIFICACION')
         .map((c, i) => {
             const valorFacturado = c.total;
             const anticipo = valorFacturado * 0.3;
@@ -269,7 +269,7 @@ const generateRegistros = (count: number, clientes: Cliente[]): RegistroObra[] =
                 subtotal: total,
                 aiuAdmin: 0, aiuImprevistos: 0, aiuUtilidad: 0, iva: 0,
                 total: total,
-                estado: 'ACEPTADA'
+                estado: 'APROBADA'
             },
             fechaInicio: new Date(),
             estado: 'EN_PROCESO',
@@ -793,6 +793,6 @@ export const initialTrabajos: Cotizacion[] = [
         items: [],
         subtotal: 5000000,
         aiuAdmin: 0, aiuImprevistos: 0, aiuUtilidad: 0, iva: 950000, total: 5950000,
-        estado: "ACEPTADA"
+        estado: "APROBADA"
     }
 ];

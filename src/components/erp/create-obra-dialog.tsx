@@ -151,7 +151,13 @@ export function CreateObraDialog({ onObraCreated }: CreateObraDialogProps) {
                                 <FormItem>
                                     <FormLabel>Valor Total del Contrato</FormLabel>
                                     <FormControl>
-                                        <Input type="number" {...field} />
+                                        <Input
+                                            type="number"
+                                            {...field}
+                                            value={field.value === "0" ? "" : field.value}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => field.onChange(e.target.value)}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

@@ -104,7 +104,7 @@ export default function CotizacionPage() {
                                     </TableCell>
                                 </TableRow>
                             ) : paginatedQuotes.map((quote) => (
-                                <TableRow key={quote.id}>
+                                <TableRow key={quote.id} className={quote.estado === 'RECHAZADA' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
                                     <TableCell className="font-medium pl-6">{quote.id}</TableCell>
                                     <TableCell>{formatDateES(quote.fecha)}</TableCell>
                                     <TableCell className="font-medium">{quote.cliente.nombre}</TableCell>
@@ -113,7 +113,7 @@ export default function CotizacionPage() {
                                         <Badge
                                             variant="outline"
                                             className={cn({
-                                                "border-green-500 text-green-500 bg-green-500/10": quote.estado === 'ACEPTADA',
+                                                "border-green-500 text-green-500 bg-green-500/10": quote.estado === 'APROBADA',
                                                 "border-yellow-500 text-yellow-500 bg-yellow-500/10": quote.estado === 'ENVIADA',
                                                 "border-blue-500 text-blue-500 bg-blue-500/10": quote.estado === 'EN_REVISION' || quote.estado === 'MODIFICACION',
                                                 "border-muted text-muted-foreground": quote.estado === 'BORRADOR',

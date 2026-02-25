@@ -227,7 +227,8 @@ export function ObraDetailDialog({ open, onOpenChange, registro, onUpdate }: Obr
                                             <Label>Monto a Abonar</Label>
                                             <Input
                                                 type="number"
-                                                value={newPaymentAmount}
+                                                value={newPaymentAmount === "0" ? "" : newPaymentAmount}
+                                                onFocus={(e) => e.target.select()}
                                                 onChange={(e) => setNewPaymentAmount(e.target.value)}
                                                 placeholder="0.00"
                                             />

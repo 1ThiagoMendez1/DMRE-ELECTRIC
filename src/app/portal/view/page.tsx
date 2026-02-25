@@ -55,7 +55,7 @@ function PortalViewContent() {
                         setQuote(found);
                         setComments(initialComments[found.numero] || []); // Mock comments support
 
-                        if (['ACEPTADA'].includes(found.estado)) {
+                        if (['APROBADA'].includes(found.estado)) {
                             await loadSecureDocs(id);
                         }
                     }
@@ -390,7 +390,7 @@ export default function PortalViewPage() {
 
 function StatusBadge({ status }: { status: string }) {
     switch (status) {
-        case 'ACEPTADA': return <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">Aceptada</Badge>;
+        case 'APROBADA': return <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">Aprobada</Badge>;
         case 'RECHAZADA': return <Badge variant="destructive">Rechazada</Badge>;
         case 'EN_REVISION': return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200">En Revisión</Badge>;
         case 'MODIFICACION': return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200">Modificación</Badge>;

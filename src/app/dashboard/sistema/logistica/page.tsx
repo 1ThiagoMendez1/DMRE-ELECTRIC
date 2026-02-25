@@ -68,6 +68,14 @@ import { WorkCodesTable } from "@/components/erp/work-codes-table";
 import { CuentasPorPagarDashboard } from "@/components/erp/cuentas-por-pagar-dashboard";
 import { MaterialDetailConsumoDialog } from "@/components/erp/material-detail-consumo-dialog";
 import { getTrabajosListAction } from "@/app/dashboard/sistema/inventario/trabajos-list-action";
+import { ServiciosTable } from "@/components/erp/servicios/servicios-table";
+import {
+    getServiciosAction,
+    createServicioAction,
+    updateServicioAction,
+    deleteServicioAction
+} from "./servicios-actions";
+import { ServicioLogistica } from "@/types/sistema";
 
 export default function LogisticaPage() {
     const { toast } = useToast();
@@ -116,6 +124,9 @@ export default function LogisticaPage() {
     const [selectedMaterial, setSelectedMaterial] = useState<InventarioItem | null>(null);
     const [trabajosList, setTrabajosList] = useState<{ id: string; nombre: string; codigo: string }[]>([]);
 
+    // Servicios State
+    const [servicios, setServicios] = useState<ServicioLogistica[]>([]);
+
     // Supplier State
     const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
     const [supplierDetailOpen, setSupplierDetailOpen] = useState(false);
@@ -132,7 +143,23 @@ export default function LogisticaPage() {
     // Load trabajos list for consumo dialogs
     useEffect(() => {
         getTrabajosListAction().then(setTrabajosList).catch(console.error);
+        getServiciosAction().then(setServicios).catch(console.error);
     }, []);
+
+    const handleCreateServicio = async (srv: Omit<ServicioLogistica, "id" | "codigo" | "createdAt">) => {
+        const nuevo = await createServicioAction(srv);
+        setServicios(prev => [nuevo, ...prev]);
+    };
+
+    const handleUpdateServicio = async (id: string, srv: Partial<ServicioLogistica>) => {
+        const updated = await updateServicioAction(id, srv);
+        setServicios(prev => prev.map(s => s.id === id ? updated : s));
+    };
+
+    const handleDeleteServicio = async (id: string) => {
+        await deleteServicioAction(id);
+        setServicios(prev => prev.filter(s => s.id !== id));
+    };
 
     // Actions Wrapper (Connecting Dialogs to Context)
     const handleCreateSupplier = (newProv: any) => addProveedor(newProv);
@@ -175,6 +202,7 @@ export default function LogisticaPage() {
                     <TabsTrigger value="resumen" className="gap-2"><LayoutDashboard className="h-4 w-4" /> Resumen</TabsTrigger>
                     <TabsTrigger value="catalogo" className="gap-2"><ListOrdered className="h-4 w-4" /> Materiales</TabsTrigger>
                     <TabsTrigger value="inventario" className="gap-2"><Package className="h-4 w-4" /> Suministro</TabsTrigger>
+                    <TabsTrigger value="servicios" className="gap-2"><Wrench className="h-4 w-4" /> Servicios</TabsTrigger>
                     <TabsTrigger value="suministro" className="gap-2"><Truck className="h-4 w-4" /> Proveedores</TabsTrigger>
                     <TabsTrigger value="dotacion" className="gap-2"><HardHat className="h-4 w-4" /> Dotación</TabsTrigger>
                     <TabsTrigger value="activos" className="gap-2"><Car className="h-4 w-4" /> Activos</TabsTrigger>
@@ -368,6 +396,23 @@ export default function LogisticaPage() {
                 {/* SUMINISTRO TAB */}
                 <TabsContent value="inventario" className="space-y-4">
                     <WorkCodesTable />
+                </TabsContent>
+
+                {/* SERVICIOS TAB */}
+                <TabsContent value="servicios" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Catálogo de Servicios</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ServiciosTable
+                                servicios={servicios}
+                                onCreateServicio={handleCreateServicio}
+                                onUpdateServicio={handleUpdateServicio}
+                                onDeleteServicio={handleDeleteServicio}
+                            />
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 {/* PROVEEDORES TAB - WITH SUB-TABS */}

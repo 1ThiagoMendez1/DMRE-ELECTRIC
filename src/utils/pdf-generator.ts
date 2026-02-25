@@ -479,30 +479,59 @@ export const generateQuotePDF = (
 
     // Subtotal
     doc.setTextColor(...text);
-    doc.text("Subtotal:", totalsX, finalY + 4);
-    doc.text(currencyFmt.format(cotizacion.subtotal), contentStartX + contentWidth, finalY + 4, { align: "right" });
 
-    // IVA
-    doc.setTextColor(...text);
-    doc.text("IVA:", totalsX, finalY + 9);
-    doc.text(currencyFmt.format(cotizacion.iva), contentStartX + contentWidth, finalY + 9, { align: "right" });
+    // Check if AIU is present
+    const hasAiu = (cotizacion.aiuAdmin || 0) > 0 || (cotizacion.aiuImprevistos || 0) > 0 || (cotizacion.aiuUtilidad || 0) > 0;
+
+    let currentTotalsY = finalY + 4;
+    const lineSpacing = 5;
+
+    doc.text("Subtotal:", totalsX, currentTotalsY);
+    doc.text(currencyFmt.format(cotizacion.subtotal), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+    if (hasAiu) {
+        currentTotalsY += lineSpacing;
+        doc.text("Admin:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.aiuAdmin || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+        currentTotalsY += lineSpacing;
+        doc.text("Imprevistos:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.aiuImprevistos || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+        currentTotalsY += lineSpacing;
+        doc.text("Utilidad:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.aiuUtilidad || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+
+        currentTotalsY += lineSpacing;
+        doc.text("IVA s/ Util.:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.iva || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+    } else {
+        currentTotalsY += lineSpacing;
+        // Normal IVA
+        doc.text("IVA:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.iva), contentStartX + contentWidth, currentTotalsY, { align: "right" });
+    }
 
     // GRAND TOTAL
     doc.setFontSize(12);
     doc.setFont(style.fonts.header, 'bold');
 
+    currentTotalsY += lineSpacing;
+
     // Colored Box for Total if Bold style
     if (style.layout === 'bold') {
         doc.setFillColor(...secondary);
-        doc.rect(totalsX - 5, finalY + 14, 70, 10, 'F');
+        doc.rect(totalsX - 5, currentTotalsY - 7, 70, 10, 'F');
         doc.setTextColor(255, 255, 255);
-        doc.text("TOTAL:", totalsX, finalY + 21);
-        doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, finalY + 21, { align: "right" });
+        doc.text("TOTAL:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
     } else {
         doc.setTextColor(...primary);
-        doc.text("TOTAL:", totalsX, finalY + 18);
-        doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, finalY + 18, { align: "right" });
+        doc.text("TOTAL:", totalsX, currentTotalsY);
+        doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
     }
+
+    currentTotalsY += 10; // Give some space before footer
 
     // FOOTERS
     // Branded footer bar?

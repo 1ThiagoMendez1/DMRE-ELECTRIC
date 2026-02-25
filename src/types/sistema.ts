@@ -100,7 +100,7 @@ export interface CotizacionItem {
     notas?: string;
 }
 
-export type EstadoCotizacion = 'BORRADOR' | 'EN_REVISION' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'MODIFICACION';
+export type EstadoCotizacion = 'BORRADOR' | 'EN_REVISION' | 'ENVIADA' | 'APROBADA' | 'RECHAZADA' | 'MODIFICACION';
 export type TipoOferta = 'NORMAL' | 'SIMPLIFICADA';
 
 export interface Cotizacion {
@@ -215,6 +215,16 @@ export interface Factura {
 }
 
 // 2. FINANCIERA
+export interface ServicioLogistica {
+    id: string;
+    codigo: string;
+    nombre: string;
+    costo: number;
+    createdAt?: Date;
+}
+
+export type GeneroDotacion = 'UNISEX' | 'MASCULINO' | 'FEMENINO';
+
 export type TipoCuenta = 'BANCO' | 'EFECTIVO' | 'CREDITO';
 
 export interface CuentaBancaria {
