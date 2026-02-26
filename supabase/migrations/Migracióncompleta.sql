@@ -1993,3 +1993,58 @@ CREATE POLICY "Users can delete versions of their projects"
             WHERE id = plan_versions.project_id
         )
     );
+
+
+
+
+
+
+
+
+-- 1. Crear el bucket (si no existe) y hacerlo público
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('Financiera_Mov', 'Financiera_Mov', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- 2. Permitir que cualquier persona vea los archivos (Lectura Pública)
+CREATE POLICY "Acceso Publico Financiera_Mov" 
+ON storage.objects FOR SELECT 
+USING (bucket_id = 'Financiera_Mov');
+
+-- 3. Permitir que usuarios autenticados suban archivos (Insertar)
+CREATE POLICY "Autenticado Subir Financiera_Mov" 
+ON storage.objects FOR INSERT 
+WITH CHECK (bucket_id = 'Financiera_Mov' AND auth.role() = 'authenticated');
+
+-- 4. Permitir que usuarios autenticados eliminen archivos
+CREATE POLICY "Autenticado Eliminar Financiera_Mov" 
+ON storage.objects FOR DELETE 
+USING (bucket_id = 'Financiera_Mov' AND auth.role() = 'authenticated');
+
+-- 5. Permitir que usuarios autenticados actualicen archivos
+CREATE POLICY "Autenticado Actualizar Financiera_Mov" 
+ON storage.objects FOR UPDATE 
+USING (bucket_id = 'Financiera_Mov' AND auth.role() = 'authenticated');
+
+
+
+
+
+
+-- Elimina políticas restrictivas anteriores si existen
+DROP POLICY IF EXISTS "Autenticado Subir Financiera_Mov" ON storage.objects;
+DROP POLICY IF EXISTS "Autenticado Eliminar Financiera_Mov" ON storage.objects;
+DROP POLICY IF EXISTS "Autenticado Actualizar Financiera_Mov" ON storage.objects;
+
+-- Crea las políticas permitiendo a la app web interactuar con el bucket libremente
+CREATE POLICY "Permitir Insertar Financiera_Mov" 
+ON storage.objects FOR INSERT 
+WITH CHECK (bucket_id = 'Financiera_Mov');
+
+CREATE POLICY "Permitir Actualizar Financiera_Mov" 
+ON storage.objects FOR UPDATE 
+USING (bucket_id = 'Financiera_Mov');
+
+CREATE POLICY "Permitir Eliminar Financiera_Mov" 
+ON storage.objects FOR DELETE 
+USING (bucket_id = 'Financiera_Mov');

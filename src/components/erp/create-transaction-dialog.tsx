@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { createClient } from "@/utils/supabase/client";
 import {
     Dialog,
     DialogContent,
@@ -30,8 +31,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, Loader2, UploadCloud } from "lucide-react";
 import { CuentaBancaria, TipoMovimiento, CategoriaMovimiento } from "@/types/sistema";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
     tipo: z.enum(["INGRESO", "EGRESO"] as const),
@@ -44,11 +46,14 @@ const formSchema = z.object({
 
 interface CreateTransactionDialogProps {
     cuentas: CuentaBancaria[];
-    onTransactionCreated: (tx: any) => void;
+    onTransactionCreated: (mov: any) => void | Promise<void>;
 }
 
 export function CreateTransactionDialog({ cuentas, onTransactionCreated }: CreateTransactionDialogProps) {
     const [open, setOpen] = useState(false);
+    const [file, setFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const { toast } = useToast();
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -61,24 +66,70 @@ export function CreateTransactionDialog({ cuentas, onTransactionCreated }: Creat
         },
     });
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        const cuenta = cuentas.find(c => c.id === values.cuentaId);
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        setIsUploading(true);
+        try {
+            let comprobanteUrl = undefined;
 
-        const newTx = {
-            id: `MOV-${Math.floor(Math.random() * 10000)}`,
-            fecha: new Date(),
-            tipo: values.tipo,
-            cuentaId: values.cuentaId,
-            cuenta: cuenta,
-            categoria: values.categoria as CategoriaMovimiento,
-            tercero: values.tercero,
-            concepto: values.concepto,
-            valor: values.valor
-        };
+            if (file) {
+                const supabase = createClient();
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+                const filePath = `movimientos/${fileName}`;
 
-        onTransactionCreated(newTx);
-        setOpen(false);
-        form.reset();
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('Financiera_Mov')
+                    .upload(filePath, file);
+
+                if (uploadError) {
+                    console.error("Upload error:", uploadError);
+                    toast({
+                        title: "Error",
+                        description: "Error al subir el archivo",
+                        variant: "destructive"
+                    });
+                    setIsUploading(false);
+                    return;
+                }
+
+                // Get public URL
+                const { data } = supabase.storage.from('Financiera_Mov').getPublicUrl(filePath);
+                comprobanteUrl = data.publicUrl;
+            }
+
+            const cuenta = cuentas.find(c => c.id === values.cuentaId);
+
+            const newTx = {
+                id: `MOV-${Math.floor(Math.random() * 10000)}`,
+                fecha: new Date(),
+                tipo: values.tipo,
+                cuentaId: values.cuentaId,
+                cuenta: cuenta,
+                categoria: values.categoria as CategoriaMovimiento,
+                tercero: values.tercero,
+                concepto: values.concepto,
+                valor: values.valor,
+                comprobanteUrl: comprobanteUrl
+            };
+
+            await onTransactionCreated(newTx);
+            setOpen(false);
+            form.reset();
+            setFile(null);
+            toast({
+                title: "Movimiento registrado",
+                description: file ? "Con archivo adjunto" : "Sin evidencias",
+            });
+        } catch (e) {
+            console.error(e);
+            toast({
+                title: "Error",
+                description: "Error inesperado al registrar el movimiento",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUploading(false);
+        }
     }
 
     return (
@@ -212,8 +263,27 @@ export function CreateTransactionDialog({ cuentas, onTransactionCreated }: Creat
                             )}
                         />
 
+                        <div className="space-y-2">
+                            <FormLabel>Evidencia / Comprobante (Opcional)</FormLabel>
+                            <label className="flex items-center gap-2 px-3 py-2 border rounded-md border-input bg-background hover:bg-muted/50 cursor-pointer transition-colors text-sm text-muted-foreground w-full">
+                                <UploadCloud className="w-4 h-4" />
+                                <span className="truncate flex-1">
+                                    {file ? file.name : "Seleccionar archivo (PDF, Imagen)..."}
+                                </span>
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    accept=".pdf,image/*"
+                                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                />
+                            </label>
+                        </div>
+
                         <DialogFooter>
-                            <Button type="submit">Registrar</Button>
+                            <Button type="submit" disabled={isUploading}>
+                                {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Registrar
+                            </Button>
                         </DialogFooter>
                     </form>
                 </Form>

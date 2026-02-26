@@ -607,14 +607,22 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const { id, ...rest } = mov;
             const saved = await createMovimientoFinancieroAction(rest as any);
             setMovimientosFinancieros(prev => [saved, ...prev]);
-        } catch (error) { console.error("Error adding movimiento:", error); }
+            await loadAllData();
+        } catch (error) {
+            console.error("Error adding movimiento:", error);
+            throw error;
+        }
     };
 
     const updateMovimientoFinanciero = async (updated: MovimientoFinanciero) => {
         try {
             const saved = await updateMovimientoFinancieroAction(updated.id, updated);
             setMovimientosFinancieros(prev => prev.map(m => m.id === saved.id ? saved : m));
-        } catch (error) { console.error("Error updating movimiento:", error); }
+            await loadAllData();
+        } catch (error) {
+            console.error("Error updating movimiento:", error);
+            throw error;
+        }
     };
 
     // =============================================
@@ -926,7 +934,13 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addOrdenCompra, updateOrdenCompra,
             consumosResumen, addConsumoMaterial, refreshConsumosResumen,
 
-            // Refresh
+            // Metodos Facturacion
+            registrarAdelantoFactura,
+            actualizarEstadoFactura,
+            actualizarFechaVencimientoFactura,
+            agregarNotaFactura,
+
+            // Metodos Datos
             refreshData: loadAllData,
             logout,
         }}>

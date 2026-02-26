@@ -258,6 +258,7 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                                         <TableHead>Concepto</TableHead>
                                         <TableHead>Categoría</TableHead>
                                         <TableHead>Tipo</TableHead>
+                                        <TableHead className="w-[80px]">Evidencia</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -281,6 +282,15 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                                                     <Badge variant={mov.tipo === 'INGRESO' ? 'default' : 'secondary'} className={mov.tipo === 'EGRESO' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'}>
                                                         {mov.tipo}
                                                     </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {mov.comprobanteUrl ? (
+                                                        <a href={mov.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:underline flex items-center justify-center" title="Ver Comprobante">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-muted-foreground text-xs text-center block">-</span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-medium ${mov.tipo === 'INGRESO' ? 'text-green-600' : 'text-red-600'}`}>
                                                     {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.valor)}

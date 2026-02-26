@@ -149,9 +149,13 @@ export default function FinancieraPage() {
         toast({ title: "Cuenta actualizada", description: "Los datos de la cuenta han sido guardados." });
     };
 
-    const handleCreateTransaction = (newTransaction: MovimientoFinanciero) => {
-        addMovimientoFinanciero(newTransaction);
-        toast({ title: "Transacción registrada", description: "El movimiento ha sido guardado exitosamente." });
+    const handleCreateTransaction = async (newTransaction: MovimientoFinanciero) => {
+        try {
+            await addMovimientoFinanciero(newTransaction);
+            toast({ title: "Transacción registrada", description: "El movimiento ha sido guardado exitosamente." });
+        } catch (error) {
+            // Error is handled by dialog and provider
+        }
     };
 
     const handleUpdateTransaction = (updatedMov: MovimientoFinanciero) => {
