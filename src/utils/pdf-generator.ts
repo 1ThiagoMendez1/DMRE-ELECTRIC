@@ -544,8 +544,8 @@ export const generateQuotePDF = (
                 showDetails ? currencyFmt.format(item.valorTotal) : '-'
             ]);
 
-            // Add sub-items for Work Codes (APUs) if they exist and we're not hiding everything
-            if (isService && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO') {
+            // Add sub-items for Work Codes (APUs) if they exist and we're not hiding everything, nor explicitly hidden by user
+            if (isService && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO' && !item.ocultarDetalles) {
                 item.subItems.forEach((sub) => {
                     const totalSubQty = (sub.cantidad || 0) * item.cantidad;
                     tableBody.push([

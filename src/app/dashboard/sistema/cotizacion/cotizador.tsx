@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment } from "react";
-import { Cliente, InventarioItem, CotizacionItem, Cotizacion, CodigoTrabajo, Instalacion } from "@/types/sistema";
+import { Cliente, InventarioItem, CotizacionItem, Cotizacion, CodigoTrabajo, Instalacion, ServicioLogistica } from "@/types/sistema";
 import { useErp } from "@/components/providers/erp-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,12 +33,13 @@ interface CotizadorProps {
     inventario: InventarioItem[];
     codigosTrabajo: CodigoTrabajo[];
     instalaciones?: Instalacion[];
+    servicios?: ServicioLogistica[];
     initialData?: Cotizacion | null;
     onClose: () => void;
     onSave?: (quote: Cotizacion) => void;
 }
 
-export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones: propInstalaciones, initialData, onClose, onSave }: CotizadorProps) {
+export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones: propInstalaciones, servicios, initialData, onClose, onSave }: CotizadorProps) {
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
     const [items, setItems] = useState<CotizacionItem[]>([]);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -133,7 +134,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
             const hasAiu = (initialData.aiuAdminGlobalPorcentaje || 0) > 0 || (initialData.aiuImprevistoGlobalPorcentaje || 0) > 0 || (initialData.aiuUtilidadGlobalPorcentaje || 0) > 0;
             setEsAiu(hasAiu);
         }
-    }, [initialData]);
+    }, [initialData?.id]);
 
 
     const { subtotal, descuento, aiuAdminVal, aiuImprevistoVal, aiuUtilidadVal, iva, total } = useMemo(() => {
@@ -414,17 +415,17 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                     {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && (
                                                                         <div className="flex items-center gap-2 mt-1">
                                                                             <CheckboxUI
-                                                                                id={`hide-details-${item.id}`}
-                                                                                checked={!!item.ocultarDetalles}
+                                                                                id={`show-details-${item.id}`}
+                                                                                checked={!item.ocultarDetalles}
                                                                                 onCheckedChange={(checked) => {
                                                                                     const updated = [...items];
-                                                                                    updated[index].ocultarDetalles = !!checked;
+                                                                                    updated[index].ocultarDetalles = !checked;
                                                                                     setItems(updated);
                                                                                 }}
                                                                                 className="h-3 w-3"
                                                                             />
-                                                                            <Label htmlFor={`hide-details-${item.id}`} className="text-[10px] text-muted-foreground cursor-pointer flex items-center gap-1">
-                                                                                <EyeOff className="h-3 w-3" /> Ocultar detalles
+                                                                            <Label htmlFor={`show-details-${item.id}`} className="text-[10px] text-muted-foreground cursor-pointer flex items-center gap-1">
+                                                                                {item.ocultarDetalles ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />} Mostrar materiales
                                                                             </Label>
                                                                         </div>
                                                                     )}
@@ -436,7 +437,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                     value={item.cantidad === 0 ? '' : item.cantidad}
                                                                     onFocus={(e) => e.target.select()}
                                                                     onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 0)}
-                                                                    className="h-7 w-14 text-xs"
+                                                                    className="h-7 w-16 text-xs"
                                                                     min={1}
                                                                 />
                                                             </TableCell>
@@ -453,7 +454,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                         updated[index].valorTotal = updated[index].cantidad * (val + ex);
                                                                         setItems(updated);
                                                                     }}
-                                                                    className="h-7 w-20 text-xs text-right"
+                                                                    className="h-7 w-28 text-xs text-right"
                                                                 />
                                                             </TableCell>
                                                             <TableCell className="text-center">
@@ -559,7 +560,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                             </Card>
                         </TabsContent>
 
-                        <TabsContent value="preview" className="flex-1 h-full m-0 outline-none">
+                        <TabsContent value="preview" className="flex-1 h-full min-h-[60vh] md:min-h-[80vh] m-0 outline-none">
                             <Card className="h-full flex flex-col items-center justify-center p-0 overflow-hidden border">
                                 {isGeneratingPdf ? (
                                     <div className="flex flex-col items-center text-muted-foreground animate-pulse">
@@ -567,7 +568,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                         <p>Generando vista previa...</p>
                                     </div>
                                 ) : pdfUrl ? (
-                                    <iframe src={`${pdfUrl}#toolbar=0`} className="w-full h-full rounded-md" title="PDF Preview" />
+                                    <iframe src={`${pdfUrl}#toolbar=0`} className="w-full h-full min-h-[60vh] md:min-h-[80vh] rounded-md" title="PDF Preview" />
                                 ) : (
                                     <div className="text-center text-muted-foreground">
                                         <p>No se pudo generar el PDF o no hay datos suficientes.</p>
@@ -759,6 +760,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                 inventario={inventario}
                 codigosTrabajo={codigosTrabajo}
                 instalaciones={activeInstalaciones}
+                serviciosLogistica={servicios}
             />
         </div>
     );

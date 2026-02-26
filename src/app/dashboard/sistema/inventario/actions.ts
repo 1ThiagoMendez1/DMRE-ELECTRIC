@@ -56,7 +56,7 @@ function mapToDB(ui: Partial<InventarioUI>) {
         modelo: ui.modelo,
         imagen_url: ui.imagenUrl,
         activo: ui.activo ?? true,
-        notas: ui.notas,
+        // notas: not present in DB schema
     };
 }
 

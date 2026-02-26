@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, Package, Code, Bolt, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +22,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
-import { CotizacionItem, InventarioItem, CodigoTrabajo, Instalacion } from "@/types/sistema";
+import { CotizacionItem, InventarioItem, CodigoTrabajo, Instalacion, ServicioLogistica } from "@/types/sistema";
+import { createClient } from "@/utils/supabase/client";
 
 interface ItemOptions {
     id: string;
     tipo: 'PRODUCTO' | 'SERVICIO';
-    subTipo?: 'INSTALACION' | 'APU'; // Se añade este tipado opcional
+    subTipo?: 'INSTALACION' | 'APU' | 'SERVICIO_LOGISTICO'; // Se añade este tipado opcional
     codigo: string;
     descripcion: string;
     valorUnitario: number;
@@ -55,11 +56,56 @@ interface ProductSelectorDialogProps {
     inventario: InventarioItem[];
     codigosTrabajo: CodigoTrabajo[];
     instalaciones: Instalacion[];
+    serviciosLogistica?: any[]; // using any since ServicioLogistica is not directly exported in this file but mapped in the component
 }
 
 export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inventario, codigosTrabajo, instalaciones }: ProductSelectorDialogProps) {
     const [searchTerm, setSearchTerm] = useState("");
-    const [activeFilter, setActiveFilter] = useState<'ALL' | 'PRODUCTO' | 'SUMINISTRO' | 'INSTALACION'>('ALL');
+    const [activeFilter, setActiveFilter] = useState<'ALL' | 'PRODUCTO' | 'SUMINISTRO' | 'INSTALACION' | 'SERVICIO'>('ALL');
+    const [serviciosState, setServiciosState] = useState<ServicioLogistica[]>([]);
+    const [instalacionesState, setInstalacionesState] = useState<Instalacion[]>([]);
+
+    // Fetch servicios logisticos directly from Supabase when dialog opens
+    useEffect(() => {
+        if (!open) return;
+        const supabase = createClient();
+
+        // Fetch servicios
+        supabase
+            .from("servicios_logistica")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .then(({ data, error }) => {
+                if (!error && data) {
+                    setServiciosState(data.map((sl: any) => ({
+                        id: sl.id,
+                        codigo: sl.codigo,
+                        nombre: sl.nombre,
+                        costo: Number(sl.costo || 0),
+                    })));
+                } else if (error) {
+                    console.error("Error fetching servicios:", error);
+                }
+            });
+
+        // Fetch instalaciones
+        supabase
+            .from("instalaciones")
+            .select("*")
+            .then(({ data, error }) => {
+                if (!error && data) {
+                    setInstalacionesState(data.map((i: any) => ({
+                        id: i.id,
+                        codigo: i.codigo,
+                        descripcion: i.descripcion || "",
+                        valorCalculado: Number(i.valor_calculado) || 0,
+                        activo: i.activo,
+                    })));
+                } else if (error) {
+                    console.error("Error fetching instalaciones:", error);
+                }
+            });
+    }, [open]);
 
     const filteredItems = useMemo(() => {
         const products: ItemOptions[] = (inventario || []).map(p => ({
@@ -91,7 +137,9 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             searchStr: `${s.nombre} ${s.codigo} ${s.descripcion}`.toLowerCase()
         }));
 
-        const installs: ItemOptions[] = (instalaciones || []).map(i => ({
+
+
+        const installs: ItemOptions[] = instalacionesState.map(i => ({
             id: i.id,
             tipo: 'SERVICIO',
             subTipo: 'INSTALACION',
@@ -105,15 +153,33 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             searchStr: `${i.descripcion} ${i.codigo}`.toLowerCase()
         }));
 
-        let all = [...products, ...services, ...installs];
+        const srvLogistica: ItemOptions[] = serviciosState.map(sl => ({
+            id: sl.id,
+            tipo: 'SERVICIO',
+            subTipo: 'SERVICIO_LOGISTICO',
+            codigo: sl.codigo,
+            descripcion: sl.nombre,
+            valorUnitario: sl.costo || 0,
+            _extraText: 'Servicio Logístico',
+            valorManoObra: sl.costo,
+            manoDeObra: sl.costo,
+            costoTotal: sl.costo,
+            searchStr: `${sl.nombre} ${sl.codigo}`.toLowerCase()
+        }));
+
+        // Modificación solicitada por el usuario: No listar los productos en el caso general
+        // dejar únicamente suministros (APU) e instalaciones y servicios logísticos.
+        let all = [...services, ...installs, ...srvLogistica];
 
         if (activeFilter !== 'ALL') {
             if (activeFilter === 'PRODUCTO') {
-                all = all.filter(item => item.tipo === 'PRODUCTO');
+                all = [...products]; // In case they force the filter
             } else if (activeFilter === 'SUMINISTRO') {
                 all = all.filter(item => item.subTipo === 'APU');
             } else if (activeFilter === 'INSTALACION') {
                 all = all.filter(item => item.subTipo === 'INSTALACION');
+            } else if (activeFilter === 'SERVICIO') {
+                all = all.filter(item => item.subTipo === 'SERVICIO_LOGISTICO');
             }
         }
 
@@ -123,7 +189,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
         }
 
         return all;
-    }, [searchTerm, activeFilter, inventario, codigosTrabajo, instalaciones]);
+    }, [searchTerm, activeFilter, inventario, codigosTrabajo, instalacionesState, serviciosState]);
 
     const handleSelect = (item: ItemOptions) => {
         const isService = item.tipo === 'SERVICIO';
@@ -138,19 +204,25 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
         const newItem: CotizacionItem = {
             id: crypto.randomUUID(), // Temp ID for the quote item
             inventarioId: isService ? undefined : item.id,
-            codigoTrabajoId: isService ? item.id : undefined,
+            // Only APU items (CodigosTrabajo) have a valid codigoTrabajoId FK.
+            // Instalaciones and Servicios Logísticos live in separate tables.
+            codigoTrabajoId: item.subTipo === 'APU' ? item.id : undefined,
             tipo: item.tipo,
-            descripcion: item.descripcion,
+            descripcion: item.subTipo === 'APU'
+                ? `Suministro: ${item.descripcion}`
+                : item.subTipo === 'INSTALACION'
+                    ? `Instalaciones: ${item.descripcion}`
+                    : item.descripcion,
             cantidad: 1,
             valorUnitario: isService ? servicePrice : (item.valorUnitario || 0),
             valorTotal: isService ? servicePrice : (item.valorUnitario || 0),
             descuentoValor: 0,
             descuentoPorcentaje: 0,
             impuesto: 19, // Default IVA
-            ocultarDetalles: false,
+            ocultarDetalles: true,
             costoUnitario: isService ? servicePrice : (item.precio_proveedor || item.precioProveedor || item.costoMateriales || 0),
-            // If it's a service (Code), include subitems
-            subItems: isService ? item.materiales : undefined
+            // Only APU services have sub-items (materials); Instalaciones/Servicios Logísticos do not
+            subItems: item.subTipo === 'APU' ? item.materiales : undefined
         };
 
         onItemSelected(newItem);
@@ -186,13 +258,6 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                             Todos
                         </Button>
                         <Button
-                            variant={activeFilter === 'PRODUCTO' ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => setActiveFilter('PRODUCTO')}
-                        >
-                            <Package className="mr-2 h-3 w-3" /> Productos
-                        </Button>
-                        <Button
                             variant={activeFilter === 'SUMINISTRO' ? 'secondary' : 'ghost'}
                             size="sm"
                             onClick={() => setActiveFilter('SUMINISTRO')}
@@ -205,6 +270,13 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                             onClick={() => setActiveFilter('INSTALACION')}
                         >
                             <Bolt className="mr-2 h-3 w-3" /> Instalaciones
+                        </Button>
+                        <Button
+                            variant={activeFilter === 'SERVICIO' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setActiveFilter('SERVICIO')}
+                        >
+                            <Bolt className="mr-2 h-3 w-3" /> Servicios
                         </Button>
                     </div>
                 </div>

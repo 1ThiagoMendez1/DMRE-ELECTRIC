@@ -276,7 +276,7 @@ export default function CommercialPage() {
                     <TabsTrigger value="resumen" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><LayoutDashboardIcon className="h-4 w-4" /> <span className="hidden sm:inline">Resumen</span></TabsTrigger>
                     <TabsTrigger value="clientes" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><Users className="h-4 w-4" /> <span className="hidden sm:inline">Clientes</span></TabsTrigger>
                     <TabsTrigger value="ofertas" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><Briefcase className="h-4 w-4" /> <span className="hidden sm:inline">Ofertas</span></TabsTrigger>
-                    <TabsTrigger value="cotizaciones" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><FileText className="h-4 w-4" /> <span className="hidden sm:inline">Cotizar</span></TabsTrigger>
+                    <TabsTrigger value="cotizaciones" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><FileText className="h-4 w-4" /> <span className="hidden sm:inline">Cotizaciones</span></TabsTrigger>
                     <TabsTrigger value="proyectos" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><Briefcase className="h-4 w-4" /> <span className="hidden sm:inline">Proyectos</span></TabsTrigger>
                     <TabsTrigger value="interaccion" className="gap-2 flex-shrink-0 relative data-[state=active]:bg-background">
                         <MessageCircle className="h-4 w-4" />

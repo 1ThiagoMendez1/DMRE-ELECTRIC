@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Cotizador } from "./cotizador";
 import { useErp } from "@/components/providers/erp-provider";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,9 @@ import { FilePlus, Search, Filter, Edit, Trash2, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Cotizacion } from "@/types/sistema";
+import { Cotizacion, ServicioLogistica } from "@/types/sistema";
 import { generateQuotePDF } from "@/utils/pdf-generator";
+import { createClient } from "@/utils/supabase/client";
 
 export default function CotizacionPage() {
     const {
@@ -30,6 +31,26 @@ export default function CotizacionPage() {
     const [selectedQuote, setSelectedQuote] = useState<Cotizacion | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [servicios, setServicios] = useState<ServicioLogistica[]>([]);
+
+    useEffect(() => {
+        const supabase = createClient();
+        supabase
+            .from("servicios_logistica")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .then(({ data, error }) => {
+                if (!error && data) {
+                    setServicios(data.map((sl: any) => ({
+                        id: sl.id,
+                        codigo: sl.codigo,
+                        nombre: sl.nombre,
+                        costo: Number(sl.costo || 0),
+                        createdAt: sl.created_at ? new Date(sl.created_at) : undefined,
+                    })));
+                }
+            });
+    }, []);
 
     const handleOpenNew = () => {
         setSelectedQuote(null);
@@ -191,6 +212,7 @@ export default function CotizacionPage() {
                             clientes={clientes}
                             inventario={inventario}
                             codigosTrabajo={codigosTrabajo}
+                            servicios={servicios}
                             initialData={selectedQuote}
                             onClose={() => setIsModalOpen(false)}
                             onSave={(q) => {
