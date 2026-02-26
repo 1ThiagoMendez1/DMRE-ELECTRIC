@@ -177,7 +177,6 @@ function PortalViewContent() {
 
         try {
             await addPublicCotizacionCommentAction(quote.numero, newMsg);
-            toast({ title: "Mensaje Enviado", description: "Su comentario ha sido registrado." });
         } catch (error) {
             console.error("Failed to save comment:", error);
             // Revert state if we want strictness, but here we just warn

@@ -137,8 +137,6 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
         updateCotizacion(updatedQuote);
 
         setNewComment("");
-
-        toast({ title: "Mensaje Enviado", description: "Su comentario ha sido enviado al portal del cliente." });
     };
 
     if (!quote) return (
