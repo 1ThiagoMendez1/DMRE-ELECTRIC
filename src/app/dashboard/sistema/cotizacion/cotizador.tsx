@@ -437,7 +437,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                     value={item.cantidad === 0 ? '' : item.cantidad}
                                                                     onFocus={(e) => e.target.select()}
                                                                     onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 0)}
-                                                                    className="h-7 w-16 text-xs"
+                                                                    className="h-7 text-xs px-2"
+                                                                    style={{
+                                                                        fieldSizing: 'content',
+                                                                        width: `${Math.max(4, (item.cantidad === 0 ? 0 : item.cantidad.toString().length) + 4)}ch`,
+                                                                        minWidth: '4ch'
+                                                                    } as any}
                                                                     min={1}
                                                                 />
                                                             </TableCell>
@@ -454,7 +459,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                         updated[index].valorTotal = updated[index].cantidad * (val + ex);
                                                                         setItems(updated);
                                                                     }}
-                                                                    className="h-7 w-28 text-xs text-right"
+                                                                    className="h-7 text-xs text-right px-2"
+                                                                    style={{
+                                                                        fieldSizing: 'content',
+                                                                        width: `${Math.max(8, (item.valorUnitario === 0 ? 0 : item.valorUnitario.toString().length) + 5)}ch`,
+                                                                        minWidth: '8ch'
+                                                                    } as any}
                                                                 />
                                                             </TableCell>
                                                             <TableCell className="text-center">
@@ -472,7 +482,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                             updated[index].valorTotal = updated[index].cantidad * (updated[index].valorUnitario + ex);
                                                                             setItems(updated);
                                                                         }}
-                                                                        className="h-7 w-16 text-xs text-center"
+                                                                        className="h-7 text-xs text-center px-1"
+                                                                        style={{
+                                                                            fieldSizing: 'content',
+                                                                            width: `${Math.max(5, (item.porcentaje?.toString().length || 0) + 4)}ch`,
+                                                                            minWidth: '5ch'
+                                                                        } as any}
                                                                         placeholder="%"
                                                                     />
                                                                 </div>
@@ -482,7 +497,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                     type="number"
                                                                     readOnly
                                                                     value={item.porcentaje !== undefined ? (item.valorUnitario * (item.porcentaje / 100)) : ''}
-                                                                    className="h-7 w-20 text-xs text-right bg-muted/20"
+                                                                    className="h-7 text-xs text-right bg-muted/20 px-2"
+                                                                    style={{
+                                                                        fieldSizing: 'content',
+                                                                        width: `${Math.max(8, (item.porcentaje !== undefined ? (item.valorUnitario * (item.porcentaje / 100)).toString().length : 0) + 5)}ch`,
+                                                                        minWidth: '8ch'
+                                                                    } as any}
                                                                     placeholder="$"
                                                                 />
                                                             </TableCell>
@@ -592,6 +612,37 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                     <span className="text-muted-foreground">Subtotal</span>
                                     <span>{formatCurrency(subtotal)}</span>
                                 </div>
+
+                                <div className="flex justify-between items-center text-sm pt-1">
+                                    <span className="text-muted-foreground">Descuento</span>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            className="h-6 text-right text-xs p-1 px-2"
+                                            style={{
+                                                fieldSizing: 'content',
+                                                width: `${Math.max(4, (globalDiscountPct === 0 ? 0 : globalDiscountPct.toString().length) + 3)}ch`,
+                                                minWidth: '4ch'
+                                            } as any}
+                                            value={globalDiscountPct === 0 ? '' : globalDiscountPct}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={e => setGlobalDiscountPct(Number(e.target.value) || 0)}
+                                            placeholder="0"
+                                        />
+                                        <span className="text-xs">%</span>
+                                        <span className="ml-2">-{formatCurrency(descuento)}</span>
+                                    </div>
+                                </div>
+
+                                {descuento > 0 && (
+                                    <div className="flex justify-between text-xs font-medium text-primary mt-1">
+                                        <span>Subtotal con descuento</span>
+                                        <span>{formatCurrency(subtotal - descuento)}</span>
+                                    </div>
+                                )}
+
+                                <Separator className="my-2" />
+
                                 {/* We hide general IVA if AIU is checked since AIU uses IVA on Utility */}
                                 {!esAiu && (
                                     <div className="flex justify-between items-center text-sm">
@@ -599,7 +650,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                         <div className="flex items-center gap-1">
                                             <Input
                                                 type="number"
-                                                className="h-6 w-12 text-right text-xs p-1"
+                                                className="h-6 text-right text-xs p-1 px-2"
+                                                style={{
+                                                    fieldSizing: 'content',
+                                                    width: `${Math.max(4, (globalIvaPct === 0 ? 0 : globalIvaPct.toString().length) + 3)}ch`,
+                                                    minWidth: '4ch'
+                                                } as any}
                                                 value={globalIvaPct === 0 ? '' : globalIvaPct}
                                                 onFocus={(e) => e.target.select()}
                                                 onChange={e => setGlobalIvaPct(Number(e.target.value) || 0)}
@@ -610,8 +666,6 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                         </div>
                                     </div>
                                 )}
-
-                                <Separator className="my-2" />
 
                                 <div className="flex items-center space-x-2 py-1">
                                     <CheckboxUI
@@ -634,15 +688,15 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                             <div className="grid grid-cols-3 gap-2">
                                                 <div className="space-y-1">
                                                     <Label className="text-[9px]">Admin %</Label>
-                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct === 0 ? '' : aiuAdminPct} onFocus={(e) => e.target.select()} onChange={e => setAiuAdminPct(Number(e.target.value) || 0)} />
+                                                    <Input type="number" className="h-6 text-[10px] p-1" style={{ width: '100%' }} value={aiuAdminPct === 0 ? '' : aiuAdminPct} onFocus={(e) => e.target.select()} onChange={e => setAiuAdminPct(Number(e.target.value) || 0)} />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Label className="text-[9px]">Impr. %</Label>
-                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuImprevistoPct === 0 ? '' : aiuImprevistoPct} onFocus={(e) => e.target.select()} onChange={e => setAiuImprevistoPct(Number(e.target.value) || 0)} />
+                                                    <Input type="number" className="h-6 text-[10px] p-1" style={{ width: '100%' }} value={aiuImprevistoPct === 0 ? '' : aiuImprevistoPct} onFocus={(e) => e.target.select()} onChange={e => setAiuImprevistoPct(Number(e.target.value) || 0)} />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Label className="text-[9px]">Util. %</Label>
-                                                    <Input type="number" className="h-6 text-[10px] p-1" value={aiuUtilidadPct === 0 ? '' : aiuUtilidadPct} onFocus={(e) => e.target.select()} onChange={e => setAiuUtilidadPct(Number(e.target.value) || 0)} />
+                                                    <Input type="number" className="h-6 text-[10px] p-1" style={{ width: '100%' }} value={aiuUtilidadPct === 0 ? '' : aiuUtilidadPct} onFocus={(e) => e.target.select()} onChange={e => setAiuUtilidadPct(Number(e.target.value) || 0)} />
                                                 </div>
                                             </div>
 
@@ -652,7 +706,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                     <div className="flex items-center">
                                                         <Input
                                                             type="number"
-                                                            className="h-6 w-12 text-right text-xs p-1"
+                                                            className="h-6 text-right text-xs p-1 px-2"
+                                                            style={{
+                                                                fieldSizing: 'content',
+                                                                width: `${Math.max(4, (ivaUtilidadPct === 0 ? 0 : ivaUtilidadPct.toString().length) + 3)}ch`,
+                                                                minWidth: '4ch'
+                                                            } as any}
                                                             value={ivaUtilidadPct === 0 ? '' : ivaUtilidadPct}
                                                             onFocus={(e) => e.target.select()}
                                                             onChange={e => setIvaUtilidadPct(Number(e.target.value) || 0)}

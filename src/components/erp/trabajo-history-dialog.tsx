@@ -231,7 +231,8 @@ export function TrabajoHistoryDialog({
             aiuImprevistoPorcentaje: item.aiuImprevistoPorcentaje || trabajo.aiuImprevistoGlobalPorcentaje || 0,
             aiuUtilidadPorcentaje: item.aiuUtilidadPorcentaje || trabajo.aiuUtilidadGlobalPorcentaje || 0,
             ivaUtilidadPorcentaje: item.ivaUtilidadPorcentaje || trabajo.ivaUtilidadGlobalPorcentaje || 19,
-            visibleEnPdf: true
+            visibleEnPdf: true,
+            ocultarDetalles: item.ocultarDetalles || false
         }))
     );
 
@@ -1401,8 +1402,26 @@ export function TrabajoHistoryDialog({
                                                                             }}
                                                                         />
                                                                         <div>
-                                                                            <p className="text-sm font-bold">{sItem.descripcion}</p>
-                                                                            <p className="text-[10px] text-muted-foreground">Código de Trabajo • Cantidad: {sItem.cantidad}</p>
+                                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                                    {sItem.tipo === 'SERVICIO' ? (
+                                                                                        <span style={{ color: '#3b82f6', fontSize: '10px' }}>🔧</span>
+                                                                                    ) : (
+                                                                                        <span style={{ color: '#22c55e', fontSize: '10px' }}>📦</span>
+                                                                                    )}
+                                                                                    <span>{sItem.descripcion}</span>
+                                                                                </div>
+                                                                                {sItem.subItems && sItem.subItems.length > 0 && !sItem.ocultarDetalles && (
+                                                                                    <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                                                                        {sItem.subItems.map((sub: any, sIdx: number) => (
+                                                                                            <div key={sIdx} style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '8px' }}>
+                                                                                                <span style={{ fontSize: '10px' }}>↳</span>
+                                                                                                <span>{sub.nombre} ({sub.cantidad * sItem.cantidad} un.)</span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                     <Badge variant={isUsed ? "default" : "outline"} className={isUsed ? "bg-green-600" : ""}>
@@ -1684,11 +1703,32 @@ export function TrabajoHistoryDialog({
                                                                     {item.tipo === 'SERVICIO' ? <Wrench className="h-3 w-3 text-blue-500" /> : <Package className="h-3 w-3 text-green-500" />}
                                                                     <span className="font-medium text-xs">{item.descripcion}</span>
                                                                 </div>
-                                                                {/* Sub-item count badge */}
+                                                                {/* Sub-item count badge & toggle */}
                                                                 {item.subItems && item.subItems.length > 0 && (
-                                                                    <Badge variant="secondary" className="w-fit text-[10px] h-5 px-1 py-0">
-                                                                        {item.subItems.length} materiales
-                                                                    </Badge>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        <Badge variant="secondary" className="w-fit text-[10px] h-5 px-1 py-0">
+                                                                            {item.subItems.length} materiales
+                                                                        </Badge>
+                                                                        {item.tipo === 'SERVICIO' && (
+                                                                            <div className="flex items-center gap-1 bg-muted/30 px-1 rounded-sm border border-muted-foreground/10">
+                                                                                <CheckboxUI
+                                                                                    id={`show-details-edit-${item.id}`}
+                                                                                    checked={!item.ocultarDetalles}
+                                                                                    onCheckedChange={(checked) => {
+                                                                                        setItems(prev => prev.map((it, i) => i === index ? { ...it, ocultarDetalles: !checked } : it));
+                                                                                    }}
+                                                                                    className="h-3 w-3"
+                                                                                />
+                                                                                <Label
+                                                                                    htmlFor={`show-details-edit-${item.id}`}
+                                                                                    className="text-[9px] text-muted-foreground cursor-pointer flex items-center gap-1"
+                                                                                >
+                                                                                    {item.ocultarDetalles ? <EyeOff className="h-2.5 w-2.5" /> : <Eye className="h-2.5 w-2.5" />}
+                                                                                    Mostrar materiales
+                                                                                </Label>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </TableCell>
@@ -1747,7 +1787,7 @@ export function TrabajoHistoryDialog({
                                                         </TableCell>
                                                     </TableRow>
                                                     {/* Subitems Materials View */}
-                                                    {item.subItems && item.subItems.length > 0 && item.subItems.map((sub, sIdx) => (
+                                                    {item.subItems && item.subItems.length > 0 && !item.ocultarDetalles && item.subItems.map((sub, sIdx) => (
                                                         <TableRow key={`${item.id}-sub-${sIdx}`} className="bg-muted/10 border-0 hover:bg-transparent">
                                                             <TableCell colSpan={2} className="pl-6 py-1">
                                                                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -2163,7 +2203,7 @@ export function TrabajoHistoryDialog({
                                             <div className="mb-8">
                                                 <table className="w-full text-sm">
                                                     <thead>
-                                                        <tr style={{ backgroundColor: currentStyle.components.tableTheme === 'plain' ? 'transparent' : rgbToHex(currentStyle.colors.secondary), color: currentStyle.components.tableTheme === 'plain' ? '#000' : '#fff' }}>
+                                                        <tr style={{ backgroundColor: currentStyle.components.tableTheme === 'plain' ? 'transparent' : rgbToHex(currentStyle.colors.primary), color: currentStyle.components.tableTheme === 'plain' ? '#000' : '#fff' }}>
                                                             <th className="p-2 text-left">Item</th>
                                                             <th className="p-2 text-left">Descripción</th>
                                                             <th className="p-2 text-center">Cant</th>
@@ -2190,7 +2230,7 @@ export function TrabajoHistoryDialog({
                                                                         <td className="p-2 text-right font-mono">{showValues ? formatCurrency(details.unitTotal) : '-'}</td>
                                                                         <td className="p-2 text-right font-bold font-mono">{showValues ? formatCurrency(details.lineTotal) : '-'}</td>
                                                                     </tr>
-                                                                    {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO' &&
+                                                                    {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO' && !item.ocultarDetalles &&
                                                                         item.subItems.map((sub, sIdx) => (
                                                                             <tr key={`${item.id}-sub-${sIdx}`} className="bg-gray-50/30 text-[10px] text-gray-600 italic">
                                                                                 <td className="p-1"></td>
@@ -2243,15 +2283,15 @@ export function TrabajoHistoryDialog({
 
                                                                 {esAiu ? (
                                                                     <>
-                                                                        <div className="flex justify-between text-sm text-black"><span>Admin:</span> <span className="font-mono">{formatCurrency(aiuAdminVisible)}</span></div>
+                                                                        <div className="flex justify-between text-sm text-black"><span>Administración:</span> <span className="font-mono">{formatCurrency(aiuAdminVisible)}</span></div>
                                                                         <div className="flex justify-between text-sm text-black"><span>Imprevistos:</span> <span className="font-mono">{formatCurrency(aiuImprevVisible)}</span></div>
                                                                         <div className="flex justify-between text-sm text-black"><span>Utilidad:</span> <span className="font-mono">{formatCurrency(aiuUtilVisible)}</span></div>
-                                                                        <div className="flex justify-between text-sm text-black"><span>IVA s/ Util.:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
+                                                                        <div className="flex justify-between text-sm text-black"><span>IVA s/ Utilidad:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
                                                                     </>
                                                                 ) : (
-                                                                    <div className="flex justify-between text-sm text-black"><span>IVA:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
+                                                                    <div className="flex justify-between text-sm text-black"><span>IVA (19%):</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
                                                                 )}
-                                                                <div className="border-t pt-2 flex justify-between text-lg font-bold" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>
+                                                                <div className="border-t pt-2 flex justify-between text-lg font-bold" style={{ color: rgbToHex(currentStyle.colors.primary) }}>
                                                                     <span>TOTAL:</span>
                                                                     <span className="font-mono">{formatCurrency(totalVisible)}</span>
                                                                 </div>

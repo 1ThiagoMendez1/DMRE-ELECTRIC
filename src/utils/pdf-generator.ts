@@ -533,6 +533,8 @@ export const generateQuotePDF = (
 
         if (showItem) {
             const showDetails = !isProduct || materialVisibilityMode === 'MOSTRAR_TODO';
+            // Calculate unit value including the specific item percentage (margin)
+            // This ensures common items look consistent with the UI
             const unitValue = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
 
             tableBody.push([
@@ -711,6 +713,9 @@ export const generateQuotePDF = (
 
     } else {
         // STANDARD TOTALS RENDERER
+        // Synchronized with UI: Subtotal -> Discount -> Subtotal w/ Discount -> Taxes/AIU -> Total
+
+        doc.setFont(style.fonts.body, 'normal');
         doc.text("Subtotal:", totalsX, currentTotalsY);
         doc.text(currencyFmt.format(cotizacion.subtotal), contentStartX + contentWidth, currentTotalsY, { align: "right" });
 
@@ -730,7 +735,7 @@ export const generateQuotePDF = (
 
         if (hasAiu) {
             currentTotalsY += lineSpacing;
-            doc.text("Admin:", totalsX, currentTotalsY);
+            doc.text("Administración:", totalsX, currentTotalsY);
             doc.text(currencyFmt.format(cotizacion.aiuAdmin || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
 
             currentTotalsY += lineSpacing;
@@ -742,12 +747,12 @@ export const generateQuotePDF = (
             doc.text(currencyFmt.format(cotizacion.aiuUtilidad || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
 
             currentTotalsY += lineSpacing;
-            doc.text("IVA s/ Util.:", totalsX, currentTotalsY);
+            doc.text("IVA s/ Utilidad:", totalsX, currentTotalsY);
             doc.text(currencyFmt.format(cotizacion.iva || 0), contentStartX + contentWidth, currentTotalsY, { align: "right" });
         } else {
             currentTotalsY += lineSpacing;
             // Normal IVA
-            doc.text("IVA:", totalsX, currentTotalsY);
+            doc.text("IVA (19%):", totalsX, currentTotalsY);
             doc.text(currencyFmt.format(cotizacion.iva), contentStartX + contentWidth, currentTotalsY, { align: "right" });
         }
 
@@ -755,12 +760,12 @@ export const generateQuotePDF = (
         doc.setFontSize(12);
         doc.setFont(style.fonts.header, 'bold');
 
-        currentTotalsY += lineSpacing;
+        currentTotalsY += lineSpacing + 2;
 
         // Colored Box for Total if Bold style
         if (style.layout === 'bold') {
             doc.setFillColor(...secondary);
-            doc.rect(totalsX - 5, currentTotalsY - 7, 70, 10, 'F');
+            doc.rect(totalsX - 5, currentTotalsY - 8, contentStartX + contentWidth - (totalsX - 5), 11, 'F');
             doc.setTextColor(255, 255, 255);
             doc.text("TOTAL:", totalsX, currentTotalsY);
             doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
@@ -769,7 +774,8 @@ export const generateQuotePDF = (
             doc.text("TOTAL:", totalsX, currentTotalsY);
             doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
         }
-        currentTotalsY += 10;
+        doc.setTextColor(...text);
+        currentTotalsY += 12;
     }
 
     // --- 7. EXTERNAL COMMERCIAL TERMS BLOCK ---
