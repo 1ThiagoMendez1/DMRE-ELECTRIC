@@ -152,7 +152,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                 addInstalacion({
                     codigo: values.codigo,
                     descripcion: values.descripcion,
-                    valorCalculado: grandTotalEstimated,
+                    valorCalculado: moAiu,
                     activo: true
                 });
             }

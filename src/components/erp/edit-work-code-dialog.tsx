@@ -46,12 +46,16 @@ interface EditWorkCodeDialogProps {
 
 export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
     const [open, setOpen] = useState(false);
-    const { updateCodigoTrabajo, inventario } = useErp();
+    const { updateCodigoTrabajo, inventario, instalaciones, updateInstalacion } = useErp();
     const { toast } = useToast();
 
     // Materials Selection State
     const [selectedMaterials, setSelectedMaterials] = useState<any[]>([]);
     const [comboOpen, setComboOpen] = useState(false);
+
+    // Profit Margins State
+    const [margenMateriales, setMargenMateriales] = useState<number>(0);
+    const [margenManoObra, setMargenManoObra] = useState<number>(0);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -101,6 +105,19 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
                 };
             });
             setSelectedMaterials(mapped);
+
+            // Infer margins if possible (or default to 0)
+            const baseMat = mapped.reduce((acc: number, curr: any) => acc + ((curr.itemRef.valorUnitario || 0) * curr.cantidad), 0);
+            const finalMat = Number(code.costoTotalMateriales || 0);
+            if (baseMat > 0 && finalMat > baseMat) {
+                setMargenMateriales(Math.round(((finalMat / baseMat) - 1) * 100));
+            }
+
+            const baseMo = Number(code.valorManoObra || 0);
+            const finalMo = Number(code.manoDeObra || 0);
+            if (baseMo > 0 && finalMo > baseMo) {
+                setMargenManoObra(Math.round(((finalMo / baseMo) - 1) * 100));
+            }
         }
     }, [code, inventario]);
 
@@ -123,28 +140,46 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
 
     function onSubmit(values: z.infer<typeof formSchema>) {
         const materialsTotal = selectedMaterials.reduce((acc, curr) => acc + ((curr.itemRef.valorUnitario || 0) * curr.cantidad), 0);
-        const total = materialsTotal + Number(values.valorManoObra);
+        const materialsAiu = materialsTotal * (margenMateriales / 100);
+        const materialsConMargen = materialsTotal + materialsAiu;
+
+        const baseMo = Number(values.valorManoObra);
+        const moAiu = baseMo * (margenManoObra / 100);
+        const moConMargen = baseMo + moAiu;
+
+        const total = materialsConMargen + moConMargen;
 
         const updatedCode = {
             ...code,
             codigo: values.codigo,
             descripcion: values.descripcion,
-            nombre: values.descripcion, // Sync nombre for compatibility
-            valorManoObra: Number(values.valorManoObra),
-            manoDeObra: Number(values.valorManoObra), // Sync for compatibility
-            costoTotalMateriales: materialsTotal,
+            nombre: values.descripcion,
+            valorManoObra: baseMo,
+            manoDeObra: moConMargen,
+            costoTotalMateriales: materialsConMargen,
             costoTotal: total,
             materiales: selectedMaterials.map(m => ({
                 inventarioId: m.inventarioId,
-                id: m.inventarioId, // Compatibility
-                nombre: m.itemRef.descripcion, // Compatibility
-                descripcion: m.itemRef.descripcion, // Compatibility
+                id: m.inventarioId,
+                nombre: m.itemRef.descripcion,
+                descripcion: m.itemRef.descripcion,
                 cantidad: m.cantidad,
                 valorUnitario: m.itemRef.valorUnitario
             }))
         };
 
         updateCodigoTrabajo(updatedCode);
+
+        // Sync with Installation
+        const relatedInst = instalaciones.find(i => i.codigo === code.codigo);
+        if (relatedInst) {
+            updateInstalacion({
+                ...relatedInst,
+                codigo: values.codigo,
+                descripcion: values.descripcion,
+                valorCalculado: moAiu
+            });
+        }
         toast({ title: "Código Actualizado", description: "Los cambios se han guardado correctamente." });
         setOpen(false);
         if (onClose) onClose();
@@ -195,7 +230,7 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
                                     name="valorManoObra"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Valor Mano de Obra</FormLabel>
+                                            <FormLabel>Valor Base / Mano de Obra</FormLabel>
                                             <FormControl>
                                                 <Input type="number" {...field} />
                                             </FormControl>
@@ -203,6 +238,30 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
                                         </FormItem>
                                     )}
                                 />
+                                <FormItem>
+                                    <FormLabel>Ganancia M.O (%)</FormLabel>
+                                    <div className="flex items-center gap-2">
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                className="w-24 text-right"
+                                                value={margenManoObra === 0 ? '' : margenManoObra}
+                                                onChange={(e) => setMargenManoObra(Number(e.target.value) || 0)}
+                                                placeholder="0"
+                                            />
+                                        </FormControl>
+                                        <span className="text-sm">%</span>
+                                        {(moCost * (margenManoObra / 100)) > 0 && (
+                                            <span className="text-sm font-semibold text-green-500 ml-2">
+                                                + {formatCurrency(moCost * (margenManoObra / 100))}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-right mt-1 px-1 bg-primary/10 rounded-md py-1 space-x-2">
+                                        <span className="text-muted-foreground">Calculado:</span>
+                                        <span className="text-primary font-bold">{formatCurrency(moCost + (moCost * (margenManoObra / 100)))}</span>
+                                    </div>
+                                </FormItem>
                                 <FormField
                                     control={form.control}
                                     name="descripcion"
@@ -291,9 +350,29 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="p-2 border-t bg-muted/20 flex justify-between items-center text-sm font-medium">
-                                        <span>Costo Materiales: {formatCurrency(totalMaterialsCost)}</span>
-                                        <span className="text-primary">Costo Total Estimado: {formatCurrency(totalMaterialsCost + moCost)}</span>
+                                    <div className="p-3 border-t bg-muted/20 text-sm rounded-b-md">
+                                        <div className="flex justify-between items-center mb-2 text-muted-foreground">
+                                            <span>Costo Neto Materiales:</span>
+                                            <span>{formatCurrency(totalMaterialsCost)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-muted-foreground">% Ganancia Materiales:</span>
+                                                <Input
+                                                    type="number"
+                                                    className="h-7 w-16 text-right"
+                                                    value={margenMateriales === 0 ? '' : margenMateriales}
+                                                    onChange={(e) => setMargenMateriales(Number(e.target.value) || 0)}
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-xs">%</span>
+                                            </div>
+                                            {(totalMaterialsCost * (margenMateriales / 100)) > 0 && <span className="text-xs text-green-500 font-medium">+ {formatCurrency(totalMaterialsCost * (margenMateriales / 100))}</span>}
+                                        </div>
+                                        <div className="flex justify-between items-center font-bold text-base pt-2 border-t">
+                                            <span>Subtotal Materiales (+%):</span>
+                                            <span className="text-primary">{formatCurrency(totalMaterialsCost + (totalMaterialsCost * (margenMateriales / 100)))}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

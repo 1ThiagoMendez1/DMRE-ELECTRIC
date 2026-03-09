@@ -4,113 +4,66 @@
 
 @layer base {
   :root {
-    /* Light Mode (Corporate Clean) */
-    --background: 0 0% 100%;
-    /* #FFFFFF */
-    --foreground: 0 0% 10%;
-    /* #1A1A1A */
+    /* Premium Corporate Light Mode */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 0 0% 0%;
-    /* Black Buttons */
-    --primary-foreground: 0 0% 100%;
-    /* White Text */
+    --primary: 217 91% 60%; /* Electric Blue */
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 20% 96%;
-    /* #F3F4F6 */
-    --secondary-foreground: 0 0% 9%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 182 100% 35%;
-    /* Darker cyan for light mode accents if needed, or keeping corporate blue/green? User said Black buttons. Let's keep accent distinct or subtle. */
-    --accent-foreground: 0 0% 98%;
+    --accent: 199 89% 48%; /* Deep Cyan */
+    --accent-foreground: 222 47% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 220 13% 91%;
-    /* Light Gray lines */
-    --input: 220 13% 91%;
-    --ring: 0 0% 0%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-    /* Slightly off-white for sidebar in light mode */
-    --sidebar-foreground: 0 0% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-accent: 210 20% 90%;
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-ring: 0 0% 0%;
-
-    /* Login Component Variables */
-    --color-bg: #f3f4f6;
-    --color-surface: #ffffff;
-    --color-muted-surface: #f9fafb;
-    --color-border: #e5e7eb;
-    --color-text-secondary: #6b7280;
-    --color-text-primary: #111827;
-    --color-heading: #1f2937;
-    --color-bg-2: #e5e7eb;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
   }
 
   .dark {
-    /* Dark Mode (Preserved from original :root) */
-    --background: 0 0% 13.3%;
-    /* #222222 */
-    --foreground: 0 0% 98%;
-    /* #fafafa */
+    /* Elite Corporate Dark Mode */
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
 
-    --card: 0 0% 16%;
-    --card-foreground: 0 0% 98%;
+    --card: 222 47% 6%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 13.3%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 222 47% 4%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 182 100% 74.3%;
-    /* #7DF9FF */
-    --primary-foreground: 0 0% 9%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
 
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 63.9%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 111 100% 53.9%;
-    /* #39FF14 */
-    --accent-foreground: 0 0% 9%;
+    --accent: 199 89% 48%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 0 0% 25%;
-    --input: 0 0% 25%;
-    --ring: 182 100% 74.3%;
-
-    --sidebar-background: 0 0% 10%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-accent: 182 100% 74.3%;
-    --sidebar-accent-foreground: 0 0% 9%;
-    --sidebar-ring: 182 100% 74.3%;
-
-    /* Login Component Variables (Dark) */
-    --color-bg: #101214;
-    --color-surface: #161A1D;
-    --color-muted-surface: #1D2125;
-    --color-border: #2C333A;
-    --color-text-secondary: #596773;
-    --color-text-primary: #C7D1DB;
-    --color-heading: #DEE4EA;
-    --color-bg-2: #C7D1DB;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
   }
 }
 
