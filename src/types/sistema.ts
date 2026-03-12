@@ -59,7 +59,7 @@ export interface InventarioItem {
     costoMateriales: number; // Deprecated: Use precioProveedor instead
     precioProveedor: number; // New explicit column
     margenUtilidad: number;
-    valorTotal: number; // Precio Venta Sugerido
+    valorTotal: number; // Precio proveedor Sugerido
     proveedorId?: string; // Link to primary supplier
     t1: number; // Lista de precios 1
     t2: number; // Lista de precios 2
@@ -149,6 +149,7 @@ export interface Cotizacion {
     formaPago?: string; // New: Payment terms
     notaFinal?: string; // New: Additional terms below scope
     historial?: HistorialCotizacion[]; // New: Persistent history
+    elaboradoPor?: string; // New: Persistent name of preparer
 }
 
 export interface HistorialCotizacion {

@@ -16,12 +16,23 @@ export interface CompanyInfo {
     descripcion: string;
 }
 
+export const COMPANY_INFO: CompanyInfo = {
+    nombre: "DMRE",
+    nit: "1075652553-9",
+    direccion: "CARRERA 4 N° 5 -122 INT 2 BARANDILLAS, Zipaquirá, Cundinamarca",
+    telefono: "CEL: 3115368577 - 3124074257 | TEL: 8816064",
+    email: "info@dmre.com.co",
+    descripcion: "Diseño y Montajes de Redes Eléctricas"
+};
+
 export const generateQuotePDF = (
     cotizacion: Cotizacion,
     materialVisibilityMode: MaterialVisibilityMode = 'MOSTRAR_TODO',
-    companyInfo?: CompanyInfo,
+    companyInfo: CompanyInfo = COMPANY_INFO,
     selectedStyle?: PDFStyleConfig,
-    action: 'save' | 'bloburl' | 'dataurlstring' = 'save'
+    action: 'save' | 'bloburl' | 'dataurlstring' = 'save',
+    preparedBy?: string,
+    watermarkText?: string
 ) => {
     // 1. Setup Style & Document
     const style = selectedStyle || PDF_STYLES[0];
@@ -47,14 +58,7 @@ export const generateQuotePDF = (
     doc.setFont(style.fonts.body);
 
     // Default company info
-    const company = companyInfo || {
-        nombre: "DMRE",
-        nit: "1075652553-9",
-        direccion: "CARRERA 4 N° 5 -122 INT 2 BARANDILLAS, Zipaquirá, Cundinamarca",
-        telefono: "CEL: 3115368577 - 3124074257 | TEL: 8816064",
-        email: "info@dmre.com.co",
-        descripcion: "Diseño y Montajes de Redes Eléctricas"
-    };
+    const company = companyInfo;
 
     // --- LAYOUT LOGIC ---
     // We define coordinate baselines based on layout type
@@ -210,6 +214,50 @@ export const generateQuotePDF = (
         currentY = 48; // Ready for boxes
     }
 
+    // F. OFFICIAL GRID LAYOUT (Technical Header with Metadata)
+    else if (style.layout === 'official_grid') {
+        const primaryColor = style.colors.primary;
+
+        // Draw Outer Frame for Header
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(14, 12, pageWidth - 28, 28); // Header box
+
+        // 1. Logo Left
+        try {
+            const logoImg = new Image();
+            logoImg.src = '/logo.png';
+            doc.addImage(logoImg, 'PNG', 16, 14, 24, 24); // Slightly larger logo
+        } catch (e) { }
+
+        // 2. Company Name Center
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(18);
+        doc.setFont('times', 'bold');
+        doc.text("DISEÑO Y MONTAJE DE REDES", pageWidth / 2 + 5, 20, { align: 'center' });
+        doc.text("ELÉCTRICAS D.M.R.E", pageWidth / 2 + 5, 27, { align: 'center' });
+
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text("gramirez.dmre@gmail.com", pageWidth / 2 + 5, 30.5, { align: 'center' });
+        doc.text("Tel: (1)8816064  Cel: 311 536 8577", pageWidth / 2 + 5, 34, { align: 'center' });
+        doc.text("www.dmreingenieria.com", pageWidth / 2 + 5, 37.5, { align: 'center' });
+
+        // 3. Metadata Right
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text("SGI-DMRE-0818", pageWidth - 16, 18, { align: 'right' });
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text("2/02/2020", pageWidth - 16, 27, { align: 'right' });
+        doc.setFont('helvetica', 'bold');
+        doc.text("Versión 2.1", pageWidth - 16, 36, { align: 'right' });
+
+        currentY = 40;
+    }
+
     // D. STANDARD & TECHNICAL (Left Align)
     else {
         // Optional top bar
@@ -334,8 +382,12 @@ export const generateQuotePDF = (
 
     const clientBoxY = currentY > 0 ? currentY + 5 : 60; // fallback
 
+    // Override specifically for the Official Grid layout: Skip standard boxes as it has its own grid later
+    if (style.layout === 'official_grid') {
+        // Do nothing here, the grid handles it
+    }
     // Override specifically for the minimal "Order of Purchase" layout
-    if (style.layout === 'minimal') {
+    else if (style.layout === 'minimal') {
         const leftBoxWidth = 85;
         const rightBoxWidth = 85;
         const boxHeight = 28;
@@ -502,24 +554,113 @@ export const generateQuotePDF = (
         currentY += 30;
     }
 
+    // Override specifically for the Official Grid layout (Detailed metadata table)
+    if (style.layout === 'official_grid') {
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.3);
+
+        const gridStartX = 14;
+        const gridWidth = pageWidth - 28;
+        const leftColW = gridWidth * 0.55; // Left column for client info
+        const rightColW = gridWidth - leftColW; // Right column for meta info
+        const labelW = 30; // Increased label width to avoid overlap
+
+        const rowH = 6;
+        const startY = currentY;
+
+        // Helper to draw a cell
+        const drawCell = (x: number, y: number, w: number, h: number, label: string, value: string, fontStyle: 'bold' | 'normal' | 'italic' | 'bolditalic' = 'normal', fontSize: number = 8, textColor: [number, number, number] = [0, 0, 0], valXOffset: number = labelW) => {
+            doc.setDrawColor(0, 0, 0);
+            doc.rect(x, y, w, h);
+
+            // Vertical separator line
+            doc.line(x + valXOffset, y, x + valXOffset, y + h);
+
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text(label, x + 2, y + 4.5);
+
+            doc.setFont('helvetica', fontStyle);
+            doc.setFontSize(fontSize);
+            doc.setTextColor(...textColor);
+
+            // Draw value
+            const valX = x + valXOffset;
+            const valText = doc.splitTextToSize(value || "", w - valXOffset - 2);
+            doc.text(valText, valX, y + 4.5);
+        };
+
+        // --- LEFT SIDE: CLIENT INFO (5 Rows) ---
+
+        drawCell(gridStartX, startY, leftColW, rowH, "Cliente", cotizacion.cliente.nombre);
+        drawCell(gridStartX, startY + rowH, leftColW, rowH, "C.C / NIT", cotizacion.cliente.documento);
+        drawCell(gridStartX, startY + rowH * 2, leftColW, rowH, "Dirección", cotizacion.cliente.direccion);
+        drawCell(gridStartX, startY + rowH * 3, leftColW, rowH, "E-mail", cotizacion.cliente.correo);
+        drawCell(gridStartX, startY + rowH * 4, leftColW, rowH, "Teléfono", cotizacion.cliente.telefono);
+
+        // --- RIGHT SIDE: META INFO (3 Rows + Offer Number) ---
+
+        // Row 1: Elaborado por
+        const rightX = gridStartX + leftColW;
+        drawCell(rightX, startY, rightColW, rowH, "Elaborado por", preparedBy || "José Gabriel Ramirez Bernal", 'italic', 8, [0, 0, 0], 30);
+
+        // Row 2: Fecha de cotización
+        drawCell(rightX, startY + rowH, rightColW, rowH, "Fecha Cotización", format(new Date(cotizacion.fecha), "dd/MM/yyyy"));
+
+        // Row 3: Fecha de vencimiento
+        drawCell(rightX, startY + rowH * 2, rightColW, rowH, "Fecha Vencimiento", format(new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy"));
+
+        // Row 4-5: NÚMERO DE OFERTA (Large Box)
+        doc.rect(rightX, startY + rowH * 3, rightColW, rowH * 2);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+        doc.text("NÚMERO DE OFERTA", rightX + rightColW / 2, startY + rowH * 3 + 4, { align: 'center' });
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bolditalic');
+        doc.setTextColor(200, 40, 40); // Red
+        doc.text(cotizacion.numero, rightX + rightColW / 2, startY + rowH * 3 + 10, { align: 'center' });
+
+        // --- BOTTOM: TRABAJO A REALIZAR (Spanning Full Width) ---
+        const bottomY = startY + rowH * 5;
+        doc.rect(gridStartX, bottomY, 25, rowH * 2); // Label box
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Trabajo a", gridStartX + 12.5, bottomY + 5, { align: 'center' });
+        doc.text("realizar", gridStartX + 12.5, bottomY + 9, { align: 'center' });
+
+        doc.rect(gridStartX + 25, bottomY, gridWidth - 25, rowH * 2); // Value box
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        const workLines = doc.splitTextToSize((cotizacion.descripcionTrabajo || "").toUpperCase(), gridWidth - 30);
+        doc.text(workLines, gridStartX + 27, bottomY + 6);
+
+        currentY = bottomY + rowH * 2 + 10;
+    }
+
 
     // --- 4. DESCRIPTION ---
-    currentY += 3; // Extra spacing before description
+    if (style.layout !== 'official_grid') {
+        currentY += 3; // Extra spacing before description
 
-    doc.setFontSize(10);
-    doc.setFont(style.fonts.header, 'bold');
-    doc.setTextColor(...primary);
-    doc.text("DESCRIPCIÓN TRABAJO:", contentStartX, currentY);
+        doc.setFontSize(10);
+        doc.setFont(style.fonts.header, 'bold');
+        doc.setTextColor(...primary);
+        doc.text("DESCRIPCIÓN TRABAJO:", contentStartX, currentY);
 
-    // Place description text BELOW the label (not beside it)
-    currentY += 6;
-    doc.setFont(style.fonts.body, 'normal');
-    doc.setTextColor(...text);
-    doc.setFontSize(10);
-    const splitDesc = doc.splitTextToSize(cotizacion.descripcionTrabajo || "", contentWidth);
-    doc.text(splitDesc, contentStartX + 1, currentY);
+        // Place description text BELOW the label (not beside it)
+        currentY += 6;
+        doc.setFont(style.fonts.body, 'normal');
+        doc.setTextColor(...text);
+        doc.setFontSize(10);
+        const splitDesc = doc.splitTextToSize(cotizacion.descripcionTrabajo || "", contentWidth);
+        doc.text(splitDesc, contentStartX + 1, currentY);
 
-    currentY += (splitDesc.length * 5) + 8;
+        currentY += (splitDesc.length * 5) + 8;
+    }
 
 
     // --- 5. ITEMS TABLE ---
@@ -552,7 +693,7 @@ export const generateQuotePDF = (
                     const totalSubQty = (sub.cantidad || 0) * item.cantidad;
                     tableBody.push([
                         "", // Empty index for sub-items
-                        `      ↳ ${sub.nombre}`, // Indented with arrow
+                        `      ↳ ${(sub as any).nombre || (sub as any).descripcion}`, // Indented with arrow
                         totalSubQty,
                         "UND",
                         "", // Don't show individual costs for sub-items by default
@@ -904,10 +1045,28 @@ export const generateQuotePDF = (
         doc.text("Gracias por su confianza.", pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 
+    // --- 9. FINALIZE ---
+    if (watermarkText) {
+        const pageCount = doc.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.saveGraphicsState();
+            doc.setGState(new (doc as any).GState({ opacity: 0.15 }));
+            doc.setFontSize(80);
+            doc.setTextColor(150, 150, 150);
+            doc.setFont(style.fonts.header, 'bold');
+            doc.text(watermarkText, pageWidth / 2, pageHeight / 2, {
+                align: 'center',
+                angle: 45
+            });
+            doc.restoreGraphicsState();
+        }
+    }
+
     if (action === 'bloburl') {
         return doc.output('bloburl');
     } else if (action === 'dataurlstring') {
-        return doc.output('datauristring');
+        return doc.output('dataurlstring');
     }
 
     doc.save(`Cotizacion_${cotizacion.numero}_${style.name}.pdf`);

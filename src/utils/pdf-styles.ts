@@ -1,4 +1,3 @@
-
 export interface PDFColorPalette {
     primary: [number, number, number];
     secondary: [number, number, number];
@@ -7,7 +6,7 @@ export interface PDFColorPalette {
     accent: [number, number, number];
 }
 
-export type PDFLayoutType = 'standard' | 'modern' | 'centered' | 'sidebar' | 'technical' | 'minimal' | 'elegant' | 'bold';
+export type PDFLayoutType = 'standard' | 'modern' | 'centered' | 'sidebar' | 'technical' | 'minimal' | 'elegant' | 'bold' | 'official_grid';
 
 export interface PDFStyleConfig {
     id: string;
@@ -30,6 +29,26 @@ export interface PDFStyleConfig {
 // Default Presets
 export const PDF_STYLES: PDFStyleConfig[] = [
     {
+        id: 'official_dmre',
+        name: 'Oficial DMRE (Grilla)',
+        description: 'Diseño oficial estructurado con grilla técnica y metadatos SGI.',
+        layout: 'official_grid',
+        colors: {
+            primary: [10, 50, 100], // Dark Blue
+            secondary: [200, 40, 40], // Red for offer number
+            text: [0, 0, 0],
+            background: [255, 255, 255],
+            accent: [245, 245, 245]
+        },
+        fonts: { header: 'helvetica', body: 'helvetica' },
+        components: {
+            clientBoxStyle: 'box',
+            tableTheme: 'grid',
+            headerStyle: 'full-color',
+            footerStyle: 'branded'
+        }
+    },
+    {
         id: 'corporate_classic',
         name: 'Corporativo Clásico',
         description: 'Elegante y tradicional. Encabezado limpio con línea divisoria.',
@@ -46,7 +65,7 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         components: {
             clientBoxStyle: 'line',
             tableTheme: 'striped',
-            headerStyle: 'logo-only', // Minimal header, logo + text next to it
+            headerStyle: 'logo-only',
             footerStyle: 'simple'
         }
     },
@@ -54,9 +73,8 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         id: 'modern_banner',
         name: 'Banner Moderno',
         description: 'Encabezado de color completo para un impacto visual fuerte.',
-        layout: 'bold', // Full width header background
+        layout: 'bold',
         colors: {
-            // Bright Blue & White
             primary: [0, 80, 200],
             secondary: [255, 255, 255],
             text: [0, 0, 0],
@@ -77,14 +95,13 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         description: 'Diseño simétrico con logo central, ideal para marcas de lujo.',
         layout: 'centered',
         colors: {
-            // Slate & Red/Burgundy
             primary: [40, 40, 40],
             secondary: [180, 50, 50],
             text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [250, 250, 250]
         },
-        fonts: { header: 'times', body: 'times' }, // Serif
+        fonts: { header: 'times', body: 'times' },
         components: {
             clientBoxStyle: 'clean',
             tableTheme: 'plain',
@@ -98,14 +115,13 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         description: 'Información organizada en cajas delineadas. Alta densidad de datos.',
         layout: 'technical',
         colors: {
-            // Dark Gray & Cyan
             primary: [30, 30, 30],
             secondary: [0, 150, 136],
             text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [235, 235, 235]
         },
-        fonts: { header: 'courier', body: 'courier' }, // Monospace
+        fonts: { header: 'courier', body: 'courier' },
         components: {
             clientBoxStyle: 'box',
             tableTheme: 'grid',
@@ -119,7 +135,6 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         description: 'Barra lateral de color con información de contacto.',
         layout: 'sidebar',
         colors: {
-            // Purple & Teal (or user brand)
             primary: [80, 40, 120],
             secondary: [0, 0, 0],
             text: [0, 0, 0],
@@ -158,14 +173,13 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         id: 'boxed_pro',
         name: 'Bloques Pro',
         description: 'Áreas de información separadas por bloques de fondo suave.',
-        layout: 'standard', // But uses specific component overrides
+        layout: 'standard',
         colors: {
-            // Blue-Grey
             primary: [55, 71, 79],
             secondary: [0, 120, 215],
             text: [0, 0, 0],
             background: [255, 255, 255],
-            accent: [236, 239, 241] // Blue Grey Light
+            accent: [236, 239, 241]
         },
         fonts: { header: 'helvetica', body: 'helvetica' },
         components: {
@@ -181,9 +195,8 @@ export const PDF_STYLES: PDFStyleConfig[] = [
         description: 'Marco perimetral y detalles finos.',
         layout: 'standard',
         colors: {
-            // Forest Green
             primary: [20, 80, 40],
-            secondary: [200, 160, 50], // Gold
+            secondary: [200, 160, 50],
             text: [0, 0, 0],
             background: [255, 255, 255],
             accent: [250, 250, 240]

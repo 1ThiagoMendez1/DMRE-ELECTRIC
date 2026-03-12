@@ -55,6 +55,7 @@ import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem, Evidencia
 import { generateQuotePDF } from "@/utils/pdf-generator";
 import { useErp } from "@/components/providers/erp-provider";
 import { ProductSelectorDialog } from "./product-selector-dialog";
+import { QuotePreview } from "./quote-preview";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/client";
 import { getHistorialAction, addHistorialEntryAction } from "@/app/dashboard/sistema/cotizacion/actions";
@@ -216,12 +217,16 @@ export function TrabajoHistoryDialog({
     defaultTab = 'detalles',
     showExecution = true
 }: TrabajoHistoryDialogProps) {
-    const { inventario, codigosTrabajo, addConsumoMaterial } = useErp();
+    const { inventario, codigosTrabajo, instalaciones, addConsumoMaterial, currentUser } = useErp();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'historial'>(defaultTab);
     const [newNote, setNewNote] = useState("");
     const [newProgress, setNewProgress] = useState<EstadoCotizacion>(trabajo.estado);
     const [progressPercent, setProgressPercent] = useState<number>(trabajo.progreso || 0);
+
+    const [editAlcance, setEditAlcance] = useState(trabajo.alcance || "");
+    const [editFormaPago, setEditFormaPago] = useState(trabajo.formaPago || "");
+    const [editNotaFinal, setEditNotaFinal] = useState(trabajo.notaFinal || "");
 
     // Items with visibility control
     const [items, setItems] = useState<ItemConVisibilidad[]>(
@@ -278,7 +283,7 @@ export function TrabajoHistoryDialog({
     const [materialVisibilityMode, setMaterialVisibilityMode] = useState<MaterialVisibilityMode>('MOSTRAR_TODO');
 
     // PDF Style State
-    const [selectedStyleId, setSelectedStyleId] = useState<string>('corporate_classic');
+    const [selectedStyleId, setSelectedStyleId] = useState<string>('official_dmre');
     const [customColors, setCustomColors] = useState<{ primary: string, secondary: string } | null>(null);
 
     // Current Style Config (Memoized)
@@ -397,6 +402,14 @@ export function TrabajoHistoryDialog({
 
             setGlobalIvaPct(trabajo.impuestoGlobalPorcentaje ?? 19);
             setGlobalDiscountPct(trabajo.descuentoGlobalPorcentaje ?? 0);
+            setAiuAdminPct(trabajo.aiuAdminGlobalPorcentaje || 0);
+            setAiuImprevPct(trabajo.aiuImprevistoGlobalPorcentaje || 0);
+            setAiuUtilPct(trabajo.aiuUtilidadGlobalPorcentaje || 0);
+            setIvaUtilPct(trabajo.ivaUtilidadGlobalPorcentaje || 19);
+
+            setEditAlcance(trabajo.alcance || "");
+            setEditFormaPago(trabajo.formaPago || "");
+            setEditNotaFinal(trabajo.notaFinal || "");
 
             setLocalEvidence(trabajo.evidencia || []);
             setItems(trabajo.items.map(item => ({
@@ -405,7 +418,8 @@ export function TrabajoHistoryDialog({
                 aiuImprevistoPorcentaje: item.aiuImprevistoPorcentaje || trabajo.aiuImprevistoGlobalPorcentaje || 0,
                 aiuUtilidadPorcentaje: item.aiuUtilidadPorcentaje || trabajo.aiuUtilidadGlobalPorcentaje || 0,
                 ivaUtilidadPorcentaje: item.ivaUtilidadPorcentaje || trabajo.ivaUtilidadGlobalPorcentaje || 19,
-                visibleEnPdf: true
+                visibleEnPdf: true,
+                ocultarDetalles: item.ocultarDetalles || false
             })));
         }
     }, [trabajo.id, trabajo.estado, trabajo.progreso, trabajo.fechaActualizacion]);
@@ -738,10 +752,10 @@ export function TrabajoHistoryDialog({
             const pVenta = item.valorUnitario || 0;
 
             // Margen Adicional (Adicional %) applied on top of P. Venta
-            const margen = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
+            const extra = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
 
             // Item Final Total (Unitary)
-            const itemTotalUnit = pVenta + margen;
+            const itemTotalUnit = pVenta + extra;
 
             // Total Line
             const lineTotal = itemTotalUnit * item.cantidad;
@@ -892,7 +906,10 @@ export function TrabajoHistoryDialog({
             fechaFinReal: fechaFinReal ? new Date(fechaFinReal) : undefined,
             costoReal,
             responsableId,
-            evidencia: localEvidence
+            evidencia: localEvidence,
+            alcance: editAlcance,
+            formaPago: editFormaPago,
+            notaFinal: editNotaFinal,
         };
         onTrabajoUpdated(updated);
         toast({ title: "Cambios guardados", description: "La información del trabajo ha sido actualizada." });
@@ -920,10 +937,10 @@ export function TrabajoHistoryDialog({
     const handleAddItem = (newItem: CotizacionItem) => {
         const itemWithVis: ItemConVisibilidad = {
             ...newItem,
-            aiuAdminPorcentaje: 0,
-            aiuImprevistoPorcentaje: 0,
-            aiuUtilidadPorcentaje: 0,
-            ivaUtilidadPorcentaje: 0,
+            aiuAdminPorcentaje: aiuAdminPct,
+            aiuImprevistoPorcentaje: aiuImprevPct,
+            aiuUtilidadPorcentaje: aiuUtilPct,
+            ivaUtilidadPorcentaje: ivaUtilPct,
             visibleEnPdf: true
         };
 
@@ -1172,6 +1189,52 @@ export function TrabajoHistoryDialog({
                                     />
                                     <Button onClick={handleAddNote} disabled={!newNote.trim()}>
                                         <Plus className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Condiciones Comerciales - Added for UI Parity */}
+                        <Card>
+                            <CardHeader className="py-3 bg-muted/20">
+                                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-primary" /> Condiciones Comerciales
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-alcance" className="text-xs">Alcance</Label>
+                                    <Textarea
+                                        id="edit-alcance"
+                                        value={editAlcance}
+                                        onChange={(e) => setEditAlcance(e.target.value)}
+                                        placeholder="Describa el alcance de los trabajos..."
+                                        className="min-h-[80px] text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-formaPago" className="text-xs">Forma de Pago</Label>
+                                    <Textarea
+                                        id="edit-formaPago"
+                                        value={editFormaPago}
+                                        onChange={(e) => setEditFormaPago(e.target.value)}
+                                        placeholder="Especificar anticipos, contraentregas..."
+                                        className="min-h-[50px] text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-notaFinal" className="text-xs">Nota Final (Condiciones)</Label>
+                                    <Textarea
+                                        id="edit-notaFinal"
+                                        value={editNotaFinal}
+                                        onChange={(e) => setEditNotaFinal(e.target.value)}
+                                        placeholder="Información adicional e importante..."
+                                        className="min-h-[80px] text-sm"
+                                    />
+                                </div>
+                                <div className="flex justify-end mt-2">
+                                    <Button size="sm" onClick={handleUpdateProgress}>
+                                        <Save className="mr-2 h-4 w-4" /> Guardar Términos
                                     </Button>
                                 </div>
                             </CardContent>
@@ -1673,16 +1736,22 @@ export function TrabajoHistoryDialog({
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Descripción</TableHead>
-                                            <TableHead className="w-[60px]">Cant.</TableHead>
-                                            <TableHead className="text-right w-[100px]">P. Prov.</TableHead>
-                                            <TableHead className="text-right w-[100px]">P. Venta</TableHead>
-                                            <TableHead className="text-center w-[100px]">+ % Adic.</TableHead>
-                                            <TableHead className="text-right w-[110px]">Total</TableHead>
-                                            <TableHead className="w-[40px]"></TableHead>
+                                            <TableHead className="text-center w-20">Cant.</TableHead>
+                                            <TableHead className="text-right w-32">Precio proveedor</TableHead>
+                                            <TableHead className="text-center w-20">%</TableHead>
+                                            <TableHead className="text-right w-32">Precio %</TableHead>
+                                            <TableHead className="text-right w-32">Total</TableHead>
+                                            <TableHead className="w-10"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {items.map((item, index) => {
+                                        {items.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground uppercase text-[10px] font-bold tracking-widest bg-muted/5">
+                                                    No hay items agregados a esta cotización
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : items.map((item, index) => {
                                             // Calculations per item
                                             const cost = item.costoUnitario || 0; // P. Prov (for reference)
                                             const pVenta = item.valorUnitario || 0; // P. Venta - Base price
@@ -1732,25 +1801,13 @@ export function TrabajoHistoryDialog({
                                                                 )}
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell>
+                                                        <TableCell className="text-center">
                                                             <Input
                                                                 type="number"
                                                                 value={item.cantidad}
                                                                 onChange={(e) => handleUpdateItemQuantity(item.id, parseInt(e.target.value) || 1)}
-                                                                className="h-7 w-12 text-xs p-1"
+                                                                className="h-7 w-12 text-xs p-1 text-center mx-auto"
                                                                 min={1}
-                                                            />
-                                                        </TableCell>
-                                                        {/* P. Proveedor (Cost) */}
-                                                        <TableCell className="text-right p-1">
-                                                            <Input
-                                                                type="number"
-                                                                value={item.costoUnitario || 0}
-                                                                onChange={(e) => {
-                                                                    const newVal = parseFloat(e.target.value) || 0;
-                                                                    setItems(prev => prev.map((it, i) => i === index ? { ...it, costoUnitario: newVal } : it));
-                                                                }}
-                                                                className="h-7 w-24 text-xs text-right p-1"
                                                             />
                                                         </TableCell>
                                                         {/* P. Venta (Base) */}
@@ -1763,22 +1820,28 @@ export function TrabajoHistoryDialog({
                                                                     const newVal = parseFloat(e.target.value) || 0;
                                                                     setItems(prev => prev.map((it, i) => i === index ? { ...it, valorUnitario: newVal } : it));
                                                                 }}
-                                                                className="h-7 w-24 text-xs text-right p-1 font-semibold text-primary"
+                                                                className="h-7 w-24 text-xs text-right p-1 font-semibold"
                                                             />
                                                         </TableCell>
-                                                        {/* Margen Adicional Input per Item */}
+                                                        {/* Percentage Input */}
                                                         <TableCell className="p-1">
-                                                            <Input
-                                                                type="number"
-                                                                className="h-7 w-20 text-xs p-1 mx-auto text-center font-bold text-primary bg-primary/5"
-                                                                value={item.aiuUtilidadPorcentaje === 0 ? '' : item.aiuUtilidadPorcentaje}
-                                                                onFocus={(e) => e.target.select()}
-                                                                onChange={e => setItems(prev => prev.map((it, i) => i === index ? { ...it, aiuUtilidadPorcentaje: parseFloat(e.target.value) || 0 } : it))}
-                                                            />
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <Input
+                                                                    type="number"
+                                                                    className="h-7 w-12 text-xs p-1 text-center font-bold text-primary bg-primary/5"
+                                                                    value={item.porcentaje || 0}
+                                                                    onFocus={(e) => e.target.select()}
+                                                                    onChange={e => setItems(prev => prev.map((it, i) => i === index ? { ...it, porcentaje: parseFloat(e.target.value) || 0 } : it))}
+                                                                />
+                                                                <span className="text-[10px]">%</span>
+                                                            </div>
                                                         </TableCell>
-
+                                                        {/* Precio % (Calculated & Rounded) */}
+                                                        <TableCell className="text-right text-xs font-mono">
+                                                            {formatCurrency(Math.round(item.valorUnitario * (1 + (item.porcentaje || 0) / 100)))}
+                                                        </TableCell>
                                                         <TableCell className="text-right font-bold text-xs font-mono">
-                                                            {formatCurrency(rowTotal)}
+                                                            {formatCurrency(Math.round(item.valorUnitario * (1 + (item.porcentaje || 0) / 100)) * item.cantidad)}
                                                         </TableCell>
                                                         <TableCell>
                                                             <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(item.id)}>
@@ -1819,6 +1882,7 @@ export function TrabajoHistoryDialog({
                             onItemSelected={handleAddItem}
                             inventario={inventario}
                             codigosTrabajo={codigosTrabajo}
+                            instalaciones={instalaciones}
                         />
 
                         {/* Totals */}
@@ -2100,7 +2164,7 @@ export function TrabajoHistoryDialog({
                                                     iva: ivaPDF,
                                                     total: totalPDF
                                                 };
-                                                generateQuotePDF(cotizacionFiltrada, materialVisibilityMode, companyInfo, currentStyle);
+                                                generateQuotePDF(cotizacionFiltrada, materialVisibilityMode, companyInfo, currentStyle, 'save', trabajo.elaboradoPor || currentUser?.name);
                                                 toast({ title: "PDF Generado", description: `Estilo: ${currentStyle.name}` });
                                             } catch (error) {
                                                 console.error(error);
@@ -2115,208 +2179,18 @@ export function TrabajoHistoryDialog({
 
                             {/* RIGHT: LIVE PREVIEW */}
                             <div className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded-xl border shadow-inner flex justify-center">
-                                {/* A4 Ratio Container (approx) */}
-                                <Card
-                                    className="w-full max-w-[800px] bg-white shadow-xl min-h-[1000px] origin-top transition-all duration-300"
-                                    style={{ fontFamily: currentStyle.fonts.body === 'times' ? 'Times New Roman, serif' : currentStyle.fonts.body === 'courier' ? 'Courier New, monospace' : 'Arial, sans-serif' }}
-                                >
-                                    <div className="relative p-0 overflow-hidden h-full flex flex-col">
-
-                                        {/* HEADER BAR if applicable */}
-                                        {currentStyle.components.headerStyle === 'bar' && (
-                                            <div className="h-2 w-full" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
-                                        )}
-                                        {currentStyle.layout === 'bold' && (
-                                            <div className="h-32 w-full absolute top-0 left-0" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
-                                        )}
-                                        {currentStyle.layout === 'sidebar' && (
-                                            <div className="absolute top-0 left-0 bottom-0 w-1/4 h-full p-4 flex flex-col items-center gap-4 border-r overflow-hidden" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary), color: '#fff' }}>
-                                                <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain bg-white rounded-md p-1 mt-4" />
-                                                <div className="text-center space-y-1">
-                                                    <h3 className="font-bold text-lg">{companyInfo.nombre}</h3>
-                                                    <p className="text-[10px] opacity-80">{companyInfo.descripcion}</p>
-                                                    <div className="text-[9px] mt-4 pt-4 border-t border-white/20 space-y-1 text-white/90">
-                                                        <p>NIT: {companyInfo.nit}</p>
-                                                        <p className="px-2">{companyInfo.direccion}</p>
-                                                        <p>{companyInfo.telefono}</p>
-                                                        <p className="truncate">{companyInfo.email}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className={`p-8 relative z-10 ${currentStyle.layout === 'sidebar' ? 'ml-[25%] pl-8' : ''}`}>
-                                            {/* HEADER CONTENT */}
-                                            <div className={`flex justify-between items-start mb-8 ${currentStyle.layout === 'centered' ? 'flex-col items-center text-center' : ''} ${currentStyle.layout === 'bold' ? 'text-white' : ''} ${currentStyle.layout === 'sidebar' ? 'hidden' : ''}`}>
-                                                <div className={`flex items-start gap-4 ${currentStyle.layout === 'centered' ? 'flex-col items-center' : ''}`}>
-                                                    <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain bg-white rounded-md p-1" />
-                                                    <div>
-                                                        <h3 className="text-2xl font-bold" style={{ color: currentStyle.layout === 'bold' ? '#fff' : rgbToHex(currentStyle.colors.primary) }}>{companyInfo.nombre}</h3>
-                                                        <p className={`text-sm font-medium ${currentStyle.layout === 'bold' ? 'text-gray-100' : 'text-gray-600'}`}>{companyInfo.descripcion}</p>
-
-                                                        {/* If not sidebar, show contact here */}
-                                                        {currentStyle.layout !== 'sidebar' && (
-                                                            <div className={`text-xs mt-2 space-y-0.5 ${currentStyle.layout === 'bold' ? 'text-gray-200' : 'text-gray-500'}`}>
-                                                                <p>NIT: {companyInfo.nit}</p>
-                                                                <p>{companyInfo.direccion}</p>
-                                                                <p>{companyInfo.telefono} | {companyInfo.email}</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* In Sidebar layout, company info is in the sidebar (simulated in CSS above) */}
-
-                                                {/* QUOTE BOX */}
-                                                <div className={`mt-4 ${currentStyle.layout === 'centered' ? 'mt-8 text-center' : 'text-right'}`}>
-                                                    <div className={`p-4 rounded-lg ${currentStyle.components.clientBoxStyle === 'box' && currentStyle.layout !== 'bold' ? 'bg-gray-50' : ''}`}>
-                                                        <h2 className="text-xl font-bold" style={{ color: currentStyle.layout === 'bold' ? '#fff' : rgbToHex(currentStyle.colors.secondary) }}>COTIZACIÓN</h2>
-                                                        <p className="text-lg font-mono" style={{ color: currentStyle.layout === 'bold' ? '#fff' : rgbToHex(currentStyle.colors.secondary) }}>{trabajo.numero}</p>
-                                                        <p className={`text-sm ${currentStyle.layout === 'bold' ? 'text-gray-200' : 'text-gray-500'}`}>{format(trabajo.fecha, "dd MMMM yyyy", { locale: es })}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* CLIENT */}
-                                            <div className={`mb-8 p-4 rounded ${currentStyle.components.clientBoxStyle === 'filled' ? '' : 'bg-gray-50'} ${currentStyle.components.clientBoxStyle === 'line' ? 'border-t-2 border-gray-200 bg-transparent px-0' : ''}`}
-                                                style={{
-                                                    backgroundColor: currentStyle.components.clientBoxStyle === 'filled' ? rgbToHex(currentStyle.colors.accent) : (currentStyle.components.clientBoxStyle === 'box' ? '#f9fafb' : 'transparent'),
-                                                    color: '#000' // Force black text for client box
-                                                }}
-                                            >
-                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: rgbToHex(currentStyle.colors.primary) }}>CLIENTE:</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                                                    <p className="font-bold col-span-2 text-base text-black">{trabajo.cliente.nombre}</p>
-                                                    <p><span className="opacity-70">NIT/CC:</span> {trabajo.cliente.documento}</p>
-                                                    <p><span className="opacity-70">Contacto:</span> {trabajo.cliente.contactoPrincipal}</p>
-                                                    <p className="col-span-2"><span className="opacity-70">Dirección:</span> {trabajo.cliente.direccion}</p>
-                                                </div>
-                                            </div>
-
-                                            {/* BODY */}
-                                            <div className="mb-8">
-                                                <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: rgbToHex(currentStyle.colors.primary) }}>DESCRIPCIÓN TRABAJO:</h3>
-                                                <p className="text-sm bg-white p-2 rounded border border-transparent text-black">{trabajo.descripcionTrabajo}</p>
-                                            </div>
-
-                                            {/* TABLE */}
-                                            <div className="mb-8">
-                                                <table className="w-full text-sm">
-                                                    <thead>
-                                                        <tr style={{ backgroundColor: currentStyle.components.tableTheme === 'plain' ? 'transparent' : rgbToHex(currentStyle.colors.primary), color: currentStyle.components.tableTheme === 'plain' ? '#000' : '#fff' }}>
-                                                            <th className="p-2 text-left">Item</th>
-                                                            <th className="p-2 text-left">Descripción</th>
-                                                            <th className="p-2 text-center">Cant</th>
-                                                            <th className="p-2 text-center">Und</th>
-                                                            <th className="p-2 text-right">V. Unit</th>
-                                                            <th className="p-2 text-right">Total</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {visibleItems.map((item, idx) => {
-                                                            const details = calculateItemDetails(item);
-                                                            const isProduct = item.tipo === 'PRODUCTO';
-                                                            const hide = isProduct && materialVisibilityMode === 'OCULTAR_TODO';
-                                                            const showValues = !isProduct || materialVisibilityMode === 'MOSTRAR_TODO';
-                                                            if (hide) return null;
-
-                                                            return (
-                                                                <React.Fragment key={item.id}>
-                                                                    <tr className={`border-b text-black ${currentStyle.components.tableTheme === 'striped' && idx % 2 === 0 ? 'bg-gray-50' : ''}`}>
-                                                                        <td className="p-2 font-mono text-xs">{idx + 1}</td>
-                                                                        <td className="p-2">{item.descripcion}</td>
-                                                                        <td className="p-2 text-center">{showValues ? item.cantidad : '-'}</td>
-                                                                        <td className="p-2 text-center">UND</td>
-                                                                        <td className="p-2 text-right font-mono">{showValues ? formatCurrency(details.unitTotal) : '-'}</td>
-                                                                        <td className="p-2 text-right font-bold font-mono">{showValues ? formatCurrency(details.lineTotal) : '-'}</td>
-                                                                    </tr>
-                                                                    {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO' && !item.ocultarDetalles &&
-                                                                        item.subItems.map((sub, sIdx) => (
-                                                                            <tr key={`${item.id}-sub-${sIdx}`} className="bg-gray-50/30 text-[10px] text-gray-600 italic">
-                                                                                <td className="p-1"></td>
-                                                                                <td className="p-1 pl-6">↳ {sub.nombre}</td>
-                                                                                <td className="p-1 text-center">{(sub.cantidad || 0) * item.cantidad}</td>
-                                                                                <td className="p-1 text-center">UND</td>
-                                                                                <td className="p-1"></td>
-                                                                                <td className="p-1"></td>
-                                                                            </tr>
-                                                                        ))
-                                                                    }
-                                                                </React.Fragment>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-
-                                            {/* TOTALS */}
-                                            <div className="flex justify-end mb-12">
-                                                <div className="w-64 space-y-2">
-                                                    {/* Live preview calculations */}
-                                                    {(() => {
-                                                        const subVisible = visibleItems.reduce((a, i) => a + calculateItemDetails(i).lineTotal, 0);
-                                                        const discountVisible = subVisible * (globalDiscountPct / 100);
-                                                        const baseVisible = subVisible - discountVisible;
-
-                                                        const aiuAdminVisible = esAiu ? baseVisible * (aiuAdminPct / 100) : 0;
-                                                        const aiuImprevVisible = esAiu ? baseVisible * (aiuImprevPct / 100) : 0;
-                                                        const aiuUtilVisible = esAiu ? baseVisible * (aiuUtilPct / 100) : 0;
-
-                                                        const ivaVisible = esAiu ? (aiuUtilVisible * (ivaUtilPct / 100)) : (baseVisible * (globalIvaPct / 100));
-                                                        const totalVisible = baseVisible + aiuAdminVisible + aiuImprevVisible + aiuUtilVisible + ivaVisible; // Simplification for preview
-                                                        return (
-                                                            <>
-                                                                <div className="flex justify-between text-sm text-black"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(subVisible)}</span></div>
-
-                                                                {discountVisible > 0 && (
-                                                                    <>
-                                                                        <div className="flex justify-between text-sm text-red-600">
-                                                                            <span>Descuento ({globalDiscountPct}%):</span>
-                                                                            <span className="font-mono">-{formatCurrency(discountVisible)}</span>
-                                                                        </div>
-                                                                        <div className="flex justify-between text-sm text-black font-bold">
-                                                                            <span>Subt. c/ descuento:</span>
-                                                                            <span className="font-mono">{formatCurrency(baseVisible)}</span>
-                                                                        </div>
-                                                                    </>
-                                                                )}
-
-                                                                {esAiu ? (
-                                                                    <>
-                                                                        <div className="flex justify-between text-sm text-black"><span>Administración:</span> <span className="font-mono">{formatCurrency(aiuAdminVisible)}</span></div>
-                                                                        <div className="flex justify-between text-sm text-black"><span>Imprevistos:</span> <span className="font-mono">{formatCurrency(aiuImprevVisible)}</span></div>
-                                                                        <div className="flex justify-between text-sm text-black"><span>Utilidad:</span> <span className="font-mono">{formatCurrency(aiuUtilVisible)}</span></div>
-                                                                        <div className="flex justify-between text-sm text-black"><span>IVA s/ Utilidad:</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
-                                                                    </>
-                                                                ) : (
-                                                                    <div className="flex justify-between text-sm text-black"><span>IVA (19%):</span> <span className="font-mono">{formatCurrency(ivaVisible)}</span></div>
-                                                                )}
-                                                                <div className="border-t pt-2 flex justify-between text-lg font-bold" style={{ color: rgbToHex(currentStyle.colors.primary) }}>
-                                                                    <span>TOTAL:</span>
-                                                                    <span className="font-mono">{formatCurrency(totalVisible)}</span>
-                                                                </div>
-                                                            </>
-                                                        );
-                                                    })()}
-                                                </div>
-                                            </div>
-
-                                            {/* FOOTER */}
-                                            {currentStyle.components.footerStyle === 'branded' && (
-                                                <div className="absolute bottom-0 left-0 w-full h-2" style={{ backgroundColor: rgbToHex(currentStyle.colors.primary) }} />
-                                            )}
-                                            <div className="absolute create-bottom p-8 text-xs text-center w-full text-gray-400">
-                                                <p>Cotización válida por 15 días calendario.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
+                                <QuotePreview
+                                    quote={trabajo}
+                                    currentStyle={currentStyle}
+                                    companyInfo={companyInfo}
+                                    preparedByFallback={currentUser?.name}
+                                />
                             </div>
                         </div>
                     </TabsContent>
 
                     {/* DOCUMENTOS TAB */}
-                    <TabsContent value="documentos" className="flex-1 overflow-auto mt-4">
+                    < TabsContent value="documentos" className="flex-1 overflow-auto mt-4" >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* DOCUMENTACIÓN LEGAL */}
                             <Card>
@@ -2551,10 +2425,10 @@ export function TrabajoHistoryDialog({
                                 </div>
                             </DialogContent>
                         </Dialog>
-                    </TabsContent>
+                    </TabsContent >
 
                     {/* HISTORIAL TAB */}
-                    <TabsContent value="historial" className="flex-1 overflow-auto mt-4">
+                    < TabsContent value="historial" className="flex-1 overflow-auto mt-4" >
                         <ScrollArea className="h-[400px] pr-4">
                             <div className="space-y-3">
                                 {historial.map((entry) => (
@@ -2585,7 +2459,7 @@ export function TrabajoHistoryDialog({
                         </ScrollArea>
                     </TabsContent>
                 </Tabs>
-            </DialogContent >
-        </Dialog >
+            </DialogContent>
+        </Dialog>
     );
 }

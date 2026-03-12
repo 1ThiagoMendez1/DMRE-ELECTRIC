@@ -33,6 +33,7 @@ function mapItemToUI(db: any): CotizacionItem {
         aiuUtilidadPorcentaje: Number(db.aiu_utilidad_porcentaje) || 0,
         ivaUtilidadPorcentaje: Number(db.iva_utilidad_porcentaje) || 0,
         notas: db.notas,
+        porcentaje: Number(db.porcentaje) || 0,
     };
 }
 
@@ -80,9 +81,11 @@ function mapToUI(db: any, items: any[] = [], cliente?: any): Cotizacion {
         costoReal: Number(db.costo_real) || 0,
         responsableId: db.responsable_id,
         progreso: Number(db.progreso) || 0,
-        notas: db.notas || "",
-        evidencia: db.evidencia || [],
         comentarios: db.comentarios || [],
+        alcance: db.alcance || "",
+        formaPago: db.forma_pago || "",
+        notaFinal: db.nota_final || "",
+        elaboradoPor: db.elaborado_por
     };
 }
 
@@ -93,7 +96,6 @@ function round2(num: number | undefined | null): number {
 }
 
 function mapToDB(ui: any): any {
-    // Helper to convert Date to ISO string or return undefined
     const formatDate = (date: any) => {
         if (!date) return null;
         if (date instanceof Date) return date.toISOString();
@@ -101,40 +103,51 @@ function mapToDB(ui: any): any {
         return null;
     };
 
-    return {
+    const db: any = {};
+    const mapping: Record<string, any> = {
         numero: ui.numero,
         tipo: ui.tipo,
-        fecha: formatDate(ui.fecha),
+        fecha: ui.fecha ? formatDate(ui.fecha) : undefined,
         cliente_id: ui.clienteId,
         descripcion_trabajo: ui.descripcionTrabajo,
-        subtotal: round2(ui.subtotal),
-        descuento_global: round2(ui.descuentoGlobal),
-        descuento_global_porcentaje: round2(ui.descuentoGlobalPorcentaje),
-        impuesto_global_porcentaje: round2(ui.impuestoGlobalPorcentaje),
-        aiu_admin_global_porcentaje: round2(ui.aiuAdminGlobalPorcentaje),
-        aiu_imprevisto_global_porcentaje: round2(ui.aiuImprevistoGlobalPorcentaje),
-        aiu_utilidad_global_porcentaje: round2(ui.aiuUtilidadGlobalPorcentaje),
-        iva_utilidad_global_porcentaje: round2(ui.ivaUtilidadGlobalPorcentaje),
-        aiu_admin: round2(ui.aiuAdmin),
-        aiu_imprevistos: round2(ui.aiuImprevistos),
-        aiu_utilidad: round2(ui.aiuUtilidad),
-        iva: round2(ui.iva),
-        total: round2(ui.total),
+        subtotal: ui.subtotal !== undefined ? round2(ui.subtotal) : undefined,
+        descuento_global: ui.descuentoGlobal !== undefined ? round2(ui.descuentoGlobal) : undefined,
+        descuento_global_porcentaje: ui.descuentoGlobalPorcentaje !== undefined ? round2(ui.descuentoGlobalPorcentaje) : undefined,
+        impuesto_global_porcentaje: ui.impuestoGlobalPorcentaje !== undefined ? round2(ui.impuestoGlobalPorcentaje) : undefined,
+        aiu_admin_global_porcentaje: ui.aiuAdminGlobalPorcentaje !== undefined ? round2(ui.aiuAdminGlobalPorcentaje) : undefined,
+        aiu_imprevisto_global_porcentaje: ui.aiuImprevistoGlobalPorcentaje !== undefined ? round2(ui.aiuImprevistoGlobalPorcentaje) : undefined,
+        aiu_utilidad_global_porcentaje: ui.aiuUtilidadGlobalPorcentaje !== undefined ? round2(ui.aiuUtilidadGlobalPorcentaje) : undefined,
+        iva_utilidad_global_porcentaje: ui.ivaUtilidadGlobalPorcentaje !== undefined ? round2(ui.ivaUtilidadGlobalPorcentaje) : undefined,
+        aiu_admin: ui.aiuAdmin !== undefined ? round2(ui.aiuAdmin) : undefined,
+        aiu_imprevistos: ui.aiuImprevistos !== undefined ? round2(ui.aiuImprevistos) : undefined,
+        aiu_utilidad: ui.aiuUtilidad !== undefined ? round2(ui.aiuUtilidad) : undefined,
+        iva: ui.iva !== undefined ? round2(ui.iva) : undefined,
+        total: ui.total !== undefined ? round2(ui.total) : undefined,
         cotizacion_estado: ui.estado,
-        estado: ui.estado, // Keep both for safety during migration
-        // Job execution fields
+        estado: ui.estado,
         direccion_proyecto: ui.direccionProyecto,
         ubicacion: ui.ubicacion,
-        fecha_inicio: formatDate(ui.fechaInicio),
-        fecha_fin_estimada: formatDate(ui.fechaFinEstimada),
-        fecha_fin_real: formatDate(ui.fechaFinReal),
-        costo_real: round2(ui.costoReal),
+        fecha_inicio: ui.fechaInicio ? formatDate(ui.fechaInicio) : undefined,
+        fecha_fin_estimada: ui.fechaFinEstimada ? formatDate(ui.fechaFinEstimada) : undefined,
+        fecha_fin_real: ui.fechaFinReal ? formatDate(ui.fechaFinReal) : undefined,
+        costo_real: ui.costoReal !== undefined ? round2(ui.costoReal) : undefined,
         responsable_id: ui.responsableId,
-        progreso: round2(ui.progreso),
-        notas: ui.notas,
-        evidencia: ui.evidencia || [],
-        comentarios: ui.comentarios || [],
+        progreso: ui.progreso !== undefined ? round2(ui.progreso) : undefined,
+        comentarios: ui.comentarios,
+        alcance: ui.alcance,
+        forma_pago: ui.formaPago,
+        nota_final: ui.notaFinal,
+        elaborado_por: ui.elaboradoPor
     };
+
+    // Only include fields that are not undefined
+    Object.keys(mapping).forEach(key => {
+        if (mapping[key] !== undefined) {
+            db[key] = mapping[key];
+        }
+    });
+
+    return db;
 }
 
 async function getNextNumero(supabase: any) {
@@ -242,12 +255,15 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
             aiu_utilidad_porcentaje: round2(item.aiuUtilidadPorcentaje),
             iva_utilidad_porcentaje: round2(item.ivaUtilidadPorcentaje),
             notas: item.notas,
+            porcentaje: round2(item.porcentaje),
         }));
 
         const { error: itemsError } = await supabase.from("cotizacion_items").insert(itemsData);
         if (itemsError) {
             console.error("Error inserting items:", itemsError);
-            // We might want to delete the header if items fail? Or just alert?
+            // Delete the header to maintain atomicity (optional but safer)
+            await supabase.from("cotizaciones").delete().eq("id", data.id);
+            throw new Error(`Error al guardar los items: ${itemsError.message}`);
         }
     }
 
@@ -348,10 +364,14 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
                 aiu_utilidad_porcentaje: round2(item.aiuUtilidadPorcentaje),
                 iva_utilidad_porcentaje: round2(item.ivaUtilidadPorcentaje),
                 notas: item.notas,
+                porcentaje: round2(item.porcentaje),
             }));
 
             const { error: itemsError } = await supabase.from("cotizacion_items").insert(itemsData);
-            if (itemsError) console.error("Error updating items:", itemsError);
+            if (itemsError) {
+                console.error("Error updating items:", itemsError);
+                throw new Error(`Error al actualizar los items: ${itemsError.message}`);
+            }
         }
     }
 

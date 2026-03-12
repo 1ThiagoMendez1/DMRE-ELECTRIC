@@ -16,6 +16,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
+import { QuotePreview } from "@/components/erp/quote-preview";
+import { generateQuotePDF, COMPANY_INFO } from "@/utils/pdf-generator";
+import { getStyleById } from "@/utils/pdf-styles";
 
 // Mock comments keep for backwards compatibility with COT-001
 const initialComments: Record<string, ComentarioCotizacion[]> = {
@@ -184,8 +187,25 @@ function PortalViewContent() {
         }
     };
 
-    const handleDownloadPDF = () => {
+    const handleDownloadPDF = async () => {
+        if (!quote) return;
         toast({ title: "Descargando PDF", description: "Generando documento oficial..." });
+        try {
+            const officialStyle = getStyleById('official_dmre');
+            // Signature: cotizacion, materialVisibilityMode, companyInfo, selectedStyle, action, preparedBy, watermarkText
+            await generateQuotePDF(
+                quote,
+                'MOSTRAR_TODO',
+                COMPANY_INFO,
+                officialStyle,
+                'save',
+                quote.elaboradoPor || 'D.M.R.E',
+                'D.M.R.E' // Watermark text
+            );
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el PDF." });
+        }
     };
 
     if (loading) return <div className="flex items-center justify-center p-12">Cargando información...</div>;
@@ -229,65 +249,13 @@ function PortalViewContent() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content: Details */}
                 <div className="lg:col-span-2 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Detalles del Servicio</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span className="text-muted-foreground block">Cliente</span>
-                                    <span className="font-medium">{typeof quote.cliente === 'string' ? quote.cliente : quote.cliente?.nombre}</span>
-                                </div>
-                                <div>
-                                    <span className="text-muted-foreground block">Ubicación</span>
-                                    <span className="font-medium flex items-center gap-1"><MapPin className="h-3 w-3" /> Bogotá, Chapinero (Simulado)</span>
-                                </div>
-                            </div>
-
-                            <Separator />
-
-                            <div>
-                                <h3 className="font-semibold mb-3">Ítems Cotizados</h3>
-                                <div className="border rounded-lg overflow-hidden">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="bg-muted/50">
-                                            <tr>
-                                                <th className="p-3 font-medium">Descripción</th>
-                                                <th className="p-3 font-medium text-right">Cant.</th>
-                                                <th className="p-3 font-medium text-right">Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {quote.items.map((item, idx) => (
-                                                <tr key={idx}>
-                                                    <td className="p-3">
-                                                        <div className="font-medium">{item.descripcion}</div>
-                                                        <div className="text-xs text-muted-foreground">{item.tipo}</div>
-                                                    </td>
-                                                    <td className="p-3 text-right">{item.cantidad}</td>
-                                                    <td className="p-3 text-right">${item.valorTotal.toLocaleString()}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                        <tfoot className="bg-muted/20 font-medium">
-                                            <tr>
-                                                <td colSpan={2} className="p-3 text-right">Subtotal</td>
-                                                <td className="p-3 text-right">${quote.subtotal.toLocaleString()}</td>
-                                            </tr>
-                                            <tr>
-                                                <td colSpan={2} className="p-3 text-right">IVA (19%)</td>
-                                                <td className="p-3 text-right">${quote.iva.toLocaleString()}</td>
-                                            </tr>
-                                            <tr className="text-base border-t-2 border-primary/20">
-                                                <td colSpan={2} className="p-3 text-right font-bold text-primary">Total</td>
-                                                <td className="p-3 text-right font-bold text-primary">${quote.total.toLocaleString()}</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        </CardContent>
+                    <Card className="overflow-hidden">
+                        <QuotePreview
+                            quote={quote}
+                            currentStyle={getStyleById('official_dmre')}
+                            companyInfo={COMPANY_INFO}
+                            preparedByFallback="D.M.R.E"
+                        />
                     </Card>
 
                     {/* Secure Documents Section (Conditionally Rendered based on State AND Backend verification) */}

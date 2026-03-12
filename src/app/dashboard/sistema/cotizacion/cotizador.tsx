@@ -40,6 +40,7 @@ interface CotizadorProps {
 }
 
 export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones: propInstalaciones, servicios, initialData, onClose, onSave }: CotizadorProps) {
+    const { currentUser } = useErp();
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
     const [items, setItems] = useState<CotizacionItem[]>([]);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -52,12 +53,14 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
     const [tipoOferta, setTipoOferta] = useState<Cotizacion['tipo']>('NORMAL');
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState("editor");
 
     // Terms
     const [alcance, setAlcance] = useState("");
     const [formaPago, setFormaPago] = useState("");
     const [notaFinal, setNotaFinal] = useState("");
+    const [elaboradoPor, setElaboradoPor] = useState("");
 
     // Global AIU & Tax State
     const [globalDiscountPct, setGlobalDiscountPct] = useState(0);
@@ -68,36 +71,48 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
     const [aiuUtilidadPct, setAiuUtilidadPct] = useState(0);
     const [ivaUtilidadPct, setIvaUtilidadPct] = useState(19);
 
-    const handleInternalSave = () => {
-        if (!selectedCliente || !onSave) return;
+    const handleInternalSave = async () => {
+        if (!selectedCliente || !onSave || isSaving) return;
 
-        const quote: Cotizacion = {
-            id: initialData?.id || `COT-${Math.floor(Math.random() * 10000)}`,
-            numero: initialData?.numero || `COT-${Math.floor(Math.random() * 10000)}`,
-            tipo: tipoOferta,
-            fecha: new Date(fechaCotizacion),
-            cliente: selectedCliente,
-            clienteId: selectedCliente.id,
-            descripcionTrabajo: descripcionTrabajo,
-            items: items,
-            subtotal: subtotal,
-            iva: iva,
-            descuentoGlobal: descuento,
-            descuentoGlobalPorcentaje: globalDiscountPct,
-            impuestoGlobalPorcentaje: globalIvaPct,
-            aiuAdminGlobalPorcentaje: esAiu ? aiuAdminPct : 0,
-            aiuImprevistoGlobalPorcentaje: esAiu ? aiuImprevistoPct : 0,
-            aiuUtilidadGlobalPorcentaje: esAiu ? aiuUtilidadPct : 0,
-            ivaUtilidadGlobalPorcentaje: ivaUtilidadPct,
-            aiuAdmin: aiuAdminVal,
-            aiuImprevistos: aiuImprevistoVal,
-            aiuUtilidad: aiuUtilidadVal,
-            total: total,
-            estado: initialData?.estado || 'BORRADOR'
-        };
+        setIsSaving(true);
+        try {
+            const quote: Cotizacion = {
+                id: initialData?.id || `COT-TEMPORAL`,
+                numero: initialData?.numero || "", // Let server generate if new
+                tipo: tipoOferta,
+                fecha: new Date(fechaCotizacion),
+                cliente: selectedCliente,
+                clienteId: selectedCliente.id,
+                descripcionTrabajo: descripcionTrabajo,
+                items: items,
+                subtotal: subtotal,
+                iva: iva,
+                descuentoGlobal: descuento,
+                descuentoGlobalPorcentaje: globalDiscountPct,
+                impuestoGlobalPorcentaje: globalIvaPct,
+                aiuAdminGlobalPorcentaje: esAiu ? aiuAdminPct : 0,
+                aiuImprevistoGlobalPorcentaje: esAiu ? aiuImprevistoPct : 0,
+                aiuUtilidadGlobalPorcentaje: esAiu ? aiuUtilidadPct : 0,
+                ivaUtilidadGlobalPorcentaje: ivaUtilidadPct,
+                aiuAdmin: aiuAdminVal,
+                aiuImprevistos: aiuImprevistoVal,
+                aiuUtilidad: aiuUtilidadVal,
+                total: total,
+                estado: initialData?.estado || 'BORRADOR',
+                elaboradoPor: elaboradoPor || currentUser?.name || "José Gabriel Ramirez Bernal",
+                alcance: alcance,
+                formaPago: formaPago,
+                notaFinal: notaFinal
+            };
 
-        onSave(quote);
-        onClose();
+            await onSave(quote);
+            onClose();
+        } catch (error) {
+            console.error("Error saving quotation:", error);
+            // Error handling is managed by erp-provider toast
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     // Extraction of global items for the modals
@@ -130,11 +145,14 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
             setAiuImprevistoPct(initialData.aiuImprevistoGlobalPorcentaje || 0);
             setAiuUtilidadPct(initialData.aiuUtilidadGlobalPorcentaje || 0);
             setIvaUtilidadPct(initialData.ivaUtilidadGlobalPorcentaje || 19);
-
             const hasAiu = (initialData.aiuAdminGlobalPorcentaje || 0) > 0 || (initialData.aiuImprevistoGlobalPorcentaje || 0) > 0 || (initialData.aiuUtilidadGlobalPorcentaje || 0) > 0;
             setEsAiu(hasAiu);
+            setElaboradoPor(initialData.elaboradoPor || "");
+        } else {
+            // Default preparer for new quotes
+            setElaboradoPor(currentUser?.name || "");
         }
-    }, [initialData?.id]);
+    }, [initialData?.id, currentUser?.name]);
 
 
     const { subtotal, descuento, aiuAdminVal, aiuImprevistoVal, aiuUtilidadVal, iva, total } = useMemo(() => {
@@ -216,7 +234,8 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                     visibilityMode as any, // type cast if needed
                     undefined, // default company
                     undefined, // default style
-                    'bloburl'
+                    'bloburl',
+                    elaboradoPor || currentUser?.name
                 ) as string;
 
                 setPdfUrl(url);
@@ -244,7 +263,8 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
             visibilityMode as any,
             undefined,
             undefined,
-            'save'
+            'save',
+            elaboradoPor || currentUser?.name
         );
     };
 
@@ -385,7 +405,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                             <TableRow>
                                                 <TableHead>Descripción</TableHead>
                                                 <TableHead className="w-[80px]">Cant.</TableHead>
-                                                <TableHead className="text-right w-[100px]">Precio Venta</TableHead>
+                                                <TableHead className="text-right w-[100px]">Precio proveedor</TableHead>
                                                 <TableHead className="text-center w-[80px]">%</TableHead>
                                                 <TableHead className="text-right w-[100px]">Precio %</TableHead>
                                                 <TableHead className="text-right w-[100px]">Total</TableHead>
@@ -496,11 +516,11 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                 <Input
                                                                     type="number"
                                                                     readOnly
-                                                                    value={item.porcentaje !== undefined ? (item.valorUnitario * (item.porcentaje / 100)) : ''}
+                                                                    value={item.porcentaje !== undefined ? Math.round(item.valorUnitario * (1 + item.porcentaje / 100)) : ''}
                                                                     className="h-7 text-xs text-right bg-muted/20 px-2"
                                                                     style={{
                                                                         fieldSizing: 'content',
-                                                                        width: `${Math.max(8, (item.porcentaje !== undefined ? (item.valorUnitario * (item.porcentaje / 100)).toString().length : 0) + 5)}ch`,
+                                                                        width: `${Math.max(8, (item.porcentaje !== undefined ? Math.round(item.valorUnitario * (1 + item.porcentaje / 100)).toString().length : 0) + 5)}ch`,
                                                                         minWidth: '8ch'
                                                                     } as any}
                                                                     placeholder="$"
@@ -754,8 +774,13 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                             </div>
 
                             <div className="grid gap-2 pt-2">
-                                <Button className="w-full" size="sm" disabled={items.length === 0 || !selectedCliente} onClick={handleInternalSave}>
-                                    <Save className="mr-2 h-3 w-3" /> {initialData ? "Actualizar" : "Guardar"}
+                                <Button className="w-full" size="sm" disabled={items.length === 0 || !selectedCliente || isSaving} onClick={handleInternalSave}>
+                                    {isSaving ? (
+                                        <RefreshCw className="mr-2 h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <Save className="mr-2 h-3 w-3" />
+                                    )}
+                                    {isSaving ? "Guardando..." : (initialData ? "Actualizar" : "Guardar")}
                                 </Button>
                                 <Button variant="outline" className="w-full" size="sm" disabled={items.length === 0} onClick={handleExportPDF}>
                                     <FileDown className="mr-2 h-3 w-3" /> Exportar PDF

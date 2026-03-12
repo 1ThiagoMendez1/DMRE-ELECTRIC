@@ -32,6 +32,7 @@ import { getOrdenesCompraAction, createOrdenCompraAction, updateOrdenCompraActio
 import { getConsumosResumenAction, createConsumoAction } from "@/app/dashboard/sistema/inventario/materiales-consumo-actions";
 import { createClient } from "@/utils/supabase/client";
 import { getInitialErpDataAction } from "@/actions/erp-actions";
+import { useToast } from "@/hooks/use-toast";
 
 // Fallback mock data for users (until profiles table is connected)
 const initialUsers: User[] = [
@@ -181,6 +182,7 @@ interface ErpContextType {
 const ErpContext = createContext<ErpContextType | undefined>(undefined);
 
 export function ErpProvider({ children }: { children: ReactNode }) {
+    const { toast } = useToast();
     // Loading state
     const [isLoading, setIsLoading] = useState(true);
 
@@ -381,19 +383,43 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const { id, ...rest } = cotizacion;
             const saved = await createCotizacionAction(rest as any);
             setCotizaciones(prev => [saved, ...prev]);
-        } catch (error) { console.error("Failed to add cotizacion:", error); }
+        } catch (error: any) {
+            console.error("Failed to add cotizacion:", error);
+            toast({
+                title: "Error al guardar",
+                description: error.message || "No se pudo crear la cotización. Revisa tu conexión.",
+                variant: "destructive"
+            });
+            throw error;
+        }
     };
     const updateCotizacion = async (updated: Cotizacion) => {
         try {
             const saved = await updateCotizacionAction(updated.id, updated);
             setCotizaciones(prev => prev.map(c => c.id === saved.id ? saved : c));
-        } catch (error) { console.error("Failed to update cotizacion:", error); }
+        } catch (error: any) {
+            console.error("Failed to update cotizacion:", error);
+            toast({
+                title: "Error al actualizar",
+                description: error.message || "No se pudo actualizar la cotización.",
+                variant: "destructive"
+            });
+            throw error;
+        }
     };
     const deleteCotizacion = async (id: string) => {
         try {
             await deleteCotizacionAction(id);
             setCotizaciones(prev => prev.filter(c => c.id !== id));
-        } catch (error) { console.error("Failed to delete cotizacion:", error); }
+        } catch (error: any) {
+            console.error("Failed to delete cotizacion:", error);
+            toast({
+                title: "Error al eliminar",
+                description: "No se pudo eliminar la cotización.",
+                variant: "destructive"
+            });
+            throw error;
+        }
     };
 
     // CLIENTE ACTIONS

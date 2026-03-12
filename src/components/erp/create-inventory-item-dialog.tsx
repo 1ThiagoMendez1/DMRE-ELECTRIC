@@ -350,7 +350,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                                 name="valorUnitario"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Precio Venta</FormLabel>
+                                        <FormLabel>Precio proveedor</FormLabel>
                                         <FormControl>
                                             <Input type="number" {...field} />
                                         </FormControl>
