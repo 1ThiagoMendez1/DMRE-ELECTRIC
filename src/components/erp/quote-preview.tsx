@@ -203,6 +203,19 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                 <span>${quote.subtotal.toLocaleString()}</span>
                             </div>
 
+                            {(quote.descuentoGlobal || 0) > 0 && (
+                                <>
+                                    <div className="flex justify-between py-1 border-b text-xs text-red-600">
+                                        <span>DESCUENTO ({quote.descuentoGlobalPorcentaje || 0}%)</span>
+                                        <span>-${(quote.descuentoGlobal || 0).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1 border-b text-xs font-bold w-full bg-gray-100/50">
+                                        <span>SUBT. C/ DESCUENTO</span>
+                                        <span>${(quote.subtotal - (quote.descuentoGlobal || 0)).toLocaleString()}</span>
+                                    </div>
+                                </>
+                            )}
+
                             {/* AIU Section if applicable */}
                             {((quote.aiuAdmin || 0) > 0 || (quote.aiuImprevistos || 0) > 0 || (quote.aiuUtilidad || 0) > 0) && (
                                 <div className="space-y-1 bg-gray-50 p-1 my-1 rounded">

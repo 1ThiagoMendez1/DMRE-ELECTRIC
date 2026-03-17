@@ -587,8 +587,8 @@ export const generateQuotePDF = (
 
             // Draw value
             const valX = x + valXOffset;
-            const valText = doc.splitTextToSize(value || "", w - valXOffset - 2);
-            doc.text(valText, valX, y + 4.5);
+            const valText = doc.splitTextToSize(value || "", w - valXOffset - 4);
+            doc.text(valText, valX + 2, y + 4.5);
         };
 
         // --- LEFT SIDE: CLIENT INFO (5 Rows) ---

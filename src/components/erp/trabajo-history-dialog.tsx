@@ -1005,6 +1005,44 @@ export function TrabajoHistoryDialog({
         }
     };
 
+    const previewQuote = useMemo(() => {
+        const visibleItems = items.filter(i => i.visibleEnPdf);
+        const itemsCalculados = visibleItems.map((item) => {
+            const { unitTotal, lineTotal } = calculateItemDetails(item);
+            const { visibleEnPdf, ...rest } = item;
+            return { ...rest, valorUnitario: unitTotal, valorTotal: lineTotal };
+        });
+
+        const subTotalPDF = itemsCalculados.reduce((a, b) => a + b.valorTotal, 0);
+        const descuentoPDF = subTotalPDF * (globalDiscountPct / 100);
+        const basePDF = subTotalPDF - descuentoPDF;
+
+        const aiuAdminPDF = esAiu ? basePDF * (aiuAdminPct / 100) : 0;
+        const aiuImprevPDF = esAiu ? basePDF * (aiuImprevPct / 100) : 0;
+        const aiuUtilPDF = esAiu ? basePDF * (aiuUtilPct / 100) : 0;
+
+        const ivaPDF = esAiu ? (aiuUtilPDF * (ivaUtilPct / 100)) : (basePDF * (globalIvaPct / 100));
+        const totalPDF = basePDF + aiuAdminPDF + aiuImprevPDF + aiuUtilPDF + ivaPDF;
+
+        return {
+            ...trabajo,
+            items: itemsCalculados,
+            subtotal: subTotalPDF,
+            descuentoGlobal: descuentoPDF,
+            descuentoGlobalPorcentaje: globalDiscountPct,
+            aiuAdmin: aiuAdminPDF,
+            aiuImprevistos: aiuImprevPDF,
+            aiuUtilidad: aiuUtilPDF,
+            iva: ivaPDF,
+            total: totalPDF,
+            impuestoGlobalPorcentaje: globalIvaPct,
+            aiuAdminGlobalPorcentaje: aiuAdminPct,
+            aiuImprevistoGlobalPorcentaje: aiuImprevPct,
+            aiuUtilidadGlobalPorcentaje: aiuUtilPct,
+            ivaUtilidadGlobalPorcentaje: ivaUtilPct,
+        };
+    }, [trabajo, items, globalDiscountPct, esAiu, aiuAdminPct, aiuImprevPct, aiuUtilPct, globalIvaPct, ivaUtilPct]);
+
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
@@ -2137,34 +2175,7 @@ export function TrabajoHistoryDialog({
 
                                         <Button className="w-full" onClick={() => {
                                             try {
-                                                const itemsCalculados = visibleItems.map((item) => {
-                                                    const { unitTotal, lineTotal } = calculateItemDetails(item);
-                                                    const { visibleEnPdf, ...rest } = item;
-                                                    return { ...rest, valorUnitario: unitTotal, valorTotal: lineTotal };
-                                                });
-
-                                                const subTotalPDF = itemsCalculados.reduce((a, b) => a + b.valorTotal, 0);
-                                                const descuentoPDF = subTotalPDF * (globalDiscountPct / 100);
-                                                const basePDF = subTotalPDF - descuentoPDF;
-
-                                                const aiuAdminPDF = esAiu ? basePDF * (aiuAdminPct / 100) : 0;
-                                                const aiuImprevPDF = esAiu ? basePDF * (aiuImprevPct / 100) : 0;
-                                                const aiuUtilPDF = esAiu ? basePDF * (aiuUtilPct / 100) : 0;
-
-                                                const ivaPDF = esAiu ? (aiuUtilPDF * (ivaUtilPct / 100)) : (basePDF * (globalIvaPct / 100));
-                                                const totalPDF = basePDF + aiuAdminPDF + aiuImprevPDF + aiuUtilPDF + ivaPDF;
-
-                                                const cotizacionFiltrada = {
-                                                    ...trabajo,
-                                                    items: itemsCalculados,
-                                                    subtotal: subTotalPDF,
-                                                    aiuAdmin: aiuAdminPDF,
-                                                    aiuImprevistos: aiuImprevPDF,
-                                                    aiuUtilidad: aiuUtilPDF,
-                                                    iva: ivaPDF,
-                                                    total: totalPDF
-                                                };
-                                                generateQuotePDF(cotizacionFiltrada, materialVisibilityMode, companyInfo, currentStyle, 'save', trabajo.elaboradoPor || currentUser?.name);
+                                                generateQuotePDF(previewQuote, materialVisibilityMode, companyInfo, currentStyle, 'save', trabajo.elaboradoPor || currentUser?.name);
                                                 toast({ title: "PDF Generado", description: `Estilo: ${currentStyle.name}` });
                                             } catch (error) {
                                                 console.error(error);
@@ -2180,7 +2191,7 @@ export function TrabajoHistoryDialog({
                             {/* RIGHT: LIVE PREVIEW */}
                             <div className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded-xl border shadow-inner flex justify-center">
                                 <QuotePreview
-                                    quote={trabajo}
+                                    quote={previewQuote}
                                     currentStyle={currentStyle}
                                     companyInfo={companyInfo}
                                     preparedByFallback={currentUser?.name}
