@@ -281,6 +281,23 @@ export function TrabajoHistoryDialog({
 
     // Material visibility mode for PDF
     const [materialVisibilityMode, setMaterialVisibilityMode] = useState<MaterialVisibilityMode>('MOSTRAR_TODO');
+    const [privadoSuministros, setPrivadoSuministros] = useState("");
+    const [privadoInstalacion, setPrivadoInstalacion] = useState("");
+    const [privadoServicios, setPrivadoServicios] = useState("");
+
+    useEffect(() => {
+        if (trabajo?.opcionesPdf) {
+            setMaterialVisibilityMode(trabajo.opcionesPdf.visibilityMode || 'MOSTRAR_TODO');
+            setPrivadoSuministros(trabajo.opcionesPdf.privadoSuministros || "");
+            setPrivadoInstalacion(trabajo.opcionesPdf.privadoInstalacion || "");
+            setPrivadoServicios(trabajo.opcionesPdf.privadoServicios || "");
+        } else {
+            setMaterialVisibilityMode('MOSTRAR_TODO');
+            setPrivadoSuministros("");
+            setPrivadoInstalacion("");
+            setPrivadoServicios("");
+        }
+    }, [trabajo]);
 
     // PDF Style State
     const [selectedStyleId, setSelectedStyleId] = useState<string>('official_dmre');
@@ -910,6 +927,13 @@ export function TrabajoHistoryDialog({
             alcance: editAlcance,
             formaPago: editFormaPago,
             notaFinal: editNotaFinal,
+            opcionesPdf: {
+                ...trabajo.opcionesPdf,
+                visibilityMode: materialVisibilityMode,
+                privadoSuministros,
+                privadoInstalacion,
+                privadoServicios,
+            }
         };
         onTrabajoUpdated(updated);
         toast({ title: "Cambios guardados", description: "La información del trabajo ha sido actualizada." });
@@ -2155,6 +2179,23 @@ export function TrabajoHistoryDialog({
                                             </Select>
                                         </div>
 
+                                        {materialVisibilityMode === 'MODO_PRIVADO' && (
+                                            <div className="space-y-3 pt-2 pb-2 border-t mt-2">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] font-bold">Suministros:</Label>
+                                                    <Input className="h-7 text-xs" value={privadoSuministros} onChange={e => setPrivadoSuministros(e.target.value)} placeholder="Ej: Materiales e insumos..." />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] font-bold">Instalación:</Label>
+                                                    <Input className="h-7 text-xs" value={privadoInstalacion} onChange={e => setPrivadoInstalacion(e.target.value)} placeholder="Ej: Mano de obra..." />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] font-bold">Servicios:</Label>
+                                                    <Input className="h-7 text-xs" value={privadoServicios} onChange={e => setPrivadoServicios(e.target.value)} placeholder="Ej: Transporte..." />
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <Popover>
                                             <PopoverTrigger asChild>
                                                 <Button variant="outline" size="sm" className="w-full">
@@ -2175,7 +2216,12 @@ export function TrabajoHistoryDialog({
 
                                         <Button className="w-full" onClick={() => {
                                             try {
-                                                generateQuotePDF(previewQuote, materialVisibilityMode, companyInfo, currentStyle, 'save', trabajo.elaboradoPor || currentUser?.name);
+                                                const privadoOpts = materialVisibilityMode === 'MODO_PRIVADO' ? {
+                                                    suministros: privadoSuministros,
+                                                    instalacion: privadoInstalacion,
+                                                    servicios: privadoServicios
+                                                } : undefined;
+                                                generateQuotePDF(previewQuote, materialVisibilityMode, companyInfo, currentStyle, 'save', trabajo.elaboradoPor || currentUser?.name, undefined, privadoOpts);
                                                 toast({ title: "PDF Generado", description: `Estilo: ${currentStyle.name}` });
                                             } catch (error) {
                                                 console.error(error);
@@ -2195,6 +2241,12 @@ export function TrabajoHistoryDialog({
                                     currentStyle={currentStyle}
                                     companyInfo={companyInfo}
                                     preparedByFallback={currentUser?.name}
+                                    materialVisibilityMode={materialVisibilityMode}
+                                    privadoOptions={{
+                                        suministros: privadoSuministros,
+                                        instalacion: privadoInstalacion,
+                                        servicios: privadoServicios
+                                    }}
                                 />
                             </div>
                         </div>

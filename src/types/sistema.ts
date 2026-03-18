@@ -134,6 +134,12 @@ export interface Cotizacion {
     fechaActualizacion?: Date;
     evidencia?: EvidenciaTrabajo[];
     comentarios?: ComentarioCotizacion[];
+    opcionesPdf?: {
+        visibilityMode?: 'MOSTRAR_TODO' | 'MODO_PRIVADO' | 'OCULTAR_TODO';
+        privadoSuministros?: string;
+        privadoInstalacion?: string;
+        privadoServicios?: string;
+    };
 
     // Job Execution Fields
     direccionProyecto?: string;

@@ -25,6 +25,12 @@ export const COMPANY_INFO: CompanyInfo = {
     descripcion: "Diseño y Montajes de Redes Eléctricas"
 };
 
+export interface PrivadoOptions {
+    suministros: string;
+    instalacion: string;
+    servicios: string;
+}
+
 export const generateQuotePDF = (
     cotizacion: Cotizacion,
     materialVisibilityMode: MaterialVisibilityMode = 'MOSTRAR_TODO',
@@ -32,7 +38,8 @@ export const generateQuotePDF = (
     selectedStyle?: PDFStyleConfig,
     action: 'save' | 'bloburl' | 'dataurlstring' = 'save',
     preparedBy?: string,
-    watermarkText?: string
+    watermarkText?: string,
+    privadoOptions?: PrivadoOptions
 ) => {
     // 1. Setup Style & Document
     const style = selectedStyle || PDF_STYLES[0];
@@ -667,28 +674,63 @@ export const generateQuotePDF = (
 
     // Prepare Data
     const tableBody: any[] = [];
-    cotizacion.items.forEach((item, index) => {
-        const isProduct = item.tipo === 'PRODUCTO';
-        const isService = item.tipo === 'SERVICIO';
-        const showItem = !isProduct || materialVisibilityMode !== 'OCULTAR_TODO';
-
-        if (showItem) {
-            const showDetails = !isProduct || materialVisibilityMode === 'MOSTRAR_TODO';
+    
+    if (materialVisibilityMode === 'MODO_PRIVADO') {
+        // En Modo Privado reemplazamos la tabla de ítems por las 3 filas personalizadas
+        tableBody.push([
+            1,
+            `Suministros: ${privadoOptions?.suministros || ''}`,
+            "-",
+            "GLB",
+            "-",
+            "-"
+        ]);
+        tableBody.push([
+            2,
+            `Instalación: ${privadoOptions?.instalacion || ''}`,
+            "-",
+            "GLB",
+            "-",
+            "-"
+        ]);
+        tableBody.push([
+            3,
+            `Servicios: ${privadoOptions?.servicios || ''}`,
+            "-",
+            "GLB",
+            "-",
+            "-"
+        ]);
+    } else if (materialVisibilityMode === 'OCULTAR_TODO') {
+        // En Ocultar Todo solo mostramos un total globalizado
+        tableBody.push([
+            1,
+            "SERVICIOS Y SUMINISTROS GLOBALES SEGÚN DESCRIPCIÓN",
+            "1",
+            "GLB",
+            currencyFmt.format(cotizacion.subtotal),
+            currencyFmt.format(cotizacion.subtotal)
+        ]);
+    } else {
+        // MOSTRAR_TODO normal behavior
+        cotizacion.items.forEach((item, index) => {
+            const isProduct = item.tipo === 'PRODUCTO';
+            const isService = item.tipo === 'SERVICIO';
+            
             // Calculate unit value including the specific item percentage (margin)
-            // This ensures common items look consistent with the UI
             const unitValue = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
 
             tableBody.push([
                 index + 1,
                 item.descripcion,
-                showDetails ? item.cantidad : '-',
+                item.cantidad,
                 "UND",
-                showDetails ? currencyFmt.format(unitValue) : '-',
-                showDetails ? currencyFmt.format(item.valorTotal) : '-'
+                currencyFmt.format(unitValue),
+                currencyFmt.format(item.valorTotal)
             ]);
 
-            // Add sub-items for Work Codes (APUs) if they exist and we're not hiding everything, nor explicitly hidden by user
-            if (isService && item.subItems && item.subItems.length > 0 && materialVisibilityMode !== 'OCULTAR_TODO' && !item.ocultarDetalles) {
+            // Add sub-items for Work Codes (APUs)
+            if (isService && item.subItems && item.subItems.length > 0 && !item.ocultarDetalles) {
                 item.subItems.forEach((sub) => {
                     const totalSubQty = (sub.cantidad || 0) * item.cantidad;
                     tableBody.push([
@@ -696,13 +738,13 @@ export const generateQuotePDF = (
                         `      ↳ ${(sub as any).nombre || (sub as any).descripcion}`, // Indented with arrow
                         totalSubQty,
                         "UND",
-                        "", // Don't show individual costs for sub-items by default
+                        "", // Don't show individual costs for sub-items
                         ""  // Total is included in parent item
                     ]);
                 });
             }
-        }
-    });
+        });
+    }
 
     // Minimal Style Table Config override
     const isMinimal = style.layout === 'minimal';

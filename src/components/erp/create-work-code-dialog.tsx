@@ -76,12 +76,12 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
     // Initialize form with generated code prefix
     const numApus = codigosExistentes.length;
     const consecutivo = numApus + 1;
-    const prefijo = 'ELEC-';
+    const prefijo = '';
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            codigo: `${prefijo}${consecutivo.toString().padStart(3, '0')}`,
+            codigo: `${consecutivo.toString().padStart(3, '0')}`,
             descripcion: "",
             valorManoObra: "0"
         }

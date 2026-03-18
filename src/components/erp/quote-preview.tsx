@@ -19,12 +19,18 @@ interface QuotePreviewProps {
         descripcion: string;
     };
     preparedByFallback?: string;
+    materialVisibilityMode?: 'MOSTRAR_TODO' | 'MODO_PRIVADO' | 'OCULTAR_TODO';
+    privadoOptions?: {
+        suministros: string;
+        instalacion: string;
+        servicios: string;
+    };
 }
 
 // Helper: RGB to Hex
 const rgbToHex = (c: [number, number, number]) => "#" + c.map(x => x.toString(16).padStart(2, '0')).join('');
 
-export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallback }: QuotePreviewProps) {
+export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallback, materialVisibilityMode = 'MOSTRAR_TODO', privadoOptions }: QuotePreviewProps) {
     return (
         <Card
             className="w-full max-w-[800px] bg-white shadow-xl min-h-[1000px] origin-top transition-all duration-300 overflow-hidden relative"
@@ -172,25 +178,74 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                 </tr>
                             </thead>
                             <tbody>
-                                {quote.items.map((item, idx) => (
-                                    <tr key={idx} className="border-b border-gray-100">
-                                        <td className="py-2 px-1 align-top text-gray-500">{idx + 1}</td>
+                                {materialVisibilityMode === 'MODO_PRIVADO' ? (
+                                    <>
+                                        <tr className="border-b border-gray-100">
+                                            <td className="py-2 px-1 align-top text-gray-500">1</td>
+                                            <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
+                                                Suministros: {privadoOptions?.suministros || ''}
+                                            </td>
+                                            <td className="py-2 px-1 align-top text-center">-</td>
+                                            <td className="py-2 px-1 align-top text-center">GLB</td>
+                                            <td className="py-2 px-1 align-top text-right">-</td>
+                                            <td className="py-2 px-1 align-top text-right font-bold">-</td>
+                                        </tr>
+                                        <tr className="border-b border-gray-100">
+                                            <td className="py-2 px-1 align-top text-gray-500">2</td>
+                                            <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
+                                                Instalación: {privadoOptions?.instalacion || ''}
+                                            </td>
+                                            <td className="py-2 px-1 align-top text-center">-</td>
+                                            <td className="py-2 px-1 align-top text-center">GLB</td>
+                                            <td className="py-2 px-1 align-top text-right">-</td>
+                                            <td className="py-2 px-1 align-top text-right font-bold">-</td>
+                                        </tr>
+                                        <tr className="border-b border-gray-100">
+                                            <td className="py-2 px-1 align-top text-gray-500">3</td>
+                                            <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
+                                                Servicios: {privadoOptions?.servicios || ''}
+                                            </td>
+                                            <td className="py-2 px-1 align-top text-center">-</td>
+                                            <td className="py-2 px-1 align-top text-center">GLB</td>
+                                            <td className="py-2 px-1 align-top text-right">-</td>
+                                            <td className="py-2 px-1 align-top text-right font-bold">-</td>
+                                        </tr>
+                                    </>
+                                ) : materialVisibilityMode === 'OCULTAR_TODO' ? (
+                                    <tr className="border-b border-gray-100">
+                                        <td className="py-2 px-1 align-top text-gray-500">1</td>
                                         <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
-                                            {item.descripcion}
-                                            {item.subItems && item.subItems.length > 0 && !item.ocultarDetalles && (
-                                                <ul className="mt-1 ml-2 space-y-0.5 opacity-80 font-normal">
-                                                    {item.subItems.map((sub: any, sidx: number) => (
-                                                        <li key={sidx}>• {sub.nombre || sub.descripcion}</li>
-                                                    ))}
-                                                </ul>
-                                            )}
+                                            SERVICIOS Y SUMINISTROS GLOBALES SEGÚN DESCRIPCIÓN
                                         </td>
-                                        <td className="py-2 px-1 align-top text-center">{item.cantidad}</td>
-                                        <td className="py-2 px-1 align-top text-center">UND</td>
-                                        <td className="py-2 px-1 align-top text-right">${item.valorUnitario.toLocaleString()}</td>
-                                        <td className="py-2 px-1 align-top text-right font-bold">${item.valorTotal.toLocaleString()}</td>
+                                        <td className="py-2 px-1 align-top text-center">1</td>
+                                        <td className="py-2 px-1 align-top text-center">GLB</td>
+                                        <td className="py-2 px-1 align-top text-right">${quote.subtotal.toLocaleString()}</td>
+                                        <td className="py-2 px-1 align-top text-right font-bold">${quote.subtotal.toLocaleString()}</td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    quote.items.map((item, idx) => {
+                                        const unitValue = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
+                                        return (
+                                            <tr key={idx} className="border-b border-gray-100">
+                                                <td className="py-2 px-1 align-top text-gray-500">{idx + 1}</td>
+                                                <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
+                                                    {item.descripcion}
+                                                    {item.subItems && item.subItems.length > 0 && !item.ocultarDetalles && (
+                                                        <ul className="mt-1 ml-2 space-y-0.5 opacity-80 font-normal">
+                                                            {item.subItems.map((sub: any, sidx: number) => (
+                                                                <li key={sidx}>• {sub.nombre || sub.descripcion}</li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </td>
+                                                <td className="py-2 px-1 align-top text-center">{item.cantidad}</td>
+                                                <td className="py-2 px-1 align-top text-center">UND</td>
+                                                <td className="py-2 px-1 align-top text-right">${unitValue.toLocaleString()}</td>
+                                                <td className="py-2 px-1 align-top text-right font-bold">${item.valorTotal.toLocaleString()}</td>
+                                            </tr>
+                                        )
+                                    })
+                                )}
                             </tbody>
                         </table>
                     </div>

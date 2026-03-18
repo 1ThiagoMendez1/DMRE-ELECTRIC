@@ -47,7 +47,10 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
     const [clientSearchTerm, setClientSearchTerm] = useState("");
     const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [showProductsInPdf, setShowProductsInPdf] = useState(true);
+    const [visibilityMode, setVisibilityMode] = useState<'MOSTRAR_TODO' | 'MODO_PRIVADO' | 'OCULTAR_TODO'>('MOSTRAR_TODO');
+    const [privadoSuministros, setPrivadoSuministros] = useState("");
+    const [privadoInstalacion, setPrivadoInstalacion] = useState("");
+    const [privadoServicios, setPrivadoServicios] = useState("");
     const [fechaCotizacion, setFechaCotizacion] = useState<string>(new Date().toISOString().split('T')[0]);
     const [descripcionTrabajo, setDescripcionTrabajo] = useState("");
     const [tipoOferta, setTipoOferta] = useState<Cotizacion['tipo']>('NORMAL');
@@ -102,7 +105,13 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                 elaboradoPor: elaboradoPor || currentUser?.name || "José Gabriel Ramirez Bernal",
                 alcance: alcance,
                 formaPago: formaPago,
-                notaFinal: notaFinal
+                notaFinal: notaFinal,
+                opcionesPdf: {
+                    visibilityMode: visibilityMode,
+                    privadoSuministros: privadoSuministros,
+                    privadoInstalacion: privadoInstalacion,
+                    privadoServicios: privadoServicios
+                }
             };
 
             await onSave(quote);
@@ -138,6 +147,13 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
             setAlcance(initialData.alcance || "");
             setFormaPago(initialData.formaPago || "");
             setNotaFinal(initialData.notaFinal || "");
+            
+            // Cargar estado de Opciones PDF (Modo Privado, etc.)
+            setVisibilityMode(initialData.opcionesPdf?.visibilityMode || 'MOSTRAR_TODO');
+            setPrivadoSuministros(initialData.opcionesPdf?.privadoSuministros || "");
+            setPrivadoInstalacion(initialData.opcionesPdf?.privadoInstalacion || "");
+            setPrivadoServicios(initialData.opcionesPdf?.privadoServicios || "");
+
             setTipoOferta(initialData.tipo || 'NORMAL');
             setGlobalDiscountPct(initialData.descuentoGlobalPorcentaje || 0);
             setGlobalIvaPct(initialData.impuestoGlobalPorcentaje || 19);
@@ -209,6 +225,12 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
         alcance: alcance,
         formaPago: formaPago,
         notaFinal: notaFinal,
+        opcionesPdf: {
+            visibilityMode: visibilityMode,
+            privadoSuministros: privadoSuministros,
+            privadoInstalacion: privadoInstalacion,
+            privadoServicios: privadoServicios
+        },
         descuentoGlobalPorcentaje: globalDiscountPct,
         impuestoGlobalPorcentaje: globalIvaPct,
         aiuAdminGlobalPorcentaje: esAiu ? aiuAdminPct : 0,
@@ -227,15 +249,21 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
         setTimeout(() => {
             try {
                 const quoteObj = getCurrentQuoteObj();
-                // Depending on settings, we might want to hide products or respect the checkbox
-                const visibilityMode = showProductsInPdf ? 'MOSTRAR_TODO' : 'OCULTAR_PRODUCTOS';
+                const privadoOptions = visibilityMode === 'MODO_PRIVADO' ? {
+                    suministros: privadoSuministros,
+                    instalacion: privadoInstalacion,
+                    servicios: privadoServicios
+                } : undefined;
+
                 const url = generateQuotePDF(
                     quoteObj,
                     visibilityMode as any, // type cast if needed
                     undefined, // default company
                     undefined, // default style
                     'bloburl',
-                    elaboradoPor || currentUser?.name
+                    elaboradoPor || currentUser?.name,
+                    undefined,
+                    privadoOptions
                 ) as string;
 
                 setPdfUrl(url);
@@ -257,14 +285,21 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
     const handleExportPDF = () => {
         if (!selectedCliente) return;
         const quoteObj = getCurrentQuoteObj();
-        const visibilityMode = showProductsInPdf ? 'MOSTRAR_TODO' : 'OCULTAR_PRODUCTOS';
+        const privadoOptions = visibilityMode === 'MODO_PRIVADO' ? {
+            suministros: privadoSuministros,
+            instalacion: privadoInstalacion,
+            servicios: privadoServicios
+        } : undefined;
+
         generateQuotePDF(
             quoteObj,
             visibilityMode as any,
             undefined,
             undefined,
             'save',
-            elaboradoPor || currentUser?.name
+            elaboradoPor || currentUser?.name,
+            undefined,
+            privadoOptions
         );
     };
 
@@ -758,20 +793,58 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                 </div>
                             </div>
 
+
                             <Separator className="my-2" />
 
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="showProducts"
-                                    checked={showProductsInPdf}
-                                    onChange={(e) => setShowProductsInPdf(e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300 text-primary"
-                                />
-                                <Label htmlFor="showProducts" className="text-xs cursor-pointer">
-                                    Mostrar productos en PDF
-                                </Label>
+                            <div className="space-y-2 pb-2">
+                                <Label className="text-xs font-medium">Visibilidad</Label>
+                                <Select
+                                    value={visibilityMode}
+                                    onValueChange={(value) => setVisibilityMode(value as any)}
+                                >
+                                    <SelectTrigger className="h-8 text-xs bg-muted/50">
+                                        <SelectValue placeholder="Seleccione visibilidad" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="MOSTRAR_TODO">
+                                            <div className="flex items-center gap-2">
+                                                <span>📋</span>
+                                                <span>Mostrar Todo</span>
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="MODO_PRIVADO">
+                                            <div className="flex items-center gap-2">
+                                                <span>🔒</span>
+                                                <span>Modo Privado</span>
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="OCULTAR_TODO">
+                                            <div className="flex items-center gap-2">
+                                                <span>🚫</span>
+                                                <span>Ocultar Todo</span>
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
+
+                            {visibilityMode === 'MODO_PRIVADO' && (
+                                <div className="space-y-3 pt-2 pb-2 border-t mt-2">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase">Textos Modo Privado</p>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-bold">Suministros:</Label>
+                                        <Input className="h-7 text-xs" value={privadoSuministros} onChange={e => setPrivadoSuministros(e.target.value)} placeholder="Ej: Materiales generales..." />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-bold">Instalación:</Label>
+                                        <Input className="h-7 text-xs" value={privadoInstalacion} onChange={e => setPrivadoInstalacion(e.target.value)} placeholder="Ej: Mano de obra empleada..." />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-bold">Servicios:</Label>
+                                        <Input className="h-7 text-xs" value={privadoServicios} onChange={e => setPrivadoServicios(e.target.value)} placeholder="Ej: Logística, viáticos..." />
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="grid gap-2 pt-2">
                                 <Button className="w-full" size="sm" disabled={items.length === 0 || !selectedCliente || isSaving} onClick={handleInternalSave}>

@@ -82,6 +82,7 @@ function mapToUI(db: any, items: any[] = [], cliente?: any): Cotizacion {
         responsableId: db.responsable_id,
         progreso: Number(db.progreso) || 0,
         comentarios: db.comentarios || [],
+        opcionesPdf: db.opciones_pdf || {},
         alcance: db.alcance || "",
         formaPago: db.forma_pago || "",
         notaFinal: db.nota_final || "",
@@ -134,6 +135,7 @@ function mapToDB(ui: any): any {
         responsable_id: ui.responsableId,
         progreso: ui.progreso !== undefined ? round2(ui.progreso) : undefined,
         comentarios: ui.comentarios,
+        opciones_pdf: ui.opcionesPdf,
         alcance: ui.alcance,
         forma_pago: ui.formaPago,
         nota_final: ui.notaFinal,
@@ -150,26 +152,35 @@ function mapToDB(ui: any): any {
     return db;
 }
 
-async function getNextNumero(supabase: any) {
-    const year = new Date().getFullYear();
-    const prefix = `COT-${year}-`;
+async function getNextNumero(supabase: any, tipo: "NORMAL" | "SIMPLIFICADA" = "NORMAL") {
+    const prefix = tipo === "SIMPLIFICADA" ? "COTS-" : "COT-";
 
     const { data } = await supabase
         .from("cotizaciones")
         .select("numero")
         .ilike("numero", `${prefix}%`)
-        .order("numero", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false }) // It's safer to order by created_at since strings sort 'COT-10' before 'COT-2'
+        .limit(50);
 
     let nextNum = 1;
-    if (data && data.length > 0 && data[0].numero) {
-        const parts = data[0].numero.split("-");
-        if (parts.length === 3) {
-            const num = parseInt(parts[2], 10);
-            if (!isNaN(num)) nextNum = num + 1;
+    if (data && data.length > 0) {
+        let maxNum = 0;
+        for (const row of data) {
+            if (!row.numero) continue;
+            // Ignore legacy formats like COT-2026-0001
+            const parts = row.numero.split("-");
+            if (parts.length === 2 && row.numero.startsWith(prefix)) {
+                const num = parseInt(parts[1], 10);
+                if (!isNaN(num) && num > maxNum) {
+                    maxNum = num;
+                }
+            }
+        }
+        if (maxNum > 0) {
+            nextNum = maxNum + 1;
         }
     }
-    return `${prefix}${nextNum.toString().padStart(4, "0")}`;
+    return `${prefix}${nextNum.toString().padStart(3, "0")}`;
 }
 
 export async function getCotizacionesAction(limit: number = 100): Promise<Cotizacion[]> {
@@ -215,7 +226,7 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
     const supabase = await createClient();
 
     if (!cotizacion.numero || cotizacion.numero.trim() === "") {
-        cotizacion.numero = await getNextNumero(supabase);
+        cotizacion.numero = await getNextNumero(supabase, cotizacion.tipo);
     }
 
     const dbData = mapToDB(cotizacion);

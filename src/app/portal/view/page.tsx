@@ -192,15 +192,23 @@ function PortalViewContent() {
         toast({ title: "Descargando PDF", description: "Generando documento oficial..." });
         try {
             const officialStyle = getStyleById('official_dmre');
-            // Signature: cotizacion, materialVisibilityMode, companyInfo, selectedStyle, action, preparedBy, watermarkText
+            const visibilityMode = quote.opcionesPdf?.visibilityMode || 'MOSTRAR_TODO';
+            const privadoOptions = visibilityMode === 'MODO_PRIVADO' ? {
+                suministros: quote.opcionesPdf?.privadoSuministros || '',
+                instalacion: quote.opcionesPdf?.privadoInstalacion || '',
+                servicios: quote.opcionesPdf?.privadoServicios || ''
+            } : undefined;
+
+            // Signature: cotizacion, materialVisibilityMode, companyInfo, selectedStyle, action, preparedBy, watermarkText, privadoOptions
             await generateQuotePDF(
                 quote,
-                'MOSTRAR_TODO',
+                visibilityMode,
                 COMPANY_INFO,
                 officialStyle,
                 'save',
                 quote.elaboradoPor || 'D.M.R.E',
-                'D.M.R.E' // Watermark text
+                'D.M.R.E', // Watermark text
+                privadoOptions
             );
         } catch (error) {
             console.error(error);
@@ -237,9 +245,6 @@ function PortalViewContent() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => window.print()}>
-                        <Printer className="h-4 w-4 mr-2" /> Imprimir
-                    </Button>
                     <Button onClick={handleDownloadPDF}>
                         <Download className="h-4 w-4 mr-2" /> Descargar PDF
                     </Button>
@@ -255,6 +260,12 @@ function PortalViewContent() {
                             currentStyle={getStyleById('official_dmre')}
                             companyInfo={COMPANY_INFO}
                             preparedByFallback="D.M.R.E"
+                            materialVisibilityMode={quote.opcionesPdf?.visibilityMode || 'MOSTRAR_TODO'}
+                            privadoOptions={{
+                                suministros: quote.opcionesPdf?.privadoSuministros || '',
+                                instalacion: quote.opcionesPdf?.privadoInstalacion || '',
+                                servicios: quote.opcionesPdf?.privadoServicios || ''
+                            }}
                         />
                     </Card>
 
