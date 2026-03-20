@@ -101,7 +101,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                         </div>
                                         <div className="flex border-b-2 border-black h-6 items-center px-1">
                                             <div className="w-32 text-[9px] font-bold">Fecha Vencimiento</div>
-                                            <div className="flex-1 text-[9px] border-l-2 border-black pl-2">{format(new Date(new Date(quote.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy")}</div>
+                                            <div className="flex-1 text-[9px] border-l-2 border-black pl-2">{format(quote.fechaValidez ? new Date(quote.fechaValidez) : new Date(new Date(quote.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy")}</div>
                                         </div>
                                         <div className="flex-1 flex flex-col items-center justify-center p-1 bg-gray-100/50">
                                             <p className="text-[9px] font-bold uppercase text-black">NÚMERO DE OFERTA</p>
@@ -138,7 +138,10 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                 <div className="p-4 rounded-lg bg-gray-50 text-black">
                                     <h2 className="text-xl font-bold" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>COTIZACIÓN</h2>
                                     <p className="text-lg font-mono" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>{quote.numero}</p>
-                                    <p className="text-sm text-gray-500">{format(new Date(quote.fecha), "dd MMMM yyyy", { locale: es })}</p>
+                                    <div className="text-sm text-gray-500 mt-2 space-y-0.5">
+                                        <p>Fecha: {format(new Date(quote.fecha), "dd MMMM yyyy", { locale: es })}</p>
+                                        <p>Vence: {format(quote.fechaValidez ? new Date(quote.fechaValidez) : new Date(new Date(quote.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: es })}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -215,7 +218,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                     <tr className="border-b border-gray-100">
                                         <td className="py-2 px-1 align-top text-gray-500">1</td>
                                         <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
-                                            SERVICIOS Y SUMINISTROS GLOBALES SEGÚN DESCRIPCIÓN
+                                            {quote.descripcionTrabajo}
                                         </td>
                                         <td className="py-2 px-1 align-top text-center">1</td>
                                         <td className="py-2 px-1 align-top text-center">GLB</td>
@@ -225,6 +228,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                 ) : (
                                     quote.items.map((item, idx) => {
                                         const unitValue = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
+                                        const totalValue = unitValue * item.cantidad;
                                         return (
                                             <tr key={idx} className="border-b border-gray-100">
                                                 <td className="py-2 px-1 align-top text-gray-500">{idx + 1}</td>
@@ -241,7 +245,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                                 <td className="py-2 px-1 align-top text-center">{item.cantidad}</td>
                                                 <td className="py-2 px-1 align-top text-center">UND</td>
                                                 <td className="py-2 px-1 align-top text-right">${unitValue.toLocaleString()}</td>
-                                                <td className="py-2 px-1 align-top text-right font-bold">${item.valorTotal.toLocaleString()}</td>
+                                                <td className="py-2 px-1 align-top text-right font-bold">${totalValue.toLocaleString()}</td>
                                             </tr>
                                         )
                                     })
@@ -322,17 +326,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                             )}
                         </div>
 
-                        {/* SIGNATURE SECTION */}
-                        <div className="mt-20 flex justify-between items-end px-4">
-                            <div className="text-center w-64 border-t border-black pt-2">
-                                <p className="text-[10px] font-bold uppercase">{quote.elaboradoPor || preparedByFallback || "José Gabriel Ramirez Bernal"}</p>
-                                <p className="text-[9px]">DISEÑO Y MONTAJE DE REDES ELÉCTRICAS D.M.R.E</p>
-                            </div>
-                            <div className="text-center w-64 border-t border-black pt-2">
-                                <p className="text-[10px] font-bold uppercase">ACEPTADO (CLIENTE)</p>
-                                <p className="text-[9px]">Firma y Sello</p>
-                            </div>
-                        </div>
+                        {/* SIGNATURE SECTION (Removed per user request) */}
 
                         <div className="mt-12 text-center text-[9px] text-gray-400">
                             Gracias por su confianza. Generado el {format(new Date(), "dd/MM/yyyy HH:mm")}

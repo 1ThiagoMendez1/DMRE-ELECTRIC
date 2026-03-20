@@ -52,6 +52,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
     const [privadoInstalacion, setPrivadoInstalacion] = useState("");
     const [privadoServicios, setPrivadoServicios] = useState("");
     const [fechaCotizacion, setFechaCotizacion] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [fechaValidez, setFechaValidez] = useState<string>("");
     const [descripcionTrabajo, setDescripcionTrabajo] = useState("");
     const [tipoOferta, setTipoOferta] = useState<Cotizacion['tipo']>('NORMAL');
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -80,10 +81,11 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
         setIsSaving(true);
         try {
             const quote: Cotizacion = {
-                id: initialData?.id || `COT-TEMPORAL`,
+                id: initialData?.id || `temp-${Date.now()}`,
                 numero: initialData?.numero || "", // Let server generate if new
                 tipo: tipoOferta,
-                fecha: new Date(fechaCotizacion),
+                fecha: new Date(`${fechaCotizacion}T12:00:00`),
+                fechaValidez: fechaValidez ? new Date(`${fechaValidez}T12:00:00`) : undefined,
                 cliente: selectedCliente,
                 clienteId: selectedCliente.id,
                 descripcionTrabajo: descripcionTrabajo,
@@ -143,6 +145,11 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                 ivaUtilidadPorcentaje: item.ivaUtilidadPorcentaje || initialData.ivaUtilidadGlobalPorcentaje || 19,
             })));
             setFechaCotizacion(new Date(initialData.fecha).toISOString().split('T')[0]);
+            if (initialData.fechaValidez) {
+                setFechaValidez(new Date(initialData.fechaValidez).toISOString().split('T')[0]);
+            } else {
+                setFechaValidez("");
+            }
             setDescripcionTrabajo(initialData.descripcionTrabajo || "");
             setAlcance(initialData.alcance || "");
             setFormaPago(initialData.formaPago || "");
@@ -201,10 +208,11 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
     }, [items, globalDiscountPct, globalIvaPct, aiuAdminPct, aiuImprevistoPct, aiuUtilidadPct, ivaUtilidadPct, esAiu]);
 
     const getCurrentQuoteObj = (): Cotizacion => ({
-        id: initialData?.id || `COT-TEMPORAL`,
-        numero: initialData?.numero || `COT-TEMPORAL`,
+        id: initialData?.id || `temp-${Date.now()}`,
+        numero: initialData?.numero || (tipoOferta === 'SIMPLIFICADA' ? 'S-NUEVO' : 'NUEVO'),
         tipo: tipoOferta,
-        fecha: new Date(fechaCotizacion),
+        fecha: new Date(`${fechaCotizacion}T12:00:00`),
+        fechaValidez: fechaValidez ? new Date(`${fechaValidez}T12:00:00`) : undefined,
         cliente: selectedCliente || {
             id: 'temp', nombre: 'Cliente de Prueba', documento: '000000',
             direccion: 'No definida', correo: '', telefono: '',
@@ -369,7 +377,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                 <CardHeader className="py-3">
                                     <CardTitle className="text-sm font-medium">Información General</CardTitle>
                                 </CardHeader>
-                                <CardContent className="py-2 grid grid-cols-2 gap-4">
+                                <CardContent className="py-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-1">
                                         <Label htmlFor="fecha" className="text-xs">Fecha de Emisión</Label>
                                         <Input
@@ -377,6 +385,16 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                             type="date"
                                             value={fechaCotizacion}
                                             onChange={(e) => setFechaCotizacion(e.target.value)}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="fechaValidez" className="text-xs">Fecha de Vencimiento</Label>
+                                        <Input
+                                            id="fechaValidez"
+                                            type="date"
+                                            value={fechaValidez}
+                                            onChange={(e) => setFechaValidez(e.target.value)}
                                             className="h-8 text-sm"
                                         />
                                     </div>
@@ -392,7 +410,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="col-span-2 space-y-1">
+                                    <div className="col-span-1 md:col-span-3 space-y-1">
                                         <Label htmlFor="descripcion" className="text-xs">Descripción del Trabajo</Label>
                                         <Input
                                             id="descripcion"

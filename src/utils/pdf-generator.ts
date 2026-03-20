@@ -333,7 +333,8 @@ export const generateQuotePDF = (
         doc.setFontSize(9);
         doc.setFont(style.fonts.body, 'normal');
         doc.setTextColor(...text); // Use black text
-        doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd/MM/yyyy")}`, boxX + 33, boxY + 24, { align: 'center' });
+        doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd/MM/yyyy")}`, boxX + 33, boxY + 22, { align: 'center' });
+        doc.text(`Vence: ${format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy")}`, boxX + 33, boxY + 27, { align: 'center' });
     }
     // Minimal layout does not need this secondary title box
     else if (style.layout === 'minimal') {
@@ -348,8 +349,12 @@ export const generateQuotePDF = (
         doc.setFontSize(14);
         doc.setFont(style.fonts.header, 'bold');
         doc.setTextColor(...primary);
-        doc.text("COTIZACIÓN", pageWidth - 50, 50, { align: 'center' });
         doc.text(`# ${cotizacion.numero}`, pageWidth - 50, 60, { align: 'center' });
+        doc.setFontSize(9);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.setTextColor(...text);
+        doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd/MM/yyyy")}`, pageWidth - 50, 66, { align: 'center' });
+        doc.text(`Vence: ${format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy")}`, pageWidth - 50, 71, { align: 'center' });
     }
     // Centered layout
     else if (style.layout === 'centered') {
@@ -361,7 +366,7 @@ export const generateQuotePDF = (
         doc.text(`COTIZACIÓN # ${cotizacion.numero}`, pageWidth / 2, currentY, { align: 'center' });
         doc.setFontSize(10);
         doc.setTextColor(...text);
-        doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd MMMM yyyy", { locale: es })}`, pageWidth / 2, currentY + 6, { align: 'center' });
+        doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd MMMM yyyy", { locale: es })} | Vence: ${format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: es })}`, pageWidth / 2, currentY + 6, { align: 'center' });
         currentY += 15;
     }
     // Sidebar layout - COTIZACIÓN title on the right side of main content
@@ -378,7 +383,8 @@ export const generateQuotePDF = (
         doc.setFontSize(9);
         doc.setFont(style.fonts.body, 'normal');
         doc.setTextColor(...text);
-        doc.text(format(new Date(cotizacion.fecha), "dd MMMM yyyy", { locale: es }), contentStartX + contentWidth, 39, { align: 'right' });
+        doc.text(`Fecha: ${format(new Date(cotizacion.fecha), "dd MMMM yyyy", { locale: es })}`, contentStartX + contentWidth, 39, { align: 'right' });
+        doc.text(`Vence: ${format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: es })}`, contentStartX + contentWidth, 44, { align: 'right' });
     }
 
 
@@ -414,22 +420,24 @@ export const generateQuotePDF = (
         doc.setFont(style.fonts.body, 'normal');
         doc.text(format(new Date(cotizacion.fecha), "dd/MM/yyyy"), 35, currentY + 6);
 
+        doc.setFont(style.fonts.header, 'bold');
+        doc.text("Vence:", 16, currentY + 11);
+        doc.setFont(style.fonts.body, 'normal');
+        doc.text(format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy"), 35, currentY + 11);
+
         if (cotizacion.estado) {
             doc.setFont(style.fonts.header, 'bold');
-            doc.text("Estado:", 16, currentY + 11);
+            doc.text("Estado:", 16, currentY + 16);
             doc.setFont(style.fonts.body, 'normal');
-            doc.text(cotizacion.estado, 35, currentY + 11);
+            doc.text(cotizacion.estado, 35, currentY + 16);
         }
 
         doc.setFont(style.fonts.header, 'bold');
-        doc.text("Tipo Oferta:", 16, currentY + 16);
+        doc.text("Oferta:", 16, currentY + 21);
         doc.setFont(style.fonts.body, 'normal');
-        doc.text(cotizacion.tipo === 'NORMAL' ? 'Normal' : 'Simplificada', 35, currentY + 16);
+        doc.text(cotizacion.tipo === 'NORMAL' ? 'Normal' : 'Simplificada', 35, currentY + 21);
 
-        doc.setFont(style.fonts.header, 'bold');
-        doc.text("Vendedor:", 16, currentY + 21);
-        doc.setFont(style.fonts.body, 'normal');
-        doc.text("DMRE", 35, currentY + 21);
+
 
         // RIGHT BOX (Client Info)
         const rightBoxX = 14 + leftBoxWidth + gap;
@@ -616,7 +624,7 @@ export const generateQuotePDF = (
         drawCell(rightX, startY + rowH, rightColW, rowH, "Fecha Cotización", format(new Date(cotizacion.fecha), "dd/MM/yyyy"));
 
         // Row 3: Fecha de vencimiento
-        drawCell(rightX, startY + rowH * 2, rightColW, rowH, "Fecha Vencimiento", format(new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy"));
+        drawCell(rightX, startY + rowH * 2, rightColW, rowH, "Fecha Vencimiento", format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy"));
 
         // Row 4-5: NÚMERO DE OFERTA (Large Box)
         doc.rect(rightX, startY + rowH * 3, rightColW, rowH * 2);
@@ -705,7 +713,7 @@ export const generateQuotePDF = (
         // En Ocultar Todo solo mostramos un total globalizado
         tableBody.push([
             1,
-            "SERVICIOS Y SUMINISTROS GLOBALES SEGÚN DESCRIPCIÓN",
+            cotizacion.descripcionTrabajo,
             "1",
             "GLB",
             currencyFmt.format(cotizacion.subtotal),

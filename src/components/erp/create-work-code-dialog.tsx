@@ -140,7 +140,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                 valorUnitario: m.itemRef.valorUnitario
             })),
             costoTotalMateriales: materialsWithProfit,
-            costoTotal: grandTotalEstimated,
+            costoTotal: materialsWithProfit,
             fechaCreacion: new Date()
         };
 
@@ -152,7 +152,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                 addInstalacion({
                     codigo: values.codigo,
                     descripcion: values.descripcion,
-                    valorCalculado: moAiu,
+                    valorCalculado: materialsWithProfit,
                     activo: true
                 });
             }
@@ -267,7 +267,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                                     </div>
                                     <div className="text-xs text-right mt-1 px-1 bg-primary/10 rounded-md py-1 space-x-2">
                                         <span className="text-muted-foreground">Calculado:</span>
-                                        <span className="text-primary font-bold">{formatCurrency(moWithProfit)}</span>
+                                        <span className="text-primary font-bold">{formatCurrency(profitMo)}</span>
                                     </div>
                                 </FormItem>
                             </div>

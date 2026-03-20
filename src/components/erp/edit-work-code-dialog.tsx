@@ -157,7 +157,7 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
             valorManoObra: baseMo,
             manoDeObra: moConMargen,
             costoTotalMateriales: materialsConMargen,
-            costoTotal: total,
+            costoTotal: materialsConMargen,
             materiales: selectedMaterials.map(m => ({
                 inventarioId: m.inventarioId,
                 id: m.inventarioId,
@@ -177,7 +177,7 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
                 ...relatedInst,
                 codigo: values.codigo,
                 descripcion: values.descripcion,
-                valorCalculado: moAiu
+                valorCalculado: materialsConMargen
             });
         }
         toast({ title: "Código Actualizado", description: "Los cambios se han guardado correctamente." });
@@ -259,7 +259,7 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
                                     </div>
                                     <div className="text-xs text-right mt-1 px-1 bg-primary/10 rounded-md py-1 space-x-2">
                                         <span className="text-muted-foreground">Calculado:</span>
-                                        <span className="text-primary font-bold">{formatCurrency(moCost + (moCost * (margenManoObra / 100)))}</span>
+                                        <span className="text-primary font-bold">{formatCurrency(moCost * (margenManoObra / 100))}</span>
                                     </div>
                                 </FormItem>
                                 <FormField

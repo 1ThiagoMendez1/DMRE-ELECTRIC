@@ -12,6 +12,14 @@ import { revalidatePath } from "next/cache";
 // I'll use multi_replace to do both at once.
 
 
+function parseLocalDate(dateStr: any): Date {
+    if (!dateStr) return new Date();
+    if (dateStr instanceof Date) return dateStr;
+    const str = dateStr.toString();
+    if (str.includes('T')) return new Date(str);
+    return new Date(`${str}T12:00:00`);
+}
+
 function mapItemToUI(db: any): CotizacionItem {
     return {
         id: db.id,
@@ -42,7 +50,8 @@ function mapToUI(db: any, items: any[] = [], cliente?: any): Cotizacion {
         id: db.id,
         numero: db.numero,
         tipo: db.tipo || "NORMAL",
-        fecha: new Date(db.fecha),
+        fecha: parseLocalDate(db.fecha),
+        fechaValidez: db.fecha_validez ? parseLocalDate(db.fecha_validez) : undefined,
         clienteId: db.cliente_id,
         trabajoId: db.trabajo_id, // Map from DB
         cliente: cliente ? {
@@ -75,9 +84,9 @@ function mapToUI(db: any, items: any[] = [], cliente?: any): Cotizacion {
         // Job execution fields
         direccionProyecto: db.direccion_proyecto,
         ubicacion: db.ubicacion,
-        fechaInicio: db.fecha_inicio ? new Date(db.fecha_inicio) : undefined,
-        fechaFinEstimada: db.fecha_fin_estimada ? new Date(db.fecha_fin_estimada) : undefined,
-        fechaFinReal: db.fecha_fin_real ? new Date(db.fecha_fin_real) : undefined,
+        fechaInicio: db.fecha_inicio ? parseLocalDate(db.fecha_inicio) : undefined,
+        fechaFinEstimada: db.fecha_fin_estimada ? parseLocalDate(db.fecha_fin_estimada) : undefined,
+        fechaFinReal: db.fecha_fin_real ? parseLocalDate(db.fecha_fin_real) : undefined,
         costoReal: Number(db.costo_real) || 0,
         responsableId: db.responsable_id,
         progreso: Number(db.progreso) || 0,
@@ -109,6 +118,7 @@ function mapToDB(ui: any): any {
         numero: ui.numero,
         tipo: ui.tipo,
         fecha: ui.fecha ? formatDate(ui.fecha) : undefined,
+        fecha_validez: ui.fechaValidez ? formatDate(ui.fechaValidez) : undefined,
         cliente_id: ui.clienteId,
         descripcion_trabajo: ui.descripcionTrabajo,
         subtotal: ui.subtotal !== undefined ? round2(ui.subtotal) : undefined,
@@ -153,24 +163,41 @@ function mapToDB(ui: any): any {
 }
 
 async function getNextNumero(supabase: any, tipo: "NORMAL" | "SIMPLIFICADA" = "NORMAL") {
-    const prefix = tipo === "SIMPLIFICADA" ? "COTS-" : "COT-";
+    const isSimplified = tipo === "SIMPLIFICADA";
+    const prefix = isSimplified ? "S-" : "";
 
     const { data } = await supabase
         .from("cotizaciones")
         .select("numero")
-        .ilike("numero", `${prefix}%`)
-        .order("created_at", { ascending: false }) // It's safer to order by created_at since strings sort 'COT-10' before 'COT-2'
-        .limit(50);
+        .order("created_at", { ascending: false })
+        .limit(500);
 
     let nextNum = 1;
     if (data && data.length > 0) {
         let maxNum = 0;
         for (const row of data) {
             if (!row.numero) continue;
-            // Ignore legacy formats like COT-2026-0001
-            const parts = row.numero.split("-");
-            if (parts.length === 2 && row.numero.startsWith(prefix)) {
-                const num = parseInt(parts[1], 10);
+            
+            let numStr = "";
+            let num = NaN;
+
+            if (isSimplified) {
+                if (row.numero.startsWith("S-")) numStr = row.numero.substring(2);
+                else if (row.numero.startsWith("COTS-")) numStr = row.numero.substring(5);
+            } else {
+                if (row.numero.startsWith("COT-")) {
+                    numStr = row.numero.substring(4);
+                } else if (/^\d+$/.test(row.numero)) {
+                    numStr = row.numero;
+                }
+            }
+
+            if (numStr) {
+                if (numStr.includes("-")) {
+                     const parts = numStr.split("-");
+                     numStr = parts[parts.length - 1];
+                }
+                num = parseInt(numStr, 10);
                 if (!isNaN(num) && num > maxNum) {
                     maxNum = num;
                 }

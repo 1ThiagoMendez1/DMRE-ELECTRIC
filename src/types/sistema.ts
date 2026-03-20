@@ -109,6 +109,7 @@ export interface Cotizacion {
     numero: string;
     tipo: TipoOferta; // New
     fecha: Date;
+    fechaValidez?: Date; // Expiration Date
     clienteId: string;
     cliente: Cliente;
     trabajoId?: string; // Links to trabajos table

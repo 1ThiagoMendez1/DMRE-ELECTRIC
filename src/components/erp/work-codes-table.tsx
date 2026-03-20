@@ -43,27 +43,9 @@ export function WorkCodesTable() {
         return searchMatch;
     });
 
-    // Helper to calculate cost
+    // Helper to reflect cost (using the saved total which now reflects materials with profit)
     const calculateCost = (code: any) => {
-        const materialCost = (code.materiales || []).reduce((sum: number, mat: any) => {
-            // Find current cost in inventory if possible
-            let invItem = inventario.find(i => i.id === mat.inventarioId || i.id === mat.id);
-
-            // Validate Match (Fix for Mock Data ID discrepancies)
-            if (invItem && mat.nombre && !invItem.descripcion.toLowerCase().includes(mat.nombre.toLowerCase()) && !mat.nombre.toLowerCase().includes(invItem.descripcion.toLowerCase())) {
-                // Try finding by name
-                const nameMatch = inventario.find(i => i.descripcion === mat.nombre || i.descripcion === mat.descripcion);
-                if (nameMatch) {
-                    invItem = nameMatch;
-                } else {
-                    invItem = undefined; // Fallback to stored price
-                }
-            }
-
-            const unitCost = invItem ? invItem.valorUnitario : (mat.valorUnitario || 0);
-            return sum + (unitCost * mat.cantidad);
-        }, 0);
-        return materialCost + (code.valorManoObra || code.manoDeObra || 0);
+        return code.costoTotal || 0;
     };
 
     return (
@@ -104,7 +86,6 @@ export function WorkCodesTable() {
                                 <TableHead>Código</TableHead>
                                 <TableHead>Descripción</TableHead>
                                 <TableHead>Materiales</TableHead>
-                                <TableHead className="text-right">Mano de Obra</TableHead>
                                 <TableHead className="text-right">Costo Total</TableHead>
                                 <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
@@ -137,9 +118,6 @@ export function WorkCodesTable() {
                                             <TableCell>{code.descripcion}</TableCell>
                                             <TableCell>
                                                 <Badge variant="outline">{code.materiales.length} Ítems</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {formatCurrency(code.valorManoObra || code.manoDeObra || 0)}
                                             </TableCell>
                                             <TableCell className="text-right font-bold">
                                                 {formatCurrency(totalCost)}

@@ -243,6 +243,9 @@ function PortalViewContent() {
                     <p className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
                         <Calendar className="h-4 w-4" /> Solicitado el {format(quote.fecha, "dd 'de' MMMM 'de' yyyy", { locale: es })}
                     </p>
+                    <p className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
+                        <Clock className="h-4 w-4" /> Válida hasta el {format(quote.fechaValidez ? new Date(quote.fechaValidez) : new Date(new Date(quote.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                    </p>
                 </div>
                 <div className="flex gap-2">
                     <Button onClick={handleDownloadPDF}>

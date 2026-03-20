@@ -332,7 +332,7 @@ export function TrabajoHistoryDialog({
     // Helper to calculate item totals with the new simple Additional Margin logic
     const calculateItemDetails = (item: ItemConVisibilidad) => {
         const pVenta = item.valorUnitario || 0;
-        const margen = pVenta * ((item.aiuUtilidadPorcentaje || 0) / 100);
+        const margen = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
 
         const unitTotal = pVenta + margen;
         const lineTotal = unitTotal * item.cantidad;
@@ -1034,7 +1034,7 @@ export function TrabajoHistoryDialog({
         const itemsCalculados = visibleItems.map((item) => {
             const { unitTotal, lineTotal } = calculateItemDetails(item);
             const { visibleEnPdf, ...rest } = item;
-            return { ...rest, valorUnitario: unitTotal, valorTotal: lineTotal };
+            return { ...rest, valorUnitario: unitTotal, valorTotal: lineTotal, porcentaje: 0 };
         });
 
         const subTotalPDF = itemsCalculados.reduce((a, b) => a + b.valorTotal, 0);
