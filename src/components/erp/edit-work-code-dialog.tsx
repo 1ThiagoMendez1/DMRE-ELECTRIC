@@ -41,11 +41,11 @@ const formSchema = z.object({
 
 interface EditWorkCodeDialogProps {
     code: any;
-    onClose?: () => void;
+    open: boolean;
+    onClose: () => void;
 }
 
-export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
-    const [open, setOpen] = useState(false);
+export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogProps) {
     const { updateCodigoTrabajo, inventario, instalaciones, updateInstalacion } = useErp();
     const { toast } = useToast();
 
@@ -171,18 +171,26 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
         updateCodigoTrabajo(updatedCode);
 
         // Sync with Installation
-        const relatedInst = instalaciones.find(i => i.codigo === code.codigo);
+        let instSku = values.codigo;
+        if (instSku.startsWith('SU-')) {
+            instSku = instSku.replace('SU-', 'IN-');
+        } else if (instSku.startsWith('SU')) {
+            instSku = instSku.replace('SU', 'IN-');
+        } else {
+            instSku = `IN-${instSku}`;
+        }
+
+        const relatedInst = instalaciones.find(i => i.codigo === code.codigo || i.codigo === instSku || i.codigo === code.codigo.replace('SU-', 'IN-'));
         if (relatedInst) {
             updateInstalacion({
                 ...relatedInst,
-                codigo: values.codigo,
+                codigo: instSku,
                 descripcion: values.descripcion,
-                valorCalculado: materialsConMargen
+                valorCalculado: total // The work code total contains materials + mo
             });
         }
-        toast({ title: "Código Actualizado", description: "Los cambios se han guardado correctamente." });
-        setOpen(false);
-        if (onClose) onClose();
+        toast({ title: "Código Actualizado", description: "Los cambios se han guardado correctamente y sincronizado en instalación." });
+        onClose();
     }
 
     // Calculate Estimated Cost
@@ -191,14 +199,8 @@ export function EditWorkCodeDialog({ code, onClose }: EditWorkCodeDialogProps) {
 
     return (
         <Dialog open={open} onOpenChange={(val) => {
-            setOpen(val);
             if (!val && onClose) onClose();
         }}>
-            <DialogTrigger asChild>
-                <div className="flex items-center w-full cursor-pointer">
-                    <Pencil className="mr-2 h-4 w-4" /> Editar
-                </div>
-            </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Editar Código de Trabajo</DialogTitle>

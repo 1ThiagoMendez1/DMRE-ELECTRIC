@@ -61,31 +61,46 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
     const [margenMateriales, setMargenMateriales] = useState<number>(0);
     const [margenManoObra, setMargenManoObra] = useState<number>(0);
 
-    // Combine Inventory and Work Codes for selection
+    // Only use Inventory for selection
     const availableItems = [
-        ...inventario.map(i => ({ ...i, type: 'MATERIAL', label: i.descripcion, value: i.descripcion })),
-        ...codigosExistentes.map(c => ({ // Use codigosExistentes instead of codigosTrabajo
-            ...c,
-            type: 'APU',
-            label: `(APU) ${c.nombre}`,
-            value: `(APU) ${c.nombre}`,
-            valorUnitario: c.costoTotal // Use calculated total cost for APU
-        }))
+        ...inventario.map(i => ({ ...i, type: 'MATERIAL', label: i.descripcion, value: i.descripcion }))
     ];
 
     // Initialize form with generated code prefix
-    const numApus = codigosExistentes.length;
-    const consecutivo = numApus + 1;
-    const prefijo = '';
-
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            codigo: `${consecutivo.toString().padStart(3, '0')}`,
+            codigo: "SU-",
             descripcion: "",
             valorManoObra: "0"
         }
     });
+
+    useEffect(() => {
+        if (open) {
+            let maxNum = 0;
+            const checkMax = (code: string | undefined) => {
+                if (code && code.startsWith("SU-")) {
+                    const numParts = code.replace("SU-", "").match(/\d+/);
+                    if (numParts) {
+                        const num = parseInt(numParts[0], 10);
+                        if (!isNaN(num) && num > maxNum) {
+                            maxNum = num;
+                        }
+                    }
+                }
+            };
+            
+            inventario.forEach(i => checkMax(i.sku));
+            codigosExistentes.forEach(c => checkMax(c.codigo));
+            
+            const nextNum = maxNum + 1;
+            const nextSku = `SU-${String(nextNum).padStart(4, '0')}`;
+            if (form.getValues("codigo") !== nextSku) {
+                form.setValue("codigo", nextSku, { shouldValidate: true });
+            }
+        }
+    }, [open, inventario, codigosExistentes, form]);
 
     const handleAddMaterial = (item: any) => {
         const idToCheck = item.id;
@@ -149,8 +164,17 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
         // CREACIÓN DOBLE AUTOMÁTICA
         try {
             if (addInstalacion) {
+                let instSku = values.codigo;
+                if (instSku.startsWith('SU-')) {
+                    instSku = instSku.replace('SU-', 'IN-');
+                } else if (instSku.startsWith('SU')) {
+                    instSku = instSku.replace('SU', 'IN-');
+                } else {
+                    instSku = `IN-${instSku}`;
+                }
+
                 addInstalacion({
-                    codigo: values.codigo,
+                    codigo: instSku,
                     descripcion: values.descripcion,
                     valorCalculado: materialsWithProfit,
                     activo: true
@@ -276,17 +300,17 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
 
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <h4 className="text-sm font-medium">Lista de Materiales y Sub-APUs</h4>
+                                    <h4 className="text-sm font-medium">Lista de Materiales</h4>
                                     <Popover open={comboOpen} onOpenChange={setComboOpen}>
                                         <PopoverTrigger asChild>
                                             <Button variant="outline" role="combobox" aria-expanded={comboOpen} className="w-[300px] justify-between">
-                                                Agregar Ítem...
+                                                Agregar Material...
                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[300px] p-0">
                                             <Command>
-                                                <CommandInput placeholder="Buscar material o APU..." />
+                                                <CommandInput placeholder="Buscar material..." />
                                                 <CommandEmpty>No encontrado.</CommandEmpty>
                                                 <ScrollArea className="h-[200px]">
                                                     <CommandGroup>

@@ -36,6 +36,7 @@ export function WorkCodesTable() {
     const [selectedCode, setSelectedCode] = useState<any>(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [editCode, setEditCode] = useState<any>(null);
 
     const filteredCodes = codigosTrabajo.filter(code => {
         const searchMatch = code.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -132,13 +133,8 @@ export function WorkCodesTable() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                        <DropdownMenuItem onSelect={(e) => {
-                                                            e.preventDefault();
-                                                            // We can also open Detail and switch tab, but simpler to just Edit
-                                                            // Actually, Detail has Edit button too.
-                                                            // Let's keep Edit here for quick access.
-                                                        }}>
-                                                            <EditWorkCodeDialog code={code} onClose={() => { }} />
+                                                        <DropdownMenuItem onSelect={() => setEditCode(code)}>
+                                                            <Edit className="mr-2 h-4 w-4" /> Editar
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem className="text-red-600" onClick={() => deleteCodigoTrabajo(code.id)}>
@@ -161,6 +157,13 @@ export function WorkCodesTable() {
                 onOpenChange={setDetailOpen}
                 code={selectedCode}
             />
+            {editCode && (
+                <EditWorkCodeDialog
+                    code={editCode}
+                    open={!!editCode}
+                    onClose={() => setEditCode(null)}
+                />
+            )}
         </Card>
     );
 }

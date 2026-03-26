@@ -157,8 +157,8 @@ export function InventoryFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-6 overflow-hidden">
+                <DialogHeader className="shrink-0">
                     <DialogTitle>{isEditing ? "Editar Item" : "Nuevo Item"}</DialogTitle>
                     <DialogDescription>
                         {formData.tipo === 'COMPUESTO'
@@ -166,6 +166,7 @@ export function InventoryFormDialog({
                             : "Información básica del item de inventario."}
                     </DialogDescription>
                 </DialogHeader>
+                <div className="flex-1 overflow-y-auto pr-2">
                 <form onSubmit={handleSubmit}>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -350,10 +351,11 @@ export function InventoryFormDialog({
                             </div>
                         )}
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="mt-4 shrink-0">
                         <Button type="submit">Guardar Item</Button>
                     </DialogFooter>
                 </form>
+                </div>
             </DialogContent>
         </Dialog>
     );
