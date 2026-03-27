@@ -222,7 +222,8 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             ocultarDetalles: true,
             costoUnitario: isService ? servicePrice : (item.precio_proveedor || item.precioProveedor || item.costoMateriales || 0),
             // Only APU services have sub-items (materials); Instalaciones/Servicios Logísticos do not
-            subItems: item.subTipo === 'APU' ? item.materiales : undefined
+            subItems: item.subTipo === 'APU' ? item.materiales : undefined,
+            codigoItem: item.codigo
         };
 
         onItemSelected(newItem);

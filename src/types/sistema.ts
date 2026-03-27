@@ -77,6 +77,7 @@ export interface CotizacionItem {
     id: string;
     inventarioId?: string;
     codigoTrabajoId?: string;
+    codigoItem?: string; // New: to elegantly hold the SU-xxx code
     tipo: 'PRODUCTO' | 'SERVICIO'; // New: Distinguish between simple products and work codes
     descripcion: string; // Snapshot of description
     cantidad: number;

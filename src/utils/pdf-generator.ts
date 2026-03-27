@@ -687,20 +687,33 @@ export const generateQuotePDF = (
     let sumSuministros = 0;
     let sumInstalaciones = 0;
     let sumServicios = 0;
+    
+    const setS = new Set<string>();
+    const setI = new Set<string>();
+    const setServ = new Set<string>();
 
     cotizacion.items.forEach(item => {
         const desc = item.descripcion.toUpperCase();
         const base = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
         const total = item.cantidad * base;
         
+        const code = item.codigoItem || item.notas;
+        
         if (desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-')) {
             sumInstalaciones += total;
+            if (code) setI.add(code);
         } else if (desc.includes('SUMINISTRO') || desc.includes('SU-') || item.codigoTrabajoId) {
             sumSuministros += total;
+            if (code) setS.add(code);
         } else {
             sumServicios += total;
+            if (code) setServ.add(code);
         }
     });
+    
+    const codesS = Array.from(setS).join(', ') || '1';
+    const codesI = Array.from(setI).join(', ') || '2';
+    const codesServ = Array.from(setServ).join(', ') || '3';
     
     if (materialVisibilityMode === 'MODO_PRIVADO') {
         // En Modo Privado reemplazamos la tabla de ítems por las 3 filas personalizadas
@@ -746,11 +759,12 @@ export const generateQuotePDF = (
             
             // Calculate unit value including the specific item percentage (margin)
             const unitValue = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
+            const itemCode = item.codigoItem || item.notas || (index + 1).toString();
 
             tableBody.push([
-                index + 1,
+                itemCode,
                 item.descripcion.replace(/INSTALACIONES:/gi, 'Instalación:'),
-                item.cantidad,
+                item.cantidad.toString(),
                 "UND",
                 currencyFmt.format(unitValue),
                 currencyFmt.format(item.valorTotal)
@@ -825,7 +839,7 @@ export const generateQuotePDF = (
             5: { halign: 'right' },
             6: { halign: 'right', fontStyle: 'bold' }
         } : {
-            0: { cellWidth: 10, halign: 'center' },
+            0: { cellWidth: 22, halign: 'center' },
             2: { cellWidth: 15, halign: 'center' },
             3: { cellWidth: 15, halign: 'center' },
             4: { halign: 'right' },

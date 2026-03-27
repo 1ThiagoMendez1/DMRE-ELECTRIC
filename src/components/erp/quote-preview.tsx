@@ -31,26 +31,40 @@ interface QuotePreviewProps {
 const rgbToHex = (c: [number, number, number]) => "#" + c.map(x => x.toString(16).padStart(2, '0')).join('');
 
 export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallback, materialVisibilityMode = 'MOSTRAR_TODO', privadoOptions }: QuotePreviewProps) {
-    const { sumSuministros, sumInstalaciones, sumServicios } = React.useMemo(() => {
+    const { sumSuministros, sumInstalaciones, sumServicios, codesSuministros, codesInstalaciones, codesServicios } = React.useMemo(() => {
         let sumS = 0;
         let sumI = 0;
         let sumServ = 0;
+        
+        const setS = new Set<string>();
+        const setI = new Set<string>();
+        const setServ = new Set<string>();
         
         quote.items.forEach(item => {
             const desc = item.descripcion.toUpperCase();
             const base = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
             const total = item.cantidad * base;
             
+            const code = item.codigoItem || item.notas;
+            
             if (desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-')) {
                 sumI += total;
+                if (code) setI.add(code);
             } else if (desc.includes('SUMINISTRO') || desc.includes('SU-') || item.codigoTrabajoId) {
                 sumS += total;
+                if (code) setS.add(code);
             } else {
                 sumServ += total;
+                if (code) setServ.add(code);
             }
         });
         
-        return { sumSuministros: sumS, sumInstalaciones: sumI, sumServicios: sumServ };
+        return { 
+            sumSuministros: sumS, sumInstalaciones: sumI, sumServicios: sumServ,
+            codesSuministros: Array.from(setS).join(', ') || '1',
+            codesInstalaciones: Array.from(setI).join(', ') || '2',
+            codesServicios: Array.from(setServ).join(', ') || '3'
+        };
     }, [quote.items]);
 
     return (
@@ -194,7 +208,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="border-b-2 border-black" style={{ backgroundColor: currentStyle.layout === 'official_grid' ? '#fff' : rgbToHex(currentStyle.colors.accent) }}>
-                                    <th className="py-2 px-1 text-left w-10">IT</th>
+                                    <th className="py-2 px-1 text-center w-16 whitespace-nowrap">IT</th>
                                     <th className="py-2 px-1 text-left">DESCRIPCIÓN</th>
                                     <th className="py-2 px-1 text-center w-16">CANT</th>
                                     <th className="py-2 px-1 text-center w-16">UND</th>
@@ -248,12 +262,12 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                         <td className="py-2 px-1 align-top text-right font-bold">${quote.subtotal.toLocaleString()}</td>
                                     </tr>
                                 ) : (
-                                    quote.items.map((item, idx) => {
+                                    quote.items.map((item, index) => {
                                         const unitValue = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
                                         const totalValue = unitValue * item.cantidad;
                                         return (
-                                            <tr key={idx} className="border-b border-gray-100">
-                                                <td className="py-2 px-1 align-top text-gray-500">{idx + 1}</td>
+                                            <tr key={index} className="border-b border-gray-100">
+                                                <td className="py-2 px-1 align-top text-gray-500 font-mono text-[10px] text-center whitespace-nowrap">{item.codigoItem || item.notas || (index + 1)}</td>
                                                 <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
                                                     {item.descripcion.replace(/INSTALACIONES:/gi, 'Instalación:')}
                                                     {item.subItems && item.subItems.length > 0 && !item.ocultarDetalles && (

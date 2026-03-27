@@ -41,6 +41,7 @@ function mapItemToUI(db: any): CotizacionItem {
         aiuUtilidadPorcentaje: Number(db.aiu_utilidad_porcentaje) || 0,
         ivaUtilidadPorcentaje: Number(db.iva_utilidad_porcentaje) || 0,
         notas: db.notas,
+        codigoItem: db.notas,
         porcentaje: Number(db.porcentaje) || 0,
     };
 }
@@ -292,7 +293,7 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
             aiu_imprevisto_porcentaje: round2(item.aiuImprevistoPorcentaje),
             aiu_utilidad_porcentaje: round2(item.aiuUtilidadPorcentaje),
             iva_utilidad_porcentaje: round2(item.ivaUtilidadPorcentaje),
-            notas: item.notas,
+            notas: item.codigoItem || item.notas,
             porcentaje: round2(item.porcentaje),
         }));
 
@@ -401,7 +402,7 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
                 aiu_imprevisto_porcentaje: round2(item.aiuImprevistoPorcentaje),
                 aiu_utilidad_porcentaje: round2(item.aiuUtilidadPorcentaje),
                 iva_utilidad_porcentaje: round2(item.ivaUtilidadPorcentaje),
-                notas: item.notas,
+                notas: item.codigoItem || item.notas,
                 porcentaje: round2(item.porcentaje),
             }));
 
