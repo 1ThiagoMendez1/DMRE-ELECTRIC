@@ -29,16 +29,44 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { CreateWorkCodeDialog } from "./create-work-code-dialog";
 import { EditWorkCodeDialog } from "./edit-work-code-dialog";
 import { WorkCodeDetailDialog } from "./work-code-detail-dialog";
+import { InventoryFormDialog } from "./inventory-form-dialog";
 
 export function WorkCodesTable() {
-    const { codigosTrabajo, addCodigoTrabajo, deleteCodigoTrabajo, inventario } = useErp();
+    const { codigosTrabajo, addCodigoTrabajo, deleteCodigoTrabajo, inventario, deleteInventarioItem, updateInventarioItem } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCode, setSelectedCode] = useState<any>(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editCode, setEditCode] = useState<any>(null);
+    const [editInventarioItem, setEditInventarioItem] = useState<any>(null);
 
-    const filteredCodes = codigosTrabajo.filter(code => {
+    const extractSuCode = (item: any) => {
+        let raw = (item.codigo || item.sku || item.item || '').toUpperCase().trim();
+        if (raw.startsWith('SU')) return raw;
+        const match = (item.descripcion || '').toUpperCase().match(/SU-?\s*\d+/);
+        if (match) return match[0].replace(/\s+/g, '');
+        return '';
+    };
+
+    const combinedCodes = [
+        ...codigosTrabajo.filter(c => extractSuCode(c) !== '').map(c => ({ ...c, codigo: extractSuCode(c), isInventario: false, originalItem: c })),
+        ...inventario.filter(i => extractSuCode(i) !== '').map(i => ({
+            id: i.id,
+            codigo: extractSuCode(i),
+            descripcion: i.descripcion,
+            materiales: i.tipo === 'COMPUESTO' && i.materiales ? i.materiales : [],
+            costoTotal: i.valorUnitario || i.precioProveedor || i.costoMateriales || 0,
+            isInventario: true,
+            originalItem: i
+        }))
+    ].sort((a, b) => {
+        const numA = parseInt((a.codigo || '').replace(/\D/g, '')) || 0;
+        const numB = parseInt((b.codigo || '').replace(/\D/g, '')) || 0;
+        if (numA !== numB) return numB - numA; // Descending sequential
+        return (a.codigo || '').localeCompare(b.codigo || '');
+    });
+
+    const filteredCodes = combinedCodes.filter(code => {
         const searchMatch = code.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
             code.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
         return searchMatch;
@@ -133,11 +161,20 @@ export function WorkCodesTable() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                        <DropdownMenuItem onSelect={() => setEditCode(code)}>
+                                                        <DropdownMenuItem onSelect={() => {
+                                                            if (code.isInventario) setEditInventarioItem(code.originalItem);
+                                                            else setEditCode(code);
+                                                        }}>
                                                             <Edit className="mr-2 h-4 w-4" /> Editar
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
-                                                        <DropdownMenuItem className="text-red-600" onClick={() => deleteCodigoTrabajo(code.id)}>
+                                                        <DropdownMenuItem className="text-red-600" onClick={() => {
+                                                            if (code.isInventario) {
+                                                                if (confirm("¿Eliminar este material?")) deleteInventarioItem(code.id);
+                                                            } else {
+                                                                deleteCodigoTrabajo(code.id);
+                                                            }
+                                                        }}>
                                                             <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
@@ -164,6 +201,16 @@ export function WorkCodesTable() {
                     onClose={() => setEditCode(null)}
                 />
             )}
+            <InventoryFormDialog
+                open={!!editInventarioItem}
+                onOpenChange={(open) => !open && setEditInventarioItem(null)}
+                initialData={editInventarioItem || {}}
+                onSave={(item) => {
+                    updateInventarioItem(item);
+                    setEditInventarioItem(null);
+                }}
+                availableItems={inventario}
+            />
         </Card>
     );
 }

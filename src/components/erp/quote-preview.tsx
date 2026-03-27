@@ -31,6 +31,28 @@ interface QuotePreviewProps {
 const rgbToHex = (c: [number, number, number]) => "#" + c.map(x => x.toString(16).padStart(2, '0')).join('');
 
 export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallback, materialVisibilityMode = 'MOSTRAR_TODO', privadoOptions }: QuotePreviewProps) {
+    const { sumSuministros, sumInstalaciones, sumServicios } = React.useMemo(() => {
+        let sumS = 0;
+        let sumI = 0;
+        let sumServ = 0;
+        
+        quote.items.forEach(item => {
+            const desc = item.descripcion.toUpperCase();
+            const base = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
+            const total = item.cantidad * base;
+            
+            if (desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-')) {
+                sumI += total;
+            } else if (desc.includes('SUMINISTRO') || desc.includes('SU-') || item.codigoTrabajoId) {
+                sumS += total;
+            } else {
+                sumServ += total;
+            }
+        });
+        
+        return { sumSuministros: sumS, sumInstalaciones: sumI, sumServicios: sumServ };
+    }, [quote.items]);
+
     return (
         <Card
             className="w-full max-w-[800px] bg-white shadow-xl min-h-[1000px] origin-top transition-all duration-300 overflow-hidden relative"
@@ -188,30 +210,30 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                             <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
                                                 Suministros: {privadoOptions?.suministros || ''}
                                             </td>
-                                            <td className="py-2 px-1 align-top text-center">-</td>
+                                            <td className="py-2 px-1 align-top text-center">{sumSuministros > 0 ? '1' : '-'}</td>
                                             <td className="py-2 px-1 align-top text-center">GLB</td>
-                                            <td className="py-2 px-1 align-top text-right">-</td>
-                                            <td className="py-2 px-1 align-top text-right font-bold">-</td>
+                                            <td className="py-2 px-1 align-top text-right">{sumSuministros > 0 ? `$${sumSuministros.toLocaleString()}` : '-'}</td>
+                                            <td className="py-2 px-1 align-top text-right font-bold">{sumSuministros > 0 ? `$${sumSuministros.toLocaleString()}` : '-'}</td>
                                         </tr>
                                         <tr className="border-b border-gray-100">
                                             <td className="py-2 px-1 align-top text-gray-500">2</td>
                                             <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
                                                 Instalación: {privadoOptions?.instalacion || ''}
                                             </td>
-                                            <td className="py-2 px-1 align-top text-center">-</td>
+                                            <td className="py-2 px-1 align-top text-center">{sumInstalaciones > 0 ? '1' : '-'}</td>
                                             <td className="py-2 px-1 align-top text-center">GLB</td>
-                                            <td className="py-2 px-1 align-top text-right">-</td>
-                                            <td className="py-2 px-1 align-top text-right font-bold">-</td>
+                                            <td className="py-2 px-1 align-top text-right">{sumInstalaciones > 0 ? `$${sumInstalaciones.toLocaleString()}` : '-'}</td>
+                                            <td className="py-2 px-1 align-top text-right font-bold">{sumInstalaciones > 0 ? `$${sumInstalaciones.toLocaleString()}` : '-'}</td>
                                         </tr>
                                         <tr className="border-b border-gray-100">
                                             <td className="py-2 px-1 align-top text-gray-500">3</td>
                                             <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
                                                 Servicios: {privadoOptions?.servicios || ''}
                                             </td>
-                                            <td className="py-2 px-1 align-top text-center">-</td>
+                                            <td className="py-2 px-1 align-top text-center">{sumServicios > 0 ? '1' : '-'}</td>
                                             <td className="py-2 px-1 align-top text-center">GLB</td>
-                                            <td className="py-2 px-1 align-top text-right">-</td>
-                                            <td className="py-2 px-1 align-top text-right font-bold">-</td>
+                                            <td className="py-2 px-1 align-top text-right">{sumServicios > 0 ? `$${sumServicios.toLocaleString()}` : '-'}</td>
+                                            <td className="py-2 px-1 align-top text-right font-bold">{sumServicios > 0 ? `$${sumServicios.toLocaleString()}` : '-'}</td>
                                         </tr>
                                     </>
                                 ) : materialVisibilityMode === 'OCULTAR_TODO' ? (
@@ -233,7 +255,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                             <tr key={idx} className="border-b border-gray-100">
                                                 <td className="py-2 px-1 align-top text-gray-500">{idx + 1}</td>
                                                 <td className="py-2 px-1 align-top font-medium uppercase text-[11px] leading-tight">
-                                                    {item.descripcion}
+                                                    {item.descripcion.replace(/INSTALACIONES:/gi, 'Instalación:')}
                                                     {item.subItems && item.subItems.length > 0 && !item.ocultarDetalles && (
                                                         <ul className="mt-1 ml-2 space-y-0.5 opacity-80 font-normal">
                                                             {item.subItems.map((sub: any, sidx: number) => (

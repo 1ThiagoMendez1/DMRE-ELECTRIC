@@ -122,7 +122,30 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
     };
 
     const handleUpdateQuantity = (id: string, qty: number) => {
-        setSelectedMaterials(prev => prev.map(m => (m.inventarioId === id || m.subCodigoId === id) ? { ...m, cantidad: qty } : m));
+        setSelectedMaterials(prev => prev.map(m => {
+            if (m.inventarioId === id || m.subCodigoId === id) {
+                let finalQty = qty;
+                if (isNaN(finalQty)) finalQty = 1;
+
+                if (m.itemRef && typeof m.itemRef.cantidad === 'number') {
+                    const stock = m.itemRef.cantidad;
+                    if (finalQty > stock && stock > 0) {
+                        toast({
+                            variant: "destructive",
+                            title: "Stock Excedido",
+                            description: `No puedes agregar más del stock disponible (${stock}).`
+                        });
+                        finalQty = stock;
+                    }
+                }
+                
+                if (finalQty > 1000000) finalQty = 1000000; // Hard sanity limit
+                if (finalQty < 1) finalQty = 1; // Minimum 1
+
+                return { ...m, cantidad: finalQty };
+            }
+            return m;
+        }));
     };
 
     const handleRemoveMaterial = (id: string) => {
@@ -176,7 +199,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                 addInstalacion({
                     codigo: instSku,
                     descripcion: values.descripcion,
-                    valorCalculado: materialsWithProfit,
+                    valorCalculado: moAiu,
                     activo: true
                 });
             }
@@ -353,6 +376,8 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                                                     <Input
                                                         type="number"
                                                         className="h-7 text-right px-2"
+                                                        min={1}
+                                                        max={mat.itemRef?.cantidad || 1000000}
                                                         value={mat.cantidad}
                                                         onChange={(e) => handleUpdateQuantity(mat.inventarioId || mat.subCodigoId, Number(e.target.value))}
                                                     />

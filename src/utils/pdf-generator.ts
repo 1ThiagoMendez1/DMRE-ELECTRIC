@@ -683,31 +683,50 @@ export const generateQuotePDF = (
     // Prepare Data
     const tableBody: any[] = [];
     
+    // Calculate category sums for Private Mode
+    let sumSuministros = 0;
+    let sumInstalaciones = 0;
+    let sumServicios = 0;
+
+    cotizacion.items.forEach(item => {
+        const desc = item.descripcion.toUpperCase();
+        const base = item.valorUnitario + (item.porcentaje ? item.valorUnitario * (item.porcentaje / 100) : 0);
+        const total = item.cantidad * base;
+        
+        if (desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-')) {
+            sumInstalaciones += total;
+        } else if (desc.includes('SUMINISTRO') || desc.includes('SU-') || item.codigoTrabajoId) {
+            sumSuministros += total;
+        } else {
+            sumServicios += total;
+        }
+    });
+    
     if (materialVisibilityMode === 'MODO_PRIVADO') {
         // En Modo Privado reemplazamos la tabla de ítems por las 3 filas personalizadas
         tableBody.push([
             1,
             `Suministros: ${privadoOptions?.suministros || ''}`,
-            "-",
+            sumSuministros > 0 ? "1" : "-",
             "GLB",
-            "-",
-            "-"
+            sumSuministros > 0 ? currencyFmt.format(sumSuministros) : "-",
+            sumSuministros > 0 ? currencyFmt.format(sumSuministros) : "-"
         ]);
         tableBody.push([
             2,
             `Instalación: ${privadoOptions?.instalacion || ''}`,
-            "-",
+            sumInstalaciones > 0 ? "1" : "-",
             "GLB",
-            "-",
-            "-"
+            sumInstalaciones > 0 ? currencyFmt.format(sumInstalaciones) : "-",
+            sumInstalaciones > 0 ? currencyFmt.format(sumInstalaciones) : "-"
         ]);
         tableBody.push([
             3,
             `Servicios: ${privadoOptions?.servicios || ''}`,
-            "-",
+            sumServicios > 0 ? "1" : "-",
             "GLB",
-            "-",
-            "-"
+            sumServicios > 0 ? currencyFmt.format(sumServicios) : "-",
+            sumServicios > 0 ? currencyFmt.format(sumServicios) : "-"
         ]);
     } else if (materialVisibilityMode === 'OCULTAR_TODO') {
         // En Ocultar Todo solo mostramos un total globalizado
@@ -730,7 +749,7 @@ export const generateQuotePDF = (
 
             tableBody.push([
                 index + 1,
-                item.descripcion,
+                item.descripcion.replace(/INSTALACIONES:/gi, 'Instalación:'),
                 item.cantidad,
                 "UND",
                 currencyFmt.format(unitValue),

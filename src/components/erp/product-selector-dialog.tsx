@@ -211,7 +211,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             descripcion: item.subTipo === 'APU'
                 ? `Suministro: ${item.descripcion}`
                 : item.subTipo === 'INSTALACION'
-                    ? `Instalaciones: ${item.descripcion}`
+                    ? `Instalación: ${item.descripcion}`
                     : item.descripcion,
             cantidad: 1,
             valorUnitario: isService ? servicePrice : (item.valorUnitario || 0),

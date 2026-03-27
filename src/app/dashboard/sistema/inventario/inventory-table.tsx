@@ -29,6 +29,7 @@ import { useErp } from "@/components/providers/erp-provider";
 import { InventoryFormDialog } from "@/components/erp/inventory-form-dialog";
 import { RegisterInventoryMovementDialog } from "@/components/erp/register-inventory-movement-dialog";
 import { Cotizacion } from "@/types/sistema";
+import { EditWorkCodeDialog } from "@/components/erp/edit-work-code-dialog";
 
 interface InventoryTableProps {
     data: InventarioItem[];
@@ -36,12 +37,55 @@ interface InventoryTableProps {
 }
 
 export function InventoryTable({ data: initialData }: InventoryTableProps) {
-    const { addInventarioItem, updateInventarioItem, deleteInventarioItem, cotizaciones } = useErp();
-    const data = initialData; // Now it comes from props (which come from context)
+    const { addInventarioItem, updateInventarioItem, deleteInventarioItem, cotizaciones, codigosTrabajo, deleteCodigoTrabajo } = useErp();
+    
+    // Combine data
+    const extractSuCode = (item: any) => {
+        let raw = (item.codigo || item.sku || item.item || '').toUpperCase().trim();
+        if (raw.startsWith('SU')) return raw;
+        const match = (item.descripcion || '').toUpperCase().match(/SU-?\s*\d+/);
+        if (match) return match[0].replace(/\s+/g, '');
+        return '';
+    };
+
+    const combinedData = [
+        ...initialData.filter(i => extractSuCode(i) !== '').map(i => ({ ...i, item: extractSuCode(i), sku: extractSuCode(i), isTrabajo: false })),
+        ...codigosTrabajo.filter(c => extractSuCode(c) !== '').map(c => ({
+            id: c.id,
+            item: extractSuCode(c),
+            descripcion: c.descripcion || (c as any).nombre || '',
+            unidad: 'UND',
+            cantidad: 0,
+            tipo: 'COMPUESTO' as const,
+            valorUnitario: c.costoTotal,
+            valorTotal: c.costoTotal,
+            fechaCreacion: c.fechaCreacion,
+            materiales: c.materiales?.map((m: any) => ({
+                id: m.materialId || m.id,
+                descripcion: m.material?.descripcion || m.descripcion || 'Material',
+                unidad: 'UND',
+                cantidad: m.cantidad,
+                valorUnitario: m.costoUnitario || m.valorUnitario || 0,
+                valorTotal: m.costoTotal || m.valorTotal || 0
+            })) || [],
+            isTrabajo: true,
+            originalItem: c
+        }))
+    ].sort((a, b) => {
+        const codeA = a.item || '';
+        const codeB = b.item || '';
+        const numA = parseInt(codeA.replace(/\D/g, '')) || 0;
+        const numB = parseInt(codeB.replace(/\D/g, '')) || 0;
+        if (numA !== numB) return numB - numA; // Descending sequential
+        return codeA.localeCompare(codeB);
+    });
+
+    const data = combinedData as InventarioItem[];
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentItem, setCurrentItem] = useState<Partial<InventarioItem>>({});
+    const [editWorkCode, setEditWorkCode] = useState<any>(null);
 
     const toggleRow = (id: string) => {
         const newExpanded = new Set(expandedRows);
@@ -98,14 +142,22 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
         }
     };
 
-    const handleEdit = (item: InventarioItem) => {
-        setCurrentItem({ ...item });
-        setIsDialogOpen(true);
+    const handleEdit = (item: any) => {
+        if (item.isTrabajo) {
+            setEditWorkCode(item.originalItem);
+        } else {
+            setCurrentItem({ ...item });
+            setIsDialogOpen(true);
+        }
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = (item: any) => {
         if (confirm("¿Estás seguro de eliminar este item?")) {
-            deleteInventarioItem(id);
+            if (item.isTrabajo) {
+                deleteCodigoTrabajo(item.id);
+            } else {
+                deleteInventarioItem(item.id);
+            }
         }
     };
 
@@ -223,7 +275,7 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDelete(item.id)}>
+                                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDelete(item)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -307,12 +359,19 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                 <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0}>Siguiente</Button>
             </div>
 
+            {editWorkCode && (
+                <EditWorkCodeDialog
+                    code={editWorkCode}
+                    open={!!editWorkCode}
+                    onClose={() => setEditWorkCode(null)}
+                />
+            )}
             <InventoryFormDialog
                 open={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
                 initialData={currentItem}
                 onSave={handleSave}
-                availableItems={data}
+                availableItems={data.filter((i: any) => !i.isTrabajo)}
             />
         </div>
     );

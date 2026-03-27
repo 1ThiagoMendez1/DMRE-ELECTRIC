@@ -17,7 +17,8 @@ import {
     Fuel,
     Search,
     ListOrdered,
-    Bolt
+    Bolt,
+    Edit
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -60,6 +61,7 @@ import { EditInventoryDialog } from "@/components/erp/edit-inventory-dialog";
 import { InventoryItemDetailDialog } from "@/components/erp/inventory-item-detail-dialog";
 import { VehicleDetailDialog } from "@/components/erp/vehicle-detail-dialog";
 import { EditVehicleDialog } from "@/components/erp/edit-vehicle-dialog";
+import { EditWorkCodeDialog } from "@/components/erp/edit-work-code-dialog";
 import { cn } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
 
@@ -107,6 +109,7 @@ export default function LogisticaPage() {
         consumosResumen,
         addConsumoMaterial,
         refreshConsumosResumen,
+        codigosTrabajo
     } = useErp();
 
     // Sub-tabs for Suministro
@@ -125,6 +128,7 @@ export default function LogisticaPage() {
     const [materialDetailOpen, setMaterialDetailOpen] = useState(false);
     const [selectedMaterial, setSelectedMaterial] = useState<InventarioItem | null>(null);
     const [trabajosList, setTrabajosList] = useState<{ id: string; nombre: string; codigo: string }[]>([]);
+    const [editWorkCode, setEditWorkCode] = useState<any>(null);
 
     // Servicios State
     const [servicios, setServicios] = useState<ServicioLogistica[]>([]);
@@ -335,12 +339,56 @@ export default function LogisticaPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {catalogoItems
+                                    {(() => {
+                                        const extractSuCode = (item: any) => {
+                                            let raw = (item.codigo || item.sku || item.item || '').toUpperCase().trim();
+                                            if (raw.startsWith('SU')) return raw;
+                                            const match = (item.descripcion || '').toUpperCase().match(/SU-?\s*\d+/);
+                                            if (match) return match[0].replace(/\s+/g, '');
+                                            return '';
+                                        };
+
+                                        return [
+                                            ...catalogoItems.filter(i => extractSuCode(i) !== '').map(i => ({ 
+                                                ...i, 
+                                                sku: extractSuCode(i), 
+                                                item: extractSuCode(i), 
+                                                isTrabajo: false, 
+                                                originalCode: undefined 
+                                            })),
+                                            ...codigosTrabajo.filter(c => extractSuCode(c) !== '').map(c => ({
+                                                id: c.id,
+                                                sku: extractSuCode(c),
+                                                item: extractSuCode(c),
+                                                descripcion: c.descripcion || (c as any).nombre || '',
+                                                marca: '-',
+                                                proveedorId: '',
+                                                categoria: 'SUMINISTRO',
+                                                unidad: 'UND',
+                                                cantidad: 0,
+                                                tipo: 'COMPUESTO' as const,
+                                                valorUnitario: c.costoTotal,
+                                                valorTotal: c.costoTotal,
+                                                precioProveedor: c.costoTotal,
+                                                costoMateriales: c.costoTotal,
+                                                fechaCreacion: c.fechaCreacion,
+                                                isTrabajo: true,
+                                                originalCode: c
+                                            }))
+                                        ]
+                                        .sort((a, b) => {
+                                            const codeA = a.sku || '';
+                                            const codeB = b.sku || '';
+                                            const numA = parseInt(codeA.replace(/\D/g, '')) || 0;
+                                            const numB = parseInt(codeB.replace(/\D/g, '')) || 0;
+                                            if (numA !== numB) return numB - numA; // Descending sequential
+                                            return codeA.localeCompare(codeB);
+                                        })
                                         .filter(item =>
                                             item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-                                        )
-                                        .map((item) => {
+                                            (item.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
+                                        );
+                                    })().map((item) => {
                                             const precioProveedor = item.precioProveedor || item.costoMateriales || 0;
                                             const proveedorInfo = proveedores.find(p => p.id === item.proveedorId);
                                             const totalConsumido = consumosResumen[item.id] || 0;
@@ -374,7 +422,13 @@ export default function LogisticaPage() {
                                                     <TableCell className="text-right font-medium text-amber-600 dark:text-amber-400">{formatCurrency(precioProveedor)}</TableCell>
                                                     <TableCell className="text-right font-bold text-primary">{formatCurrency(item.valorUnitario)}</TableCell>
                                                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                        <EditInventoryDialog articulo={item} onItemUpdated={updateInventarioItem} />
+                                                        {item.isTrabajo ? (
+                                                            <Button variant="ghost" size="icon" onClick={() => setEditWorkCode(item.originalCode)}>
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        ) : (
+                                                            <EditInventoryDialog articulo={item as InventarioItem} onItemUpdated={updateInventarioItem} />
+                                                        )}
                                                     </TableCell>
                                                 </TableRow>
                                             )
@@ -384,7 +438,6 @@ export default function LogisticaPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Material Detail Dialog with Consumption History */}
                     <MaterialDetailConsumoDialog
                         open={materialDetailOpen}
                         onOpenChange={setMaterialDetailOpen}
@@ -394,6 +447,14 @@ export default function LogisticaPage() {
                         onConsumoRegistered={addConsumoMaterial}
                         onConsumoDeleted={refreshConsumosResumen}
                     />
+
+                    {editWorkCode && (
+                        <EditWorkCodeDialog
+                            code={editWorkCode}
+                            open={!!editWorkCode}
+                            onClose={() => setEditWorkCode(null)}
+                        />
+                    )}
                 </TabsContent>
 
                 {/* SUMINISTRO TAB */}

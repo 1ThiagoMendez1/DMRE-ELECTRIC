@@ -483,7 +483,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                                                 <div className="flex flex-col gap-1">
                                                                     <div className="flex items-center gap-2">
                                                                         {item.tipo === 'SERVICIO' ? <Wrench className="h-3 w-3 text-blue-500" /> : <Package className="h-3 w-3 text-green-500" />}
-                                                                        <span className="font-medium">{item.descripcion}</span>
+                                                                        <span className="font-medium">{item.descripcion.replace(/INSTALACIONES:/gi, 'Instalación:')}</span>
                                                                     </div>
                                                                     {item.tipo === 'SERVICIO' && item.subItems && item.subItems.length > 0 && (
                                                                         <div className="flex items-center gap-2 mt-1">

@@ -52,16 +52,7 @@ export function InstalacionesTable() {
                         />
                     </div>
 
-                    <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-                        <Bolt className="h-4 w-4" />
-                        Nueva Instalación
-                    </Button>
-                    <CreateInstalacionDialog
-                        open={isCreateOpen}
-                        onOpenChange={setIsCreateOpen}
-                        instalacionesExistentes={instalaciones}
-                        onSave={addInstalacion}
-                    />
+                    {/* Botón de Nueva Instalación eliminado a petición del usuario ya que se crean automáticamente */}
                 </div>
             </CardHeader>
             <CardContent>
