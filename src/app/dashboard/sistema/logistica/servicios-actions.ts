@@ -47,7 +47,7 @@ export async function createServicioAction(servicio: Omit<ServicioLogistica, "id
     let nextNum = 1;
     if (existingCodes && existingCodes.length > 0) {
         const numbers = existingCodes
-            .map(c => parseInt(c.codigo.replace("SE", ""), 10))
+            .map(c => parseInt(c.codigo.replace(/^SE-?/, ""), 10))
             .filter(n => !isNaN(n));
 
         if (numbers.length > 0) {
@@ -55,7 +55,7 @@ export async function createServicioAction(servicio: Omit<ServicioLogistica, "id
         }
     }
 
-    const nextCode = `SE${nextNum}`;
+    const nextCode = `SE-${String(nextNum).padStart(3, '0')}`;
 
     const { data, error } = await supabase
         .from("servicios_logistica")

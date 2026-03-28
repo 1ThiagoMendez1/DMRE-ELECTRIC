@@ -213,7 +213,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                     <Plus className="h-4 w-4" /> Nuevo Item
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] w-[95vw] sm:w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Crear Nuevo Item de Inventario</DialogTitle>
                     <DialogDescription>
@@ -223,7 +223,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="sku"
@@ -252,7 +252,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="marca"
@@ -347,7 +347,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="categoria"
@@ -394,7 +394,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="cantidad"
@@ -423,7 +423,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="precioProveedor"
@@ -470,8 +470,8 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
 
                         <div className="pt-4 mt-2 border-t border-muted">
                             <h4 className="text-sm font-medium mb-4 text-muted-foreground">Adicional: Creación de Instalación</h4>
-                            <div className="flex items-end gap-6">
-                                <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-6">
+                                <div className="w-full sm:flex-1">
                                     <FormField
                                         control={form.control}
                                         name="porcentajeInstalacion"
@@ -492,7 +492,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                                         )}
                                     />
                                 </div>
-                                <div className="flex-1 pb-6">
+                                <div className="w-full sm:flex-1 sm:pb-6">
                                     {calculoInstalacion > 0 && (
                                         <div className="flex flex-col p-3 bg-green-500/10 border border-green-500/20 rounded-md">
                                             <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">Costo Calculado</span>

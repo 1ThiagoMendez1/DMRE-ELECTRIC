@@ -136,7 +136,7 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
                     <Pencil className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px]">
+            <DialogContent className="sm:max-w-[550px] w-[95vw] sm:w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Editar Artículo {articulo.sku}</DialogTitle>
                     <DialogDescription>
@@ -146,7 +146,7 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="sku"
@@ -185,7 +185,7 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="marca"
@@ -280,7 +280,7 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
                             )}
                         />
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="ubicacion"
@@ -342,7 +342,7 @@ export function EditInventoryDialog({ articulo, onItemUpdated }: EditInventoryDi
                             />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="stockMinimo"

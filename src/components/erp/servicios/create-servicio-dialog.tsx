@@ -71,7 +71,7 @@ export function CreateServicioDialog({ onCreateServicio }: CreateServicioDialogP
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label>Código</Label>
-                        <Input disabled placeholder="Auto-generado (ej: SE1)" className="bg-muted" />
+                        <Input disabled placeholder="Auto-generado (ej: SE-001)" className="bg-muted" />
                         <p className="text-[10px] text-muted-foreground">El código se asignará de manera incremental y única automáticamente.</p>
                     </div>
 

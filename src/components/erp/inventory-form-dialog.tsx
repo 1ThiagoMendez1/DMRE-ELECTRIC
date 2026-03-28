@@ -157,7 +157,7 @@ export function InventoryFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-6 overflow-hidden">
+            <DialogContent className="sm:max-w-[700px] w-[95vw] sm:w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6 overflow-hidden">
                 <DialogHeader className="shrink-0">
                     <DialogTitle>{isEditing ? "Editar Item" : "Nuevo Item"}</DialogTitle>
                     <DialogDescription>
@@ -169,7 +169,7 @@ export function InventoryFormDialog({
                 <div className="flex-1 overflow-y-auto pr-2">
                 <form onSubmit={handleSubmit}>
                     <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="item">Código</Label>
                                 <Input
@@ -208,7 +208,7 @@ export function InventoryFormDialog({
                             />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="unidad">Unidad</Label>
                                 <Input
@@ -301,7 +301,7 @@ export function InventoryFormDialog({
                                     </Popover>
                                 </div>
 
-                                <div className="rounded-md border bg-background">
+                                <div className="rounded-md border bg-background overflow-x-auto">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>

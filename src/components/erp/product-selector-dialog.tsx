@@ -122,54 +122,68 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             searchStr: `${p.descripcion} ${p.sku} ${p.categoria}`.toLowerCase()
         }));
 
-        const services: ItemOptions[] = (codigosTrabajo || []).map(s => ({
-            id: s.id,
-            tipo: 'SERVICIO',
-            subTipo: 'APU',
-            codigo: s.codigo,
-            descripcion: s.nombre,
-            valorUnitario: s.costoTotal || 0, // Use costoTotal as the reference price
-            _extraText: s.descripcion,
-            materiales: s.materiales,
-            valorManoObra: s.valorManoObra,
-            manoDeObra: s.manoDeObra,
-            costoTotal: s.costoTotal, // Keep original costTotal for calculation if needed
-            searchStr: `${s.nombre} ${s.codigo} ${s.descripcion}`.toLowerCase()
-        }));
+        const services: ItemOptions[] = (codigosTrabajo || []).map(s => {
+            const invMatch = (inventario || []).find(inv => inv.sku === s.codigo || inv.item === s.codigo);
+            return {
+                id: s.id,
+                tipo: 'SERVICIO',
+                subTipo: 'APU',
+                codigo: s.codigo,
+                descripcion: s.nombre,
+                valorUnitario: s.costoTotal || 0, // Use costoTotal as the reference price
+                _extraText: s.descripcion,
+                materiales: s.materiales,
+                valorManoObra: s.valorManoObra,
+                manoDeObra: s.manoDeObra,
+                costoTotal: s.costoTotal, // Keep original costTotal for calculation if needed
+                cantidad: invMatch?.cantidad ?? 0, // Extract stock organically
+                searchStr: `${s.nombre} ${s.codigo} ${s.descripcion}`.toLowerCase()
+            };
+        });
 
 
 
-        const installs: ItemOptions[] = instalacionesState.map(i => ({
-            id: i.id,
-            tipo: 'SERVICIO',
-            subTipo: 'INSTALACION',
-            codigo: i.codigo,
-            descripcion: i.descripcion,
-            valorUnitario: i.valorCalculado || 0,
-            _extraText: 'Instalación Básica',
-            valorManoObra: i.valorCalculado,
-            manoDeObra: i.valorCalculado,
-            costoTotal: i.valorCalculado,
-            searchStr: `${i.descripcion} ${i.codigo}`.toLowerCase()
-        }));
+        const installs: ItemOptions[] = instalacionesState.map(i => {
+            const invMatch = (inventario || []).find(inv => inv.sku === i.codigo || inv.item === i.codigo);
+            return {
+                id: i.id,
+                tipo: 'SERVICIO',
+                subTipo: 'INSTALACION',
+                codigo: i.codigo,
+                descripcion: i.descripcion,
+                valorUnitario: i.valorCalculado || 0,
+                _extraText: 'Instalación Básica',
+                valorManoObra: i.valorCalculado,
+                manoDeObra: i.valorCalculado,
+                costoTotal: i.valorCalculado,
+                cantidad: invMatch?.cantidad ?? 0,
+                searchStr: `${i.descripcion} ${i.codigo}`.toLowerCase()
+            };
+        });
 
-        const srvLogistica: ItemOptions[] = serviciosState.map(sl => ({
-            id: sl.id,
-            tipo: 'SERVICIO',
-            subTipo: 'SERVICIO_LOGISTICO',
-            codigo: sl.codigo,
-            descripcion: sl.nombre,
-            valorUnitario: sl.costo || 0,
-            _extraText: 'Servicio Logístico',
-            valorManoObra: sl.costo,
-            manoDeObra: sl.costo,
-            costoTotal: sl.costo,
-            searchStr: `${sl.nombre} ${sl.codigo}`.toLowerCase()
-        }));
+        const srvLogistica: ItemOptions[] = serviciosState.map(sl => {
+            const invMatch = (inventario || []).find(inv => inv.sku === sl.codigo || inv.item === sl.codigo);
+            return {
+                id: sl.id,
+                tipo: 'SERVICIO',
+                subTipo: 'SERVICIO_LOGISTICO',
+                codigo: sl.codigo,
+                descripcion: sl.nombre,
+                valorUnitario: sl.costo || 0,
+                _extraText: 'Servicio Logístico',
+                valorManoObra: sl.costo,
+                manoDeObra: sl.costo,
+                costoTotal: sl.costo,
+                cantidad: invMatch?.cantidad ?? 0,
+                searchStr: `${sl.nombre} ${sl.codigo}`.toLowerCase()
+            };
+        });
 
-        // Modificación solicitada por el usuario: No listar los productos en el caso general
-        // dejar únicamente suministros (APU) e instalaciones y servicios logísticos.
-        let all = [...services, ...installs, ...srvLogistica];
+        // Combinar todos asegurando que productos no se dupliquen con servicios que comparten código (sincronizados)
+        const existingCodes = new Set([...services, ...installs, ...srvLogistica].map(x => x.codigo));
+        const standaloneProducts = products.filter(p => !existingCodes.has(p.codigo));
+        
+        let all = [...standaloneProducts, ...services, ...installs, ...srvLogistica];
 
         if (activeFilter !== 'ALL') {
             if (activeFilter === 'PRODUCTO') {
@@ -319,6 +333,11 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                                                     </span>
                                                     {item._extraText && (
                                                         <span className="truncate max-w-[250px]">{item._extraText}</span>
+                                                    )}
+                                                    {(item.cantidad || 0) > 0 && (
+                                                        <Badge variant="outline" className="text-[10px] ml-2 bg-green-500/10 text-green-600 border-green-500/20">
+                                                            Stock: {item.cantidad}
+                                                        </Badge>
                                                     )}
                                                 </div>
                                             </div>

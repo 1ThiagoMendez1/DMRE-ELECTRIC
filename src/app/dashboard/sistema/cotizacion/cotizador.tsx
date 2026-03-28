@@ -675,7 +675,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
 
                 {/* Right Column: Summary & Actions */}
                 <div className="space-y-4">
-                    <Card className="bg-muted/30">
+<Card className="bg-muted/30">
                         <CardHeader className="py-3">
                             <CardTitle className="text-sm">Resumen</CardTitle>
                         </CardHeader>
@@ -685,7 +685,6 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
                                     <span className="text-muted-foreground">Subtotal</span>
                                     <span>{formatCurrency(subtotal)}</span>
                                 </div>
-
                                 <div className="flex justify-between items-center text-sm pt-1">
                                     <span className="text-muted-foreground">Descuento</span>
                                     <div className="flex items-center gap-1">
