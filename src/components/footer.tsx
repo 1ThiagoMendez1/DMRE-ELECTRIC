@@ -9,7 +9,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-16">
           <div className="flex flex-col col-span-1 lg:col-span-1">
             <Link href="/" className="flex items-center gap-3 text-3xl font-black font-headline mb-8">
-              <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" width={64} height={64} className="h-16 w-16" />
+              <Image src="/logo.png" alt="D.M.R.E Logo" width={200} height={200} quality={100} className="w-[150px] lg:w-[200px] h-auto object-contain" />
               <span>D.M.R.E</span>
             </Link>
             <p className="text-xl text-muted-foreground leading-relaxed mb-8">

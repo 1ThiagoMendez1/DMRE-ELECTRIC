@@ -222,9 +222,9 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             // Instalaciones and Servicios Logísticos live in separate tables.
             codigoTrabajoId: item.subTipo === 'APU' ? item.id : undefined,
             tipo: item.tipo,
-            descripcion: item.subTipo === 'APU'
+            descripcion: item.subTipo === 'APU' && !item.descripcion.toUpperCase().includes('SUMINISTRO')
                 ? `Suministro: ${item.descripcion}`
-                : item.subTipo === 'INSTALACION'
+                : item.subTipo === 'INSTALACION' && !item.descripcion.toUpperCase().includes('INSTALACIÓN') && !item.descripcion.toUpperCase().includes('INSTALACION')
                     ? `Instalación: ${item.descripcion}`
                     : item.descripcion,
             cantidad: 1,

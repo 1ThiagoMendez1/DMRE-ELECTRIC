@@ -50,10 +50,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-            <Link href="/" className="flex items-center gap-2 text-xl font-bold font-headline text-glow-primary transition-all duration-300">
-              <div className="relative h-10 w-10 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 transition-all duration-300">
-                <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E Logo" fill className="object-contain" />
+          <div className="flex items-center gap-2 px-2 py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+            <Link href="/" className="flex items-center gap-3 text-2xl font-bold font-headline text-glow-primary transition-all duration-300">
+              <div className="relative h-24 w-24 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 transition-all duration-300 shrink-0">
+                <Image src="/logo.png" alt="D.M.R.E Logo" fill priority quality={100} className="object-contain" />
               </div>
               <span className="group-data-[collapsible=icon]:hidden whitespace-nowrap overflow-hidden transition-all duration-300">D.M.R.E</span>
             </Link>

@@ -90,7 +90,7 @@ export const generateQuotePDF = (
         try {
             const logoImg = new Image();
             logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 12, 15, 40, 40);
+            doc.addImage(logoImg, 'PNG', 10, 8, 55, 55);
         } catch (e) { }
 
         // Company Details in sidebar (White text)
@@ -125,7 +125,7 @@ export const generateQuotePDF = (
         try {
             const logoImg = new Image();
             logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 14, 12, 30, 30);
+            doc.addImage(logoImg, 'PNG', 12, 5, 50, 50);
         } catch (e) { }
 
         // Company Text White
@@ -153,8 +153,8 @@ export const generateQuotePDF = (
         try {
             const logoImg = new Image();
             logoImg.src = '/logo.png';
-            const logoX = (pageWidth - 30) / 2;
-            doc.addImage(logoImg, 'PNG', logoX, 15, 30, 30);
+            const logoX = (pageWidth - 55) / 2;
+            doc.addImage(logoImg, 'PNG', logoX, 5, 55, 55);
         } catch (e) { }
 
         doc.setTextColor(...primary);
@@ -210,7 +210,7 @@ export const generateQuotePDF = (
         try {
             const logoImg = new Image();
             logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', pageWidth - 55, 12, 40, 18);
+            doc.addImage(logoImg, 'PNG', pageWidth - 50, 8, 40, 40);
         } catch (e) { }
 
         // Below the logo text
@@ -234,7 +234,7 @@ export const generateQuotePDF = (
         try {
             const logoImg = new Image();
             logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 16, 14, 24, 24); // Slightly larger logo
+            doc.addImage(logoImg, 'PNG', 13, 10, 32, 32);
         } catch (e) { }
 
         // 2. Company Name Center
@@ -277,7 +277,7 @@ export const generateQuotePDF = (
         try {
             const logoImg = new Image();
             logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 14, 15, 25, 25);
+            doc.addImage(logoImg, 'PNG', 10, 8, 45, 45);
         } catch (e) { }
 
         doc.setTextColor(...primary);
@@ -699,15 +699,19 @@ export const generateQuotePDF = (
         
         const code = item.codigoItem || item.notas;
         
-        if (desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-')) {
+        const isInstalacion = desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-');
+        const isServicio = item.tipo === 'SERVICIO' && !isInstalacion && !item.codigoTrabajoId;
+
+        if (isInstalacion) {
             sumInstalaciones += total;
             if (code) setI.add(code);
-        } else if (desc.includes('SUMINISTRO') || desc.includes('SU-') || item.codigoTrabajoId) {
-            sumSuministros += total;
-            if (code) setS.add(code);
-        } else {
+        } else if (isServicio) {
             sumServicios += total;
             if (code) setServ.add(code);
+        } else {
+            // Suministros, productos sueltos, materiales y APUs
+            sumSuministros += total;
+            if (code) setS.add(code);
         }
     });
     
@@ -716,7 +720,7 @@ export const generateQuotePDF = (
     const codesServ = Array.from(setServ).join(', ') || '3';
     
     if (materialVisibilityMode === 'MODO_PRIVADO') {
-        // En Modo Privado reemplazamos la tabla de ítems por las 3 filas personalizadas
+        // En Modo Privado reemplazamos la tabla de ítems por las 3 filas customizadas, siempre visibles
         tableBody.push([
             1,
             `Suministros: ${privadoOptions?.suministros || ''}`,

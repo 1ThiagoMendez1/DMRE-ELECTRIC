@@ -47,15 +47,19 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
             
             const code = item.codigoItem || item.notas;
             
-            if (desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-')) {
+            const isInstalacion = desc.includes('INSTALACIÓN') || desc.includes('INSTALACION') || desc.includes('IN-');
+            const isServicio = item.tipo === 'SERVICIO' && !isInstalacion && !item.codigoTrabajoId;
+
+            if (isInstalacion) {
                 sumI += total;
                 if (code) setI.add(code);
-            } else if (desc.includes('SUMINISTRO') || desc.includes('SU-') || item.codigoTrabajoId) {
-                sumS += total;
-                if (code) setS.add(code);
-            } else {
+            } else if (isServicio) {
                 sumServ += total;
                 if (code) setServ.add(code);
+            } else {
+                // Suministros, productos sueltos, materiales y APUs
+                sumS += total;
+                if (code) setS.add(code);
             }
         });
         

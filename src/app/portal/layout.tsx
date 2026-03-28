@@ -7,11 +7,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <div className="min-h-screen bg-background flex flex-col">
             <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="container flex h-16 items-center justify-between py-4">
-                    <Link href="/portal" className="flex items-center gap-2 font-bold text-xl">
-                        <div className="relative h-8 w-8">
-                            <Image src="https://i.ibb.co/MFtSVtR/dmreLogo.png" alt="D.M.R.E" fill className="object-contain" />
+                    <Link href="/portal" className="flex items-center gap-3 font-bold text-2xl">
+                        <div className="relative h-14 w-14">
+                            <Image src="/logo.png" alt="D.M.R.E" fill priority quality={100} className="object-contain" />
                         </div>
-                        <span>D.M.R.E <span className="text-muted-foreground font-normal text-sm">| Portal Clientes</span></span>
+                        <span>D.M.R.E <span className="text-muted-foreground font-normal text-lg">| Portal Clientes</span></span>
                     </Link>
                     <ThemeToggle />
                 </div>

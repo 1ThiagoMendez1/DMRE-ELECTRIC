@@ -34,23 +34,25 @@ export function Header() {
           : 'bg-transparent'
       )}
     >
-      <div className="container mx-auto flex h-24 items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-3 text-3xl font-black font-headline group">
+      <div className="w-full flex min-h-[100px] items-center justify-between px-6 lg:px-12 xl:px-20 py-4">
+        <Link href="/" className="flex items-center gap-8 lg:gap-10 text-3xl font-black font-headline group shrink-0">
           <Image
-            src="https://i.ibb.co/MFtSVtR/dmreLogo.png"
+            src="/logo.png"
             alt="D.M.R.E Logo"
-            width={64}
-            height={64}
-            className="h-16 w-16 transition-transform duration-500 group-hover:rotate-12"
+            width={200}
+            height={200}
+            quality={100}
+            priority
+            className="w-[120px] md:w-[200px] h-auto transition-transform duration-500 group-hover:scale-105 object-contain drop-shadow-2xl"
           />
           <span className={cn(
-            "hidden sm:inline transition-colors duration-500",
+            "hidden sm:inline transition-colors duration-500 whitespace-nowrap",
             hasScrolled ? "text-foreground" : "text-foreground" // Adjust if needed
           )}>
             D.M.R.E
           </span>
         </Link>
-        <nav className="hidden xl:flex items-center gap-10">
+        <nav className="hidden xl:flex flex-1 justify-end items-center gap-6 2xl:gap-10 pl-16">
           {navLinks.map((link) => (
             <Link
               key={link.name}

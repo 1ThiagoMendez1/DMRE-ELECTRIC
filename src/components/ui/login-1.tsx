@@ -151,11 +151,13 @@ const StartLoginOne = () => {
                             <div className='grid gap-4 md:gap-6 mb-2 justify-items-center'>
                                 <div className="relative h-32 w-32">
                                     <Image
-                                        src="https://i.ibb.co/MFtSVtR/dmreLogo.png"
+                                        src="/logo.png"
                                         alt="D.M.R.E Logo"
                                         fill
                                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                        className="object-contain"
+                                        priority
+                                        quality={100}
+                                        className="object-contain drop-shadow-xl"
                                     />
                                 </div>
                                 <div className="mb-2">
