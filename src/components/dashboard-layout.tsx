@@ -50,12 +50,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-            <Link href="/" className="flex items-center gap-3 text-2xl font-bold font-headline text-glow-primary transition-all duration-300">
+          <div className="flex items-center justify-center w-full px-2 py-4 group-data-[collapsible=icon]:px-0">
+            <Link href="/" className="flex items-center justify-center transition-all duration-300">
               <div className="relative h-24 w-24 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 transition-all duration-300 shrink-0">
                 <Image src="/logo.png" alt="D.M.R.E Logo" fill priority quality={100} className="object-contain" />
               </div>
-              <span className="group-data-[collapsible=icon]:hidden whitespace-nowrap overflow-hidden transition-all duration-300">D.M.R.E</span>
             </Link>
           </div>
         </SidebarHeader>
@@ -77,7 +76,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         asChild
                         isActive={item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)}
                         tooltip={item.label}
-                        className={cn((item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)) && "bg-sidebar-accent text-sidebar-accent-foreground")}
+                        className={cn(
+                          "transition-all duration-300",
+                          (item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)) 
+                            ? "bg-primary/20 text-primary font-bold border-l-4 border-primary rounded-none" 
+                            : "hover:bg-primary/10 hover:text-primary hover:translate-x-1"
+                        )}
                       >
                         <Link href={item.href}>
                           <item.icon className="h-4 w-4" />

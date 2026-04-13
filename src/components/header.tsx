@@ -29,10 +29,7 @@ export function Header() {
             priority
             className="w-[120px] lg:w-[160px] 2xl:w-[200px] h-auto transition-transform duration-500 group-hover:scale-105 object-contain drop-shadow-2xl shrink-0"
           />
-          <span className={cn(
-            "hidden sm:inline transition-colors duration-500 whitespace-nowrap",
-            hasScrolled ? "text-foreground" : "text-foreground" // Adjust if needed
-          )}>
+          <span className="hidden sm:inline transition-colors duration-500 whitespace-nowrap text-foreground">
             D.M.R.E
           </span>
         </Link>
