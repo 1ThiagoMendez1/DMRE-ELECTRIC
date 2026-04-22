@@ -100,6 +100,8 @@ export interface CotizacionItem {
     // Extended
     notas?: string;
     porcentaje?: number;
+    esExtra?: boolean; // Indicates if this item was added during execution as an extra
+    cantidadFinal?: number; // Cantidad realmente ejecutada (puede diferir de la ofertada)
 }
 
 export type EstadoCotizacion = 'BORRADOR' | 'EN_REVISION' | 'ENVIADA' | 'APROBADA' | 'RECHAZADA' | 'MODIFICACION';

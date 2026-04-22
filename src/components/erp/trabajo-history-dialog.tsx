@@ -52,7 +52,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Cotizacion, CotizacionItem, EstadoCotizacion, InventarioItem, EvidenciaTrabajo, Ubicacion, MaterialAsociado, CodigoTrabajo } from "@/types/sistema";
-import { generateQuotePDF } from "@/utils/pdf-generator";
+import { generateQuotePDF, generateActaPDF, ActaData } from "@/utils/pdf-generator";
 import { useErp } from "@/components/providers/erp-provider";
 import { ProductSelectorDialog } from "./product-selector-dialog";
 import { QuotePreview } from "./quote-preview";
@@ -348,6 +348,19 @@ export function TrabajoHistoryDialog({
     const [isUploading, setIsUploading] = useState(false);
     // Track consumed materials by item ID (Set of material keys that have been used)
     const [materialesUsados, setMaterialesUsados] = useState<Set<string>>(new Set());
+    // Final quantities per item: { [itemId]: number } — initialized from persisted cantidadFinal on each item
+    const [cantidadesFinales, setCantidadesFinales] = useState<Record<string, number>>(() => {
+        const initial: Record<string, number> = {};
+        trabajo.items.forEach(item => {
+            if (item.cantidadFinal !== undefined) {
+                initial[item.id] = item.cantidadFinal;
+            }
+        });
+        return initial;
+    });
+    // Acta dialog state
+    const [showActa, setShowActa] = useState(false);
+    const [observacionesActa, setObservacionesActa] = useState(trabajo.notas || '');
 
     // Load existing consumo records for this cotizacion to persist checkbox state
     useEffect(() => {
@@ -375,7 +388,6 @@ export function TrabajoHistoryDialog({
             }).catch(err => console.error("Error loading existing consumos:", err));
         }
     }, [isOpen, trabajo.id, items]);
-
     const photoInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
@@ -428,9 +440,25 @@ export function TrabajoHistoryDialog({
             setEditFormaPago(trabajo.formaPago || "");
             setEditNotaFinal(trabajo.notaFinal || "");
 
-            setLocalEvidence(trabajo.evidencia || []);
+            // Note: intentionally bypassing `setLocalEvidence(trabajo.evidencia || [])` to avoid destroying optimistic UI
+            // Evidences are now primarily hydrated via the DB History (historial) safely.
+            
+            // Rebuild cantidadesFinales merging: incoming item.cantidadFinal (DB) + whatever user has in memory
+            // Memory wins to avoid realtime round-trip from erasing just-typed values
+            setCantidadesFinales(prev => {
+                const merged = { ...prev };
+                trabajo.items.forEach(item => {
+                    if (item.cantidadFinal !== undefined && merged[item.id] === undefined) {
+                        merged[item.id] = item.cantidadFinal;
+                    }
+                });
+                return merged;
+            });
+
             setItems(trabajo.items.map(item => ({
                 ...item,
+                // Preserve cantidadFinal from in-memory state if present (user just typed it)
+                cantidadFinal: cantidadesFinales[item.id] ?? item.cantidadFinal,
                 aiuAdminPorcentaje: item.aiuAdminPorcentaje || trabajo.aiuAdminGlobalPorcentaje || 0,
                 aiuImprevistoPorcentaje: item.aiuImprevistoPorcentaje || trabajo.aiuImprevistoGlobalPorcentaje || 0,
                 aiuUtilidadPorcentaje: item.aiuUtilidadPorcentaje || trabajo.aiuUtilidadGlobalPorcentaje || 0,
@@ -755,6 +783,30 @@ export function TrabajoHistoryDialog({
         }
     }, [isOpen, trabajo.id]);
 
+    const combinedEvidences = useMemo(() => {
+        const historyEvidences: EvidenciaTrabajo[] = historial
+            .filter(h => ['UBICACION', 'FOTO', 'VIDEO'].includes(h.tipo) || (h.tipo === 'NOTA' && h.descripcion && !h.descripcion.includes('Item ')))
+            .map(h => ({
+                id: h.id,
+                fecha: new Date(h.fecha),
+                usuarioId: 'history',
+                usuarioNombre: h.usuario,
+                tipo: h.tipo as any,
+                descripcion: h.descripcion,
+                url: h.url || h.metadata?.url,
+                ubicacion: h.metadata?.lat ? {
+                    lat: h.metadata?.lat,
+                    lng: h.metadata?.lng,
+                    precision: h.metadata?.precision,
+                    timestamp: h.metadata?.timestamp
+                } : undefined
+            }));
+
+        // Filter out local evidences that are older than 10 seconds to avoid duplicates with history
+        const recentLocal = localEvidence.filter(le => (Date.now() - new Date(le.fecha).getTime()) < 10000);
+        return [...recentLocal, ...historyEvidences];
+    }, [historial, localEvidence]);
+
 
 
 
@@ -965,7 +1017,8 @@ export function TrabajoHistoryDialog({
             aiuImprevistoPorcentaje: aiuImprevPct,
             aiuUtilidadPorcentaje: aiuUtilPct,
             ivaUtilidadPorcentaje: ivaUtilPct,
-            visibleEnPdf: true
+            visibleEnPdf: true,
+            esExtra: true // Mark as an extra item when added from this dashboard
         };
 
         const updatedItems = [...items, itemWithVis];
@@ -1406,6 +1459,186 @@ export function TrabajoHistoryDialog({
                                 </Card>
                             </div>
 
+                            {/* Análisis de Cantidades y Extras en Tiempo Real */}
+                            {(() => {
+                                let costoOriginal = 0;
+                                let costoExtras = 0;
+                                let cantOriginales = 0;
+                                let cantExtras = 0;
+
+                                // Quantity analysis: items with variances
+                                const itemsConVariacion: { item: ItemConVisibilidad; cantOferta: number; cantFinal: number; diff: number; pVentaUnit: number }[] = [];
+
+                                items.forEach(item => {
+                                    const pVenta = item.valorUnitario || 0;
+                                    const margen = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
+                                    const pUnit = pVenta + margen;
+
+                                    if (item.esExtra) {
+                                        costoExtras += pUnit * item.cantidad;
+                                        cantExtras++;
+                                    } else {
+                                        costoOriginal += pUnit * item.cantidad;
+                                        cantOriginales++;
+                                    }
+
+                                    // Check quantity variance for non-extra items
+                                    if (!item.esExtra) {
+                                        const cantFinal = cantidadesFinales[item.id];
+                                        if (cantFinal !== undefined && cantFinal !== item.cantidad) {
+                                            itemsConVariacion.push({
+                                                item,
+                                                cantOferta: item.cantidad,
+                                                cantFinal,
+                                                diff: cantFinal - item.cantidad,
+                                                pVentaUnit: pUnit
+                                            });
+                                        }
+                                    }
+                                });
+
+                                const costoVariacion = itemsConVariacion.reduce((acc, v) => acc + v.diff * v.pVentaUnit, 0);
+
+                                return (
+                                    <div className="flex flex-col gap-4 mb-4">
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <Card className="bg-muted/10 border-dashed">
+                                                <CardContent className="p-4 flex flex-col justify-center items-center">
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">
+                                                        Originales ({cantOriginales})
+                                                    </p>
+                                                    <p className="font-mono text-lg font-semibold">{formatCurrency(costoOriginal)}</p>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900 border-dashed">
+                                                <CardContent className="p-4 flex flex-col justify-center items-center text-center">
+                                                    <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold uppercase mb-1 flex items-center justify-center gap-1">
+                                                        <Plus className="h-3 w-3" /> Extras ({cantExtras})
+                                                    </p>
+                                                    <p className="font-mono text-lg font-bold text-amber-600 dark:text-amber-500">+{formatCurrency(costoExtras)}</p>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="bg-primary/5 hover:bg-primary/10 transition-colors">
+                                                <CardContent className="p-4 flex flex-col justify-center items-center text-center">
+                                                    <p className="text-[10px] text-primary font-bold uppercase mb-1">Costo Actual</p>
+                                                    <p className="font-mono text-xl font-bold text-primary">{formatCurrency(costoOriginal + costoExtras)}</p>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+
+                                        {/* Análisis de Variación de Cantidades */}
+                                        {itemsConVariacion.length > 0 && (
+                                            <Card className="border-blue-200 dark:border-blue-900 overflow-hidden">
+                                                <div className="bg-blue-50 dark:bg-blue-950/30 py-2 px-4 border-b border-blue-100 dark:border-blue-900/50 flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                                                        <TrendingUp className="h-3 w-3" /> Variación de Cantidades
+                                                    </span>
+                                                    <span className={`text-xs font-mono font-semibold ${costoVariacion > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                        {costoVariacion > 0 ? '+' : ''}{formatCurrency(costoVariacion)}
+                                                    </span>
+                                                </div>
+                                                <CardContent className="p-0">
+                                                    <Table>
+                                                        <TableHeader>
+                                                            <TableRow className="bg-muted/20">
+                                                                <TableHead className="text-[10px] py-1">Ítem</TableHead>
+                                                                <TableHead className="text-center text-[10px] py-1">Oferta</TableHead>
+                                                                <TableHead className="text-center text-[10px] py-1">Final</TableHead>
+                                                                <TableHead className="text-center text-[10px] py-1">Δ Cant.</TableHead>
+                                                                <TableHead className="text-right text-[10px] py-1">Δ Valor</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {itemsConVariacion.map(v => (
+                                                                <TableRow key={v.item.id}>
+                                                                    <TableCell className="text-xs py-1.5 font-medium">{v.item.descripcion}</TableCell>
+                                                                    <TableCell className="text-center text-xs py-1.5 text-muted-foreground">{v.cantOferta}</TableCell>
+                                                                    <TableCell className="text-center text-xs py-1.5 font-semibold">{v.cantFinal}</TableCell>
+                                                                    <TableCell className="text-center py-1.5">
+                                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${v.diff > 0 ? 'bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'}`}>
+                                                                            {v.diff > 0 ? '+' : ''}{v.diff}
+                                                                        </span>
+                                                                    </TableCell>
+                                                                    <TableCell className={`text-right text-xs font-mono font-semibold py-1.5 ${v.diff > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                                        {v.diff > 0 ? '+' : ''}{formatCurrency(v.diff * v.pVentaUnit)}
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                        {/* Extras Detail */}
+                                        {cantExtras > 0 && (
+                                            <Card className="border-amber-200 dark:border-amber-900 overflow-hidden">
+                                                <div className="bg-amber-50 dark:bg-amber-950/30 py-2 px-4 border-b border-amber-100 dark:border-amber-900/50 flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-amber-700 dark:text-amber-500 uppercase tracking-wider flex items-center gap-2">
+                                                        <AlertCircle className="h-3 w-3" /> Detalle de Extras
+                                                    </span>
+                                                    <span className="text-xs font-mono font-medium text-amber-600 dark:text-amber-500">
+                                                        {cantExtras} item{cantExtras > 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                                <CardContent className="p-0">
+                                                    <div className="divide-y divide-amber-100 dark:divide-amber-900/30">
+                                                        {items.filter(i => i.esExtra).map(extra => {
+                                                            const pVenta = extra.valorUnitario || 0;
+                                                            const margen = extra.porcentaje ? pVenta * (extra.porcentaje / 100) : 0;
+                                                            const unitTotal = pVenta + margen;
+                                                            return (
+                                                                <div key={extra.id} className="flex justify-between items-center py-2 px-4 hover:bg-amber-50/50 dark:hover:bg-amber-950/10 transition-colors group">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-xs font-medium">{extra.descripcion}</span>
+                                                                        <span className="text-[10px] text-muted-foreground mt-0.5">
+                                                                            Cant: {extra.cantidad} x {formatCurrency(unitTotal)}
+                                                                            {extra.porcentaje ? ` (+${extra.porcentaje}% extra)` : ''}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="font-mono text-sm font-semibold text-amber-600 dark:text-amber-500 bg-amber-100/50 dark:bg-amber-900/30 px-2 py-0.5 rounded">
+                                                                            +{formatCurrency(unitTotal * extra.cantidad)}
+                                                                        </div>
+                                                                        <button
+                                                                            title="Eliminar extra"
+                                                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-100 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500"
+                                                                            onClick={() => {
+                                                                                const updatedItems = items.filter(i => i.id !== extra.id);
+                                                                                setItems(updatedItems);
+                                                                                onTrabajoUpdated({
+                                                                                    ...trabajo,
+                                                                                    items: updatedItems.map(({ visibleEnPdf, ...item }) => item),
+                                                                                });
+                                                                                toast({ title: 'Extra eliminado', description: `"${extra.descripcion}" fue removido de los extras.` });
+                                                                            }}
+                                                                        >
+                                                                            <X className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                        {/* Generar Acta Button */}
+                                        <div className="flex justify-end">
+                                            <Button
+                                                variant="default"
+                                                className="bg-gradient-to-r from-primary to-primary/80 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all gap-2"
+                                                onClick={() => setShowActa(true)}
+                                            >
+                                                <FileSignature className="h-4 w-4" />
+                                                Generar Acta
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             {/* Materials Consumption Section */}
                             <Collapsible defaultOpen className="mt-4">
                                 <Card>
@@ -1414,7 +1647,7 @@ export function TrabajoHistoryDialog({
                                             <CardTitle className="text-base flex items-center gap-2">
                                                 <Package className="h-4 w-4 text-orange-500" /> Materiales y Códigos del Trabajo
                                                 <Badge variant="outline" className="ml-auto">
-                                                    {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length} grupos
+                                                    {items.length} grupos
                                                 </Badge>
                                             </CardTitle>
                                             <CardDescription>Marca como utilizado para descontar del inventario (incluye materiales de códigos).</CardDescription>
@@ -1422,8 +1655,14 @@ export function TrabajoHistoryDialog({
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
                                         <CardContent className="p-4 space-y-4">
-                                            {items.filter(i => i.tipo === 'PRODUCTO' || (i.subItems && i.subItems.length > 0)).length === 0 ? (
-                                                <p className="text-sm text-muted-foreground text-center py-4">No hay materiales ni códigos con materiales en este trabajo.</p>
+                                            <div className="flex justify-end">
+                                                <Button size="sm" variant="outline" onClick={() => setShowAddItem(true)} className="border-primary text-primary hover:bg-primary/10">
+                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    Agregar Suministro o Servicio
+                                                </Button>
+                                            </div>
+                                            {items.length === 0 ? (
+                                                <p className="text-sm text-muted-foreground text-center py-4">No hay suministros, instalaciones ni servicios agregados en este trabajo.</p>
                                             ) : (
                                                 <div className="space-y-6">
                                                     {/* Independent Materials */}
@@ -1435,7 +1674,8 @@ export function TrabajoHistoryDialog({
                                                                     <TableRow>
                                                                         <TableHead className="w-12">Usado</TableHead>
                                                                         <TableHead>Material</TableHead>
-                                                                        <TableHead className="text-right">Cant.</TableHead>
+                                                                        <TableHead className="text-right">Cant. Oferta</TableHead>
+                                                                        <TableHead className="text-right w-28">Cant. Final</TableHead>
                                                                         <TableHead className="text-right">Existencias</TableHead>
                                                                     </TableRow>
                                                                 </TableHeader>
@@ -1444,43 +1684,73 @@ export function TrabajoHistoryDialog({
                                                                         const itemKey = `${trabajo.id}-${pItem.inventarioId || pItem.id}`;
                                                                         const inventoryItem = inventario.find(inv => inv.id === pItem.inventarioId);
                                                                         const isUsed = materialesUsados.has(itemKey);
+                                                                        const cantFinal = cantidadesFinales[pItem.id];
+                                                                        const hasDiff = cantFinal !== undefined && cantFinal !== pItem.cantidad;
 
                                                                         return (
-                                                                            <TableRow key={pItem.id} className={isUsed ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                                                                            <TableRow key={pItem.id} className={`${isUsed ? "bg-green-50 dark:bg-green-950/20" : pItem.esExtra ? "bg-amber-50/50 dark:bg-amber-900/10" : ""}`}>
                                                                                 <TableCell>
                                                                                     <CheckboxUI
                                                                                         checked={isUsed}
                                                                                         disabled={isUsed}
                                                                                         onCheckedChange={async (checked: boolean) => {
                                                                                             if (checked) {
+                                                                                                setMaterialesUsados(prev => new Set(prev).add(itemKey));
                                                                                                 try {
                                                                                                     await addConsumoMaterial({
                                                                                                         inventarioId: pItem.inventarioId || undefined,
                                                                                                         descripcionMaterial: pItem.descripcion,
                                                                                                         cotizacionId: trabajo.id,
-                                                                                                        cantidad: pItem.cantidad,
+                                                                                                        cantidad: cantidadesFinales[pItem.id] ?? pItem.cantidad,
                                                                                                         unidad: 'UND',
                                                                                                         descripcion: `Consumo desde trabajo #${trabajo.numero} — ${pItem.descripcion}`,
                                                                                                     });
-                                                                                                    setMaterialesUsados(prev => new Set(prev).add(itemKey));
-                                                                                                    toast({
-                                                                                                        title: "✅ Consumo Registrado",
-                                                                                                        description: `${pItem.descripcion} marcado como utilizado.`
-                                                                                                    });
+                                                                                                    toast({ title: "✅ Consumo Registrado", description: `${pItem.descripcion} marcado como utilizado.` });
                                                                                                 } catch (err: any) {
-                                                                                                    console.error("Error registrando consumo:", err);
-                                                                                                    toast({
-                                                                                                        title: "Error al Registrar",
-                                                                                                        description: err?.message || "No se pudo registrar el consumo. Verifica la tabla consumo_material en Supabase.",
-                                                                                                        variant: "destructive"
-                                                                                                    });
+                                                                                                    setMaterialesUsados(prev => { const next = new Set(prev); next.delete(itemKey); return next; });
+                                                                                                    toast({ title: "Error al Registrar", description: err?.message || "No se pudo registrar el consumo.", variant: "destructive" });
                                                                                                 }
                                                                                             }
                                                                                         }}
                                                                                     />
                                                                                 </TableCell>
-                                                                                <TableCell className="font-medium">{pItem.descripcion}</TableCell>
-                                                                                <TableCell className="text-right">{pItem.cantidad}</TableCell>
+                                                                                <TableCell className="font-medium">
+                                                                                    {pItem.descripcion}
+                                                                                    {pItem.esExtra && <Badge variant="secondary" className="ml-2 text-[8px] bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">EXTRA</Badge>}
+                                                                                </TableCell>
+                                                                                <TableCell className="text-right text-muted-foreground">{pItem.cantidad}</TableCell>
+                                                                                <TableCell className="text-right">
+                                                                                    <div className="flex items-center justify-end gap-1">
+                                                                                        <Input
+                                                                                            type="number"
+                                                                                            min={0}
+                                                                                            placeholder={String(pItem.cantidad)}
+                                                                                            value={cantidadesFinales[pItem.id] ?? ''}
+                                                                                            onChange={e => {
+                                                                                                const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                                                                                const newCants = val === undefined
+                                                                                                    ? (({ [pItem.id]: _, ...rest }) => rest)(cantidadesFinales)
+                                                                                                    : { ...cantidadesFinales, [pItem.id]: val };
+                                                                                                setCantidadesFinales(newCants);
+                                                                                                // Persist cantidadFinal in the item itself
+                                                                                                const updatedItems = items.map(i =>
+                                                                                                    i.id === pItem.id ? { ...i, cantidadFinal: val } : i
+                                                                                                );
+                                                                                                setItems(updatedItems);
+                                                                                                onTrabajoUpdated({
+                                                                                                    ...trabajo,
+                                                                                                    items: updatedItems.map(({ visibleEnPdf, ...item }) => item),
+                                                                                                });
+                                                                                            }}
+                                                                                            className={`h-7 w-20 text-xs text-right p-1 ${hasDiff ? (cantFinal! > pItem.cantidad ? 'border-red-400 bg-red-50 dark:bg-red-950/20 text-red-600 font-bold' : 'border-green-400 bg-green-50 dark:bg-green-950/20 text-green-700 font-bold') : ''}`}
+                                                                                        />
+                                                                                        {hasDiff && (
+                                                                                            <span className={`text-[10px] font-bold ${cantFinal! > pItem.cantidad ? 'text-red-500' : 'text-green-600'}`}>
+                                                                                                {cantFinal! > pItem.cantidad ? '+' : ''}{cantFinal! - pItem.cantidad}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </TableCell>
                                                                                 <TableCell className="text-right text-muted-foreground">
                                                                                     {inventoryItem ? inventoryItem.cantidad : 'N/A'}
                                                                                 </TableCell>
@@ -1492,29 +1762,39 @@ export function TrabajoHistoryDialog({
                                                         </div>
                                                     )}
 
-                                                    {/* Work Codes (APUs) */}
-                                                    {items.filter(i => i.tipo === 'SERVICIO' && i.subItems && i.subItems.length > 0).map((sItem: ItemConVisibilidad) => {
+                                                    {/* Instalaciones y Servicios */}
+                                                    {items.filter(i => i.tipo !== 'PRODUCTO').map((sItem: ItemConVisibilidad) => {
                                                         const itemKey = `${trabajo.id}-${sItem.id}`;
                                                         const isUsed = materialesUsados.has(itemKey);
+                                                        const cantFinalSrv = cantidadesFinales[sItem.id];
+                                                        const hasDiffSrv = cantFinalSrv !== undefined && cantFinalSrv !== sItem.cantidad;
 
                                                         return (
-                                                            <div key={sItem.id} className="border rounded-lg overflow-hidden">
-                                                                <div className={`p-3 border-b flex justify-between items-center ${isUsed ? "bg-green-50 dark:bg-green-950/20" : "bg-muted/30"}`}>
+                                                            <div key={sItem.id} className={`border rounded-lg overflow-hidden ${sItem.esExtra ? 'border-amber-200 dark:border-amber-800' : ''}`}>
+                                                                <div className={`p-3 border-b flex justify-between items-center ${isUsed ? "bg-green-50 dark:bg-green-950/20" : sItem.esExtra ? "bg-amber-50/70 dark:bg-amber-950/30" : "bg-muted/30"}`}>
                                                                     <div className="flex items-center gap-3">
                                                                         <CheckboxUI
                                                                             checked={isUsed}
                                                                             disabled={isUsed || isDeducting}
                                                                             onCheckedChange={async (checked: boolean) => {
                                                                                 if (checked) {
+                                                                                    // Optimistic UI Update
+                                                                                    setMaterialesUsados(prev => new Set(prev).add(itemKey));
                                                                                     setIsDeducting(true);
+                                                                                    
                                                                                     try {
                                                                                         const totalDeducted = await deductRecursive(sItem, sItem.cantidad);
-                                                                                        setMaterialesUsados(prev => new Set(prev).add(itemKey));
                                                                                         toast({
                                                                                             title: "Código Aplicado",
                                                                                             description: `Se descontaron los materiales para ${sItem.cantidad} unidades de "${sItem.descripcion}".`
                                                                                         });
                                                                                     } catch (err) {
+                                                                                        // Rollback on failure
+                                                                                        setMaterialesUsados(prev => {
+                                                                                            const next = new Set(prev);
+                                                                                            next.delete(itemKey);
+                                                                                            return next;
+                                                                                        });
                                                                                         toast({
                                                                                             title: "Error",
                                                                                             description: "No se pudieron descontar todos los materiales del código.",
@@ -1549,34 +1829,65 @@ export function TrabajoHistoryDialog({
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                    <Badge variant={isUsed ? "default" : "outline"} className={isUsed ? "bg-green-600" : ""}>
-                                                                        {isUsed ? "Consumido" : "Pendiente"}
-                                                                    </Badge>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-[9px] text-muted-foreground">Oferta: {sItem.cantidad}</span>
+                                                                            <Input
+                                                                                type="number"
+                                                                                min={0}
+                                                                                placeholder={String(sItem.cantidad)}
+                                                                                value={cantidadesFinales[sItem.id] ?? ''}
+                                                                                onChange={e => {
+                                                                                    const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                                                                    const newCants = val === undefined
+                                                                                        ? (({ [sItem.id]: _, ...rest }) => rest)(cantidadesFinales)
+                                                                                        : { ...cantidadesFinales, [sItem.id]: val };
+                                                                                    setCantidadesFinales(newCants);
+                                                                                    // Persist cantidadFinal in the item itself
+                                                                                    const updatedItems = items.map(i =>
+                                                                                        i.id === sItem.id ? { ...i, cantidadFinal: val } : i
+                                                                                    );
+                                                                                    setItems(updatedItems);
+                                                                                    onTrabajoUpdated({
+                                                                                        ...trabajo,
+                                                                                        items: updatedItems.map(({ visibleEnPdf, ...item }) => item),
+                                                                                    });
+                                                                                }}
+                                                                                className={`h-6 w-16 text-[10px] text-right p-1 ${hasDiffSrv ? (cantFinalSrv! > sItem.cantidad ? 'border-red-400 bg-red-50 text-red-600 font-bold' : 'border-green-400 bg-green-50 text-green-700 font-bold') : ''}`}
+                                                                            />
+                                                                            {hasDiffSrv && <span className={`text-[9px] font-bold ${cantFinalSrv! > sItem.cantidad ? 'text-red-500' : 'text-green-600'}`}>{cantFinalSrv! > sItem.cantidad ? '+' : ''}{cantFinalSrv! - sItem.cantidad}</span>}
+                                                                        </div>
+                                                                        <Badge variant={isUsed ? "default" : "outline"} className={isUsed ? "bg-green-600" : ""}>
+                                                                            {isUsed ? "Consumido" : "Pendiente"}
+                                                                        </Badge>
+                                                                    </div>
                                                                 </div>
-                                                                <Collapsible>
-                                                                    <CollapsibleTrigger className="w-full text-left text-[10px] p-2 hover:bg-muted/50 transition-colors flex items-center gap-2">
-                                                                        Ver materiales incluidos ({sItem.subItems?.length})
-                                                                    </CollapsibleTrigger>
-                                                                    <CollapsibleContent>
-                                                                        <Table>
-                                                                            <TableBody>
-                                                                                {sItem.subItems?.map((sub: MaterialAsociado, sIdx: number) => (
-                                                                                    <TableRow key={sIdx} className="bg-muted/5 border-0">
-                                                                                        <TableCell className="pl-10 py-1 text-xs">
-                                                                                            <div className="flex items-center gap-2">
-                                                                                                <span className="text-muted-foreground">↳</span>
-                                                                                                {sub.nombre}
-                                                                                            </div>
-                                                                                        </TableCell>
-                                                                                        <TableCell className="text-right py-1 text-xs text-muted-foreground">
-                                                                                            {(sub.cantidad || 0) * sItem.cantidad} unidades
-                                                                                        </TableCell>
-                                                                                    </TableRow>
-                                                                                ))}
-                                                                            </TableBody>
-                                                                        </Table>
-                                                                    </CollapsibleContent>
-                                                                </Collapsible>
+                                                                {sItem.subItems && sItem.subItems.length > 0 && (
+                                                                    <Collapsible>
+                                                                        <CollapsibleTrigger className="w-full text-left text-[10px] p-2 hover:bg-muted/50 transition-colors flex items-center gap-2">
+                                                                            Ver materiales incluidos ({sItem.subItems.length})
+                                                                        </CollapsibleTrigger>
+                                                                        <CollapsibleContent>
+                                                                            <Table>
+                                                                                <TableBody>
+                                                                                    {sItem.subItems.map((sub: MaterialAsociado, sIdx: number) => (
+                                                                                        <TableRow key={sIdx} className="bg-muted/5 border-0">
+                                                                                            <TableCell className="pl-10 py-1 text-xs">
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <span className="text-muted-foreground">↳</span>
+                                                                                                    {sub.nombre}
+                                                                                                </div>
+                                                                                            </TableCell>
+                                                                                            <TableCell className="text-right py-1 text-xs text-muted-foreground">
+                                                                                                {(sub.cantidad || 0) * sItem.cantidad} unidades
+                                                                                            </TableCell>
+                                                                                        </TableRow>
+                                                                                    ))}
+                                                                                </TableBody>
+                                                                            </Table>
+                                                                        </CollapsibleContent>
+                                                                    </Collapsible>
+                                                                )}
                                                             </div>
                                                         );
                                                     })}
@@ -1677,9 +1988,9 @@ export function TrabajoHistoryDialog({
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        {localEvidence.filter(e => e.tipo === 'UBICACION').length > 0 ? (
+                                        {combinedEvidences.filter(e => e.tipo === 'UBICACION').length > 0 ? (
                                             (() => {
-                                                const lastLoc = localEvidence.filter(e => e.tipo === 'UBICACION').sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+                                                const lastLoc = combinedEvidences.filter(e => e.tipo === 'UBICACION').sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
                                                 return (
                                                     <div className="space-y-2">
                                                         <div className="h-[150px] bg-muted rounded-md flex items-center justify-center relative overflow-hidden group">
@@ -1717,10 +2028,10 @@ export function TrabajoHistoryDialog({
                             {/* Evidence History Timeline */}
                             <div className="mt-4">
                                 <h3 className="font-semibold mb-2 flex items-center gap-2">
-                                    <Clock className="h-4 w-4" /> Historial de Ejecución ({localEvidence.length})
+                                    <Clock className="h-4 w-4" /> Historial de Ejecución ({combinedEvidences.length})
                                 </h3>
                                 <div className="space-y-4 pl-2">
-                                    {localEvidence.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((ev) => (
+                                    {combinedEvidences.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((ev) => (
                                         <div key={ev.id} className="flex gap-4 border-l-2 border-muted pl-4 relative pb-4 last:pb-0">
                                             <div className="absolute -left-[9px] top-0 bg-background border rounded-full p-1">
                                                 {ev.tipo === 'FOTO' && <Camera className="h-3 w-3 text-blue-500" />}
@@ -1775,6 +2086,315 @@ export function TrabajoHistoryDialog({
                             </div>
                         </TabsContent>
                     )}
+
+                    {/* ACTA DIALOG */}
+                    <Dialog open={showActa} onOpenChange={setShowActa}>
+                        <DialogContent className="sm:max-w-[820px] max-h-[90vh] overflow-hidden flex flex-col">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2 text-lg">
+                                    <FileSignature className="h-5 w-5 text-primary" />
+                                    Acta de Ejecución — Trabajo #{trabajo.numero}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Documento oficial para entrega al cliente. Ajuste los datos y luego imprima.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <ScrollArea className="flex-1 overflow-auto pr-2">
+                                <div className="space-y-6 py-2">
+
+                                    {/* === MEMBRETE EMPRESA + CLIENTE === */}
+                                    <div className="rounded-xl border-2 border-primary/20 overflow-hidden">
+
+                                        {/* Top bar */}
+                                        <div className="bg-primary px-5 py-3 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white/20 rounded-lg p-2">
+                                                    <Zap className="h-5 w-5 text-white" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-white font-bold text-base leading-none">{companyInfo.nombre}</p>
+                                                    <p className="text-white/70 text-[10px] mt-0.5">{companyInfo.descripcion}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-white/80 text-[10px] uppercase tracking-wider font-bold">Acta de Ejecución</p>
+                                                <p className="text-white font-mono font-bold text-sm">N° {trabajo.numero}</p>
+                                                <p className="text-white/70 text-[10px]">{format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Company info row */}
+                                        <div className="bg-primary/5 px-5 py-2 border-b border-primary/10 flex flex-wrap gap-x-6 gap-y-1">
+                                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                <MapPin className="h-3 w-3" /> {companyInfo.direccion}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                <Phone className="h-3 w-3" /> {companyInfo.telefono}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                <Mail className="h-3 w-3" /> {companyInfo.email}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                                NIT: {companyInfo.nit}
+                                            </span>
+                                        </div>
+
+                                        {/* Main two-column block */}
+                                        <div className="grid grid-cols-2 divide-x">
+                                            {/* Client info */}
+                                            <div className="p-4 space-y-1">
+                                                <p className="text-[10px] text-primary font-bold uppercase tracking-wider mb-2">Datos del Cliente</p>
+                                                <p className="font-bold text-sm">{trabajo.cliente.nombre}</p>
+                                                {trabajo.cliente.documento && (
+                                                    <p className="text-xs text-muted-foreground">NIT / C.C.: {trabajo.cliente.documento}</p>
+                                                )}
+                                                {trabajo.cliente.telefono && (
+                                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                        <Phone className="h-3 w-3" /> {trabajo.cliente.telefono}
+                                                    </p>
+                                                )}
+                                                {trabajo.cliente.correo && (
+                                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                        <Mail className="h-3 w-3" /> {trabajo.cliente.correo}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Project info */}
+                                            <div className="p-4 space-y-1">
+                                                <p className="text-[10px] text-primary font-bold uppercase tracking-wider mb-2">Datos del Proyecto</p>
+                                                <p className="font-bold text-sm">{trabajo.descripcionTrabajo || ''}</p>
+                                                {direccionProyecto && (
+                                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                        <MapPin className="h-3 w-3" /> {direccionProyecto}
+                                                    </p>
+                                                )}
+                                                <div className="flex gap-4 mt-1">
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground uppercase">Inicio</p>
+                                                        <p className="text-xs font-medium">{fechaInicio ? new Date(fechaInicio).toLocaleDateString('es-CO') : '—'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground uppercase">Fin Real</p>
+                                                        <p className="text-xs font-medium">{fechaFinReal ? new Date(fechaFinReal).toLocaleDateString('es-CO') : '—'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground uppercase">Progreso</p>
+                                                        <p className="text-xs font-medium">{progressPercent}%</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Análisis de Cantidades: Oferta vs. Final */}
+                                    <div>
+                                        <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
+                                            <TrendingUp className="h-4 w-4 text-blue-500" />
+                                            Análisis de Cantidades — Oferta vs. Final
+                                        </h3>
+                                        <Card className="overflow-hidden">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow className="bg-muted/40">
+                                                        <TableHead className="text-xs py-2">Ítem</TableHead>
+                                                        <TableHead className="text-center text-xs py-2">Tipo</TableHead>
+                                                        <TableHead className="text-center text-xs py-2">Cant. Oferta</TableHead>
+                                                        <TableHead className="text-center text-xs py-2">Cant. Final</TableHead>
+                                                        <TableHead className="text-center text-xs py-2">Δ</TableHead>
+                                                        <TableHead className="text-right text-xs py-2">V. Unit.</TableHead>
+                                                        <TableHead className="text-right text-xs py-2">Δ Valor</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {items.filter(i => !i.esExtra).map(item => {
+                                                        const pVenta = item.valorUnitario || 0;
+                                                        const margen = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
+                                                        const pUnit = pVenta + margen;
+                                                        const cantFinal = cantidadesFinales[item.id] ?? item.cantidad;
+                                                        const diff = cantFinal - item.cantidad;
+                                                        const deltaValor = diff * pUnit;
+                                                        return (
+                                                            <TableRow key={item.id} className={diff !== 0 ? (diff > 0 ? 'bg-red-50/50 dark:bg-red-950/10' : 'bg-green-50/50 dark:bg-green-950/10') : ''}>
+                                                                <TableCell className="text-xs py-2 font-medium">{item.descripcion}</TableCell>
+                                                                <TableCell className="text-center py-2">
+                                                                    <Badge variant="outline" className="text-[9px] py-0">{item.tipo === 'SERVICIO' ? '🔧 Serv.' : '📦 Mat.'}</Badge>
+                                                                </TableCell>
+                                                                <TableCell className="text-center text-xs py-2 text-muted-foreground">{item.cantidad}</TableCell>
+                                                                <TableCell className="text-center text-xs py-2 font-semibold">{cantFinal}</TableCell>
+                                                                <TableCell className="text-center py-2">
+                                                                    {diff === 0 ? (
+                                                                        <span className="text-[10px] text-muted-foreground">—</span>
+                                                                    ) : (
+                                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${diff > 0 ? 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'}`}>
+                                                                            {diff > 0 ? '+' : ''}{diff}
+                                                                        </span>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell className="text-right text-xs font-mono py-2">{formatCurrency(pUnit)}</TableCell>
+                                                                <TableCell className={`text-right text-xs font-mono font-semibold py-2 ${diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                                                    {diff !== 0 ? (diff > 0 ? '+' : '') + formatCurrency(deltaValor) : '—'}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        </Card>
+                                    </div>
+
+                                    {/* Extras Section */}
+                                    {items.filter(i => i.esExtra).length > 0 && (
+                                        <div>
+                                            <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
+                                                <Plus className="h-4 w-4 text-amber-500" />
+                                                Ítems Adicionales / Extras
+                                            </h3>
+                                            <Card className="border-amber-200 dark:border-amber-800 overflow-hidden">
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow className="bg-amber-50 dark:bg-amber-950/30">
+                                                            <TableHead className="text-xs py-2">Ítem Extra</TableHead>
+                                                            <TableHead className="text-center text-xs py-2">Cant.</TableHead>
+                                                            <TableHead className="text-right text-xs py-2">V. Unit.</TableHead>
+                                                            <TableHead className="text-right text-xs py-2">Total</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {items.filter(i => i.esExtra).map(extra => {
+                                                            const pVenta = extra.valorUnitario || 0;
+                                                            const margen = extra.porcentaje ? pVenta * (extra.porcentaje / 100) : 0;
+                                                            const pUnit = pVenta + margen;
+                                                            return (
+                                                                <TableRow key={extra.id}>
+                                                                    <TableCell className="text-xs py-2 font-medium text-amber-700 dark:text-amber-400">{extra.descripcion}</TableCell>
+                                                                    <TableCell className="text-center text-xs py-2">{extra.cantidad}</TableCell>
+                                                                    <TableCell className="text-right text-xs font-mono py-2">{formatCurrency(pUnit)}</TableCell>
+                                                                    <TableCell className="text-right text-xs font-mono font-bold py-2 text-amber-600">
+                                                                        +{formatCurrency(pUnit * extra.cantidad)}
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            );
+                                                        })}
+                                                    </TableBody>
+                                                </Table>
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* Financial Summary */}
+                                    {(() => {
+                                        const totalOriginal = items.filter(i => !i.esExtra).reduce((acc, item) => {
+                                            const pVenta = item.valorUnitario || 0;
+                                            const margen = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
+                                            return acc + (pVenta + margen) * item.cantidad;
+                                        }, 0);
+                                        const totalExtras = items.filter(i => i.esExtra).reduce((acc, item) => {
+                                            const pVenta = item.valorUnitario || 0;
+                                            const margen = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
+                                            return acc + (pVenta + margen) * item.cantidad;
+                                        }, 0);
+                                        const totalVariacion = items.filter(i => !i.esExtra).reduce((acc, item) => {
+                                            const pVenta = item.valorUnitario || 0;
+                                            const margen = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
+                                            const pUnit = pVenta + margen;
+                                            const cantFinal = cantidadesFinales[item.id] ?? item.cantidad;
+                                            return acc + (cantFinal - item.cantidad) * pUnit;
+                                        }, 0);
+                                        const totalFinal = totalOriginal + totalExtras + totalVariacion;
+
+                                        return (
+                                            <Card className="bg-muted/20">
+                                                <CardContent className="p-4 space-y-2">
+                                                    <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
+                                                        <Receipt className="h-4 w-4 text-primary" /> Resumen Financiero
+                                                    </h3>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-muted-foreground">Valor Oferta Original:</span>
+                                                        <span className="font-mono font-medium">{formatCurrency(totalOriginal)}</span>
+                                                    </div>
+                                                    {totalVariacion !== 0 && (
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-muted-foreground">Ajuste por Cantidades:</span>
+                                                            <span className={`font-mono font-medium ${totalVariacion > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                                {totalVariacion > 0 ? '+' : ''}{formatCurrency(totalVariacion)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {totalExtras > 0 && (
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-muted-foreground">Ítems Extras:</span>
+                                                            <span className="font-mono font-medium text-amber-600">+{formatCurrency(totalExtras)}</span>
+                                                        </div>
+                                                    )}
+                                                    <Separator className="my-1" />
+                                                    <div className="flex justify-between text-base font-bold">
+                                                        <span>Total a Cobrar:</span>
+                                                        <span className="font-mono text-primary">{formatCurrency(totalFinal)}</span>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })()}
+
+                                    {/* Notas del Acta */}
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold">Observaciones del Acta</Label>
+                                        <Textarea
+                                            placeholder="Ingrese observaciones, firma o condiciones adicionales del acta..."
+                                            className="min-h-[80px] text-sm"
+                                            value={observacionesActa}
+                                            onChange={e => setObservacionesActa(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </ScrollArea>
+                            <div className="flex justify-end gap-2 pt-4 border-t">
+                                <Button variant="outline" onClick={() => setShowActa(false)}>Cerrar</Button>
+                                <Button
+                                    className="gap-2"
+                                    onClick={() => {
+                                        try {
+                                            const actaData: ActaData = {
+                                                numero: trabajo.numero,
+                                                descripcionTrabajo: trabajo.descripcionTrabajo || '',
+                                                direccionProyecto: direccionProyecto || undefined,
+                                                fechaInicio: fechaInicio || undefined,
+                                                fechaFinReal: fechaFinReal || undefined,
+                                                progreso: progressPercent,
+                                                cliente: {
+                                                    nombre: trabajo.cliente.nombre,
+                                                    documento: trabajo.cliente.documento || undefined,
+                                                    telefono: trabajo.cliente.telefono || undefined,
+                                                    correo: trabajo.cliente.correo || undefined,
+                                                    direccion: trabajo.cliente.direccion || undefined,
+                                                },
+                                                items: items.map(item => {
+                                                    const pVenta = item.valorUnitario || 0;
+                                                    const margen = item.porcentaje ? pVenta * (item.porcentaje / 100) : 0;
+                                                    return {
+                                                        descripcion: item.descripcion,
+                                                        tipo: item.tipo,
+                                                        cantOferta: item.cantidad,
+                                                        cantFinal: cantidadesFinales[item.id] ?? item.cantidad,
+                                                        valorUnitario: pVenta + margen,
+                                                        esExtra: item.esExtra || false,
+                                                    };
+                                                })
+                                            };
+                                            generateActaPDF(actaData, companyInfo, observacionesActa || undefined);
+                                            toast({ title: 'PDF Generado', description: 'El acta de ejecución se descargó correctamente.' });
+                                        } catch (err) {
+                                            console.error(err);
+                                            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo generar el PDF del acta.' });
+                                        }
+                                    }}
+                                >
+                                    <Printer className="h-4 w-4" /> Descargar PDF
+                                </Button>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
 
                     {/* ITEMS TAB */}
                     <TabsContent value="items" className="flex-1 overflow-auto space-y-4 mt-4">
@@ -1832,7 +2452,10 @@ export function TrabajoHistoryDialog({
                                                             <div className="flex flex-col gap-1">
                                                                 <div className="flex items-center gap-2">
                                                                     {item.tipo === 'SERVICIO' ? <Wrench className="h-3 w-3 text-blue-500" /> : <Package className="h-3 w-3 text-green-500" />}
-                                                                    <span className="font-medium text-xs">{item.descripcion}</span>
+                                                                    <span className="font-medium text-xs">
+                                                                        {item.descripcion}
+                                                                        {item.esExtra && <Badge variant="secondary" className="ml-2 py-0 h-4 text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">EXTRA</Badge>}
+                                                                    </span>
                                                                 </div>
                                                                 {/* Sub-item count badge & toggle */}
                                                                 {item.subItems && item.subItems.length > 0 && (
@@ -1937,15 +2560,6 @@ export function TrabajoHistoryDialog({
                             </CardContent>
                         </Card>
 
-                        {/* Product/Service Selector Dialog */}
-                        <ProductSelectorDialog
-                            open={showAddItem}
-                            onOpenChange={setShowAddItem}
-                            onItemSelected={handleAddItem}
-                            inventario={inventario}
-                            codigosTrabajo={codigosTrabajo}
-                            instalaciones={instalaciones}
-                        />
 
                         {/* Totals */}
                         <Card className="bg-muted/30">
@@ -2522,6 +3136,16 @@ export function TrabajoHistoryDialog({
                         </ScrollArea>
                     </TabsContent>
                 </Tabs>
+                
+                {/* Product/Service Selector Dialog Global */}
+                <ProductSelectorDialog
+                    open={showAddItem}
+                    onOpenChange={setShowAddItem}
+                    onItemSelected={handleAddItem}
+                    inventario={inventario}
+                    codigosTrabajo={codigosTrabajo}
+                    instalaciones={instalaciones}
+                />
             </DialogContent>
         </Dialog>
     );

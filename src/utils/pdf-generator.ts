@@ -1159,3 +1159,309 @@ export const generateQuotePDF = (
     doc.save(`Cotizacion_${cotizacion.numero}_${style.name}.pdf`);
     return null;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTA DE EJECUCIÓN PDF
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ActaItem {
+    descripcion: string;
+    tipo: string;
+    cantOferta: number;
+    cantFinal: number;
+    valorUnitario: number;
+    esExtra: boolean;
+}
+
+export interface ActaData {
+    numero: string;
+    descripcionTrabajo: string;
+    direccionProyecto?: string;
+    fechaInicio?: string;
+    fechaFinReal?: string;
+    progreso?: number;
+    cliente: {
+        nombre: string;
+        documento?: string;
+        telefono?: string;
+        correo?: string;
+        direccion?: string;
+    };
+    items: ActaItem[];
+}
+
+export const generateActaPDF = (
+    acta: ActaData,
+    companyInfo: CompanyInfo = COMPANY_INFO,
+    observaciones?: string
+) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const primary: [number, number, number] = [30, 58, 138];
+    const primaryLight: [number, number, number] = [219, 234, 254];
+    const accent: [number, number, number] = [180, 83, 9];
+    const red: [number, number, number] = [220, 38, 38];
+    const green: [number, number, number] = [22, 163, 74];
+    const textDark: [number, number, number] = [31, 41, 55];
+    const textMuted: [number, number, number] = [107, 114, 128];
+    const white: [number, number, number] = [255, 255, 255];
+
+    const currencyFmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+    // White background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+    // 1. HEADER BAND
+    doc.setFillColor(...primary);
+    doc.rect(0, 0, pageWidth, 22, 'F');
+
+    doc.setTextColor(...white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(companyInfo.nombre, 14, 10);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(companyInfo.descripcion, 14, 16);
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ACTA DE EJECUCION', pageWidth - 14, 9, { align: 'right' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`N\u00b0 ${acta.numero}`, pageWidth - 14, 15, { align: 'right' });
+
+    // 2. INFO SUBBAND
+    doc.setFillColor(...primaryLight);
+    doc.rect(0, 22, pageWidth, 7, 'F');
+    doc.setTextColor(...textMuted);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    const infoLine = [companyInfo.direccion, companyInfo.telefono, companyInfo.email, `NIT: ${companyInfo.nit}`].join('   |   ');
+    doc.text(infoLine, 14, 27);
+
+    // 3. TWO-COLUMN INFO BLOCK
+    const blockY = 32;
+    const blockH = 32;
+    const colW = (pageWidth - 28) / 2;
+
+    // Left: CLIENT
+    doc.setFillColor(250, 250, 250);
+    doc.setDrawColor(220, 220, 220);
+    doc.roundedRect(14, blockY, colW - 2, blockH, 2, 2, 'FD');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...primary);
+    doc.text('DATOS DEL CLIENTE', 17, blockY + 6);
+    doc.setTextColor(...textDark);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(acta.cliente.nombre, 17, blockY + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...textMuted);
+    let cy = blockY + 19;
+    if (acta.cliente.documento) { doc.text(`NIT / CC: ${acta.cliente.documento}`, 17, cy); cy += 4.5; }
+    if (acta.cliente.telefono) { doc.text(`Tel: ${acta.cliente.telefono}`, 17, cy); cy += 4.5; }
+    if (acta.cliente.correo) { doc.text(`Email: ${acta.cliente.correo}`, 17, cy); }
+
+    // Right: PROJECT
+    const rx = 14 + colW + 2;
+    doc.setFillColor(250, 250, 250);
+    doc.roundedRect(rx, blockY, colW - 2, blockH, 2, 2, 'FD');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...primary);
+    doc.text('DATOS DEL PROYECTO', rx + 3, blockY + 6);
+    doc.setTextColor(...textDark);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    const projDesc = doc.splitTextToSize(acta.descripcionTrabajo || '', colW - 8);
+    doc.text(projDesc, rx + 3, blockY + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...textMuted);
+    let py = blockY + 19;
+    if (acta.direccionProyecto) { doc.text(`Dir: ${acta.direccionProyecto}`, rx + 3, py); py += 4.5; }
+    const dateStr = [
+        acta.fechaInicio ? `Inicio: ${new Date(acta.fechaInicio).toLocaleDateString('es-CO')}` : '',
+        acta.fechaFinReal ? `Fin: ${new Date(acta.fechaFinReal).toLocaleDateString('es-CO')}` : '',
+        acta.progreso !== undefined ? `Avance: ${acta.progreso}%` : ''
+    ].filter(Boolean).join('   |   ');
+    if (dateStr) doc.text(dateStr, rx + 3, py);
+
+    let currentY = blockY + blockH + 8;
+
+    // 4. QUANTITY ANALYSIS TABLE
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...primary);
+    doc.text('ANALISIS DE CANTIDADES - OFERTA VS. EJECUTADO', 14, currentY);
+    currentY += 4;
+
+    const origItems = acta.items.filter(i => !i.esExtra);
+    const qtyBody = origItems.map(item => {
+        const diff = item.cantFinal - item.cantOferta;
+        const deltaVal = diff * item.valorUnitario;
+        return [
+            item.descripcion,
+            item.tipo === 'SERVICIO' ? 'Serv.' : 'Mat.',
+            item.cantOferta.toString(),
+            item.cantFinal.toString(),
+            diff === 0 ? '-' : (diff > 0 ? `+${diff}` : `${diff}`),
+            currencyFmt.format(item.valorUnitario),
+            diff === 0 ? '-' : ((diff > 0 ? '+' : '') + currencyFmt.format(deltaVal))
+        ];
+    });
+
+    autoTable(doc, {
+        startY: currentY,
+        head: [['Item', 'Tipo', 'Cant. Oferta', 'Cant. Final', 'Delta', 'V. Unit.', 'Delta Valor']],
+        body: qtyBody,
+        theme: 'grid',
+        styles: { fontSize: 7.5, cellPadding: 2, textColor: textDark, lineColor: [220, 220, 220] },
+        headStyles: { fillColor: primary, textColor: white, fontStyle: 'bold', fontSize: 7.5 },
+        columnStyles: {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 15, halign: 'center' },
+            2: { cellWidth: 18, halign: 'center' },
+            3: { cellWidth: 18, halign: 'center' },
+            4: { cellWidth: 14, halign: 'center' },
+            5: { cellWidth: 25, halign: 'right' },
+            6: { cellWidth: 28, halign: 'right' }
+        },
+        didParseCell: (data) => {
+            if (data.section !== 'body') return;
+            if (data.column.index === 4 || data.column.index === 6) {
+                const v = String(data.cell.raw);
+                if (v.startsWith('+')) data.cell.styles.textColor = red;
+                else if (v !== '-') data.cell.styles.textColor = green;
+            }
+        },
+        margin: { left: 14, right: 14 }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 8;
+
+    // 5. EXTRAS TABLE
+    const extraItems = acta.items.filter(i => i.esExtra);
+    if (extraItems.length > 0) {
+        if (currentY > pageHeight - 60) { doc.addPage(); currentY = 16; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...accent);
+        doc.text('ITEMS ADICIONALES / EXTRAS', 14, currentY);
+        currentY += 4;
+
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Descripcion', 'Cantidad', 'V. Unit.', 'Total Extra']],
+            body: extraItems.map(item => [
+                item.descripcion,
+                item.cantFinal.toString(),
+                currencyFmt.format(item.valorUnitario),
+                `+${currencyFmt.format(item.valorUnitario * item.cantFinal)}`
+            ]),
+            theme: 'grid',
+            styles: { fontSize: 7.5, cellPadding: 2, textColor: textDark, lineColor: [220, 220, 220] },
+            headStyles: { fillColor: [180, 83, 9], textColor: white, fontStyle: 'bold', fontSize: 7.5 },
+            columnStyles: {
+                0: { cellWidth: 90 },
+                1: { halign: 'center' },
+                2: { halign: 'right' },
+                3: { halign: 'right', textColor: accent }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // 6. FINANCIAL SUMMARY
+    if (currentY > pageHeight - 55) { doc.addPage(); currentY = 16; }
+    const totalOriginal = origItems.reduce((acc, i) => acc + i.valorUnitario * i.cantOferta, 0);
+    const totalVariacion = origItems.reduce((acc, i) => acc + (i.cantFinal - i.cantOferta) * i.valorUnitario, 0);
+    const totalExtras = extraItems.reduce((acc, i) => acc + i.valorUnitario * i.cantFinal, 0);
+    const totalFinal = totalOriginal + totalVariacion + totalExtras;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...primary);
+    doc.text('RESUMEN FINANCIERO', 14, currentY);
+    currentY += 4;
+
+    const summaryRows: [string, string][] = [['Valor Oferta Original:', currencyFmt.format(totalOriginal)]];
+    if (totalVariacion !== 0) summaryRows.push([`Ajuste por Cantidades:`, (totalVariacion > 0 ? '+' : '') + currencyFmt.format(totalVariacion)]);
+    if (totalExtras > 0) summaryRows.push(['Items Extras:', `+${currencyFmt.format(totalExtras)}`]);
+    summaryRows.push(['TOTAL A COBRAR:', currencyFmt.format(totalFinal)]);
+
+    autoTable(doc, {
+        startY: currentY,
+        body: summaryRows,
+        theme: 'plain',
+        styles: { fontSize: 8.5, cellPadding: 2, textColor: textDark },
+        columnStyles: { 0: { cellWidth: 80, fontStyle: 'bold' }, 1: { halign: 'right', fontStyle: 'bold' } },
+        didParseCell: (data) => {
+            const isLast = data.row.index === summaryRows.length - 1;
+            if (isLast) {
+                data.cell.styles.fontSize = 10;
+                data.cell.styles.textColor = primary;
+                data.cell.styles.fillColor = primaryLight;
+                data.cell.styles.fontStyle = 'bold';
+            }
+        },
+        margin: { left: 14, right: 14 }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+
+    // 7. OBSERVATIONS
+    if (observaciones) {
+        if (currentY > pageHeight - 40) { doc.addPage(); currentY = 16; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...primary);
+        doc.text('OBSERVACIONES', 14, currentY);
+        currentY += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...textDark);
+        const obsLines = doc.splitTextToSize(observaciones, pageWidth - 28);
+        doc.text(obsLines, 14, currentY);
+        currentY += obsLines.length * 4.5 + 8;
+    }
+
+    // 8. SIGNATURE AREA
+    if (currentY > pageHeight - 45) { doc.addPage(); currentY = 16; }
+    currentY = Math.max(currentY, pageHeight - 45);
+
+    doc.setDrawColor(...textMuted);
+    doc.setLineWidth(0.5);
+    doc.line(14, currentY + 25, 80, currentY + 25);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...textDark);
+    doc.text(companyInfo.nombre, 47, currentY + 30, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...textMuted);
+    doc.text('Firma y Sello Empresa', 47, currentY + 35, { align: 'center' });
+
+    doc.line(pageWidth - 80, currentY + 25, pageWidth - 14, currentY + 25);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...textDark);
+    doc.text(acta.cliente.nombre, pageWidth - 47, currentY + 30, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...textMuted);
+    doc.text('Firma y Sello Cliente', pageWidth - 47, currentY + 35, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...textMuted);
+    doc.text(`Generado el ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
+
+    doc.save(`Acta_Ejecucion_${acta.numero}.pdf`);
+};

@@ -34,7 +34,7 @@ function mapItemToUI(db: any): CotizacionItem {
         descuentoPorcentaje: Number(db.descuento_porcentaje) || 0,
         impuesto: Number(db.impuesto) || 0,
         ocultarDetalles: !!db.ocultar_detalles,
-        subItems: db.sub_items || [],
+        subItems: (db.sub_items || []).filter((s: any) => !s || s._esExtra !== true),
         costoUnitario: Number(db.costo_unitario) || 0,
         aiuAdminPorcentaje: Number(db.aiu_admin_porcentaje) || 0,
         aiuImprevistoPorcentaje: Number(db.aiu_imprevisto_porcentaje) || 0,
@@ -43,6 +43,7 @@ function mapItemToUI(db: any): CotizacionItem {
         notas: db.notas,
         codigoItem: db.notas,
         porcentaje: Number(db.porcentaje) || 0,
+        esExtra: (db.sub_items || []).some((s: any) => s && s._esExtra === true),
     };
 }
 
@@ -287,7 +288,7 @@ export async function createCotizacionAction(cotizacion: Omit<Cotizacion, "id">)
             descuento_porcentaje: round2(item.descuentoPorcentaje),
             impuesto: round2(item.impuesto),
             ocultar_detalles: item.ocultarDetalles,
-            sub_items: item.subItems,
+            sub_items: item.esExtra ? [{ _esExtra: true }, ...(item.subItems || [])] : (item.subItems || []),
             costo_unitario: round2(item.costoUnitario),
             aiu_admin_porcentaje: round2(item.aiuAdminPorcentaje),
             aiu_imprevisto_porcentaje: round2(item.aiuImprevistoPorcentaje),
@@ -396,7 +397,7 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
                 descuento_porcentaje: round2(item.descuentoPorcentaje),
                 impuesto: round2(item.impuesto),
                 ocultar_detalles: item.ocultarDetalles || false,
-                sub_items: item.subItems || [],
+                sub_items: item.esExtra ? [{ _esExtra: true }, ...(item.subItems || [])] : (item.subItems || []),
                 costo_unitario: round2(item.costoUnitario),
                 aiu_admin_porcentaje: round2(item.aiuAdminPorcentaje),
                 aiu_imprevisto_porcentaje: round2(item.aiuImprevistoPorcentaje),

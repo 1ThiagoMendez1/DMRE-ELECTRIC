@@ -189,7 +189,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             if (activeFilter === 'PRODUCTO') {
                 all = [...products]; // In case they force the filter
             } else if (activeFilter === 'SUMINISTRO') {
-                all = all.filter(item => item.subTipo === 'APU');
+                all = all.filter(item => item.subTipo === 'APU' || item.tipo === 'PRODUCTO');
             } else if (activeFilter === 'INSTALACION') {
                 all = all.filter(item => item.subTipo === 'INSTALACION');
             } else if (activeFilter === 'SERVICIO') {

@@ -18,7 +18,11 @@ import {
     Search,
     ListOrdered,
     Bolt,
-    Edit
+    Edit,
+    Hammer,
+    TrendingUp,
+    ChevronDown,
+    ChevronRight
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -42,7 +46,7 @@ import {
     initialEmpleados,
     initialCodigosTrabajo
 } from "@/lib/mock-data";
-import { CodigoTrabajo, InventarioItem } from "@/types/sistema";
+import { CodigoTrabajo, InventarioItem, Cotizacion } from "@/types/sistema";
 
 // Import submodule components
 import { InventoryTable } from "../inventario/inventory-table";
@@ -109,7 +113,8 @@ export default function LogisticaPage() {
         consumosResumen,
         addConsumoMaterial,
         refreshConsumosResumen,
-        codigosTrabajo
+        codigosTrabajo,
+        cotizaciones
     } = useErp();
 
     // Sub-tabs for Suministro
@@ -132,6 +137,9 @@ export default function LogisticaPage() {
 
     // Servicios State
     const [servicios, setServicios] = useState<ServicioLogistica[]>([]);
+    // Ejecucion tab search
+    const [ejecucionSearch, setEjecucionSearch] = useState("");
+    const [expandedProyecto, setExpandedProyecto] = useState<string | null>(null);
 
     // Supplier State
     const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
@@ -213,6 +221,7 @@ export default function LogisticaPage() {
                     <TabsTrigger value="suministro" className="gap-2"><Truck className="h-4 w-4" /> Proveedores</TabsTrigger>
                     <TabsTrigger value="dotacion" className="gap-2"><HardHat className="h-4 w-4" /> Dotación</TabsTrigger>
                     <TabsTrigger value="activos" className="gap-2"><Car className="h-4 w-4" /> Activos</TabsTrigger>
+                    <TabsTrigger value="ejecucion" className="gap-2"><Hammer className="h-4 w-4" /> Ejecución</TabsTrigger>
                 </TabsList>
 
                 {/* RESUMEN TAB */}
@@ -985,6 +994,163 @@ export default function LogisticaPage() {
                             </Card>
                         </TabsContent>
                     </Tabs>
+                </TabsContent>
+
+                {/* EJECUCION TAB */}
+                <TabsContent value="ejecucion" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="flex items-center gap-2">
+                                    <Hammer className="h-5 w-5 text-primary" />
+                                    Análisis de Ejecución — Cantidades Ofertadas vs. Finales
+                                </CardTitle>
+                                <div className="relative w-64">
+                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <input
+                                        placeholder="Buscar proyecto o cliente..."
+                                        className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-background"
+                                        value={ejecucionSearch}
+                                        onChange={e => setEjecucionSearch(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {(() => {
+                                const proyectosEnEjecucion = (cotizaciones || []).filter(c =>
+                                    c.items.some(i => i.cantidadFinal !== undefined || i.esExtra)
+                                ).filter(c =>
+                                    !ejecucionSearch ||
+                                    c.numero.toLowerCase().includes(ejecucionSearch.toLowerCase()) ||
+                                    c.cliente.nombre.toLowerCase().includes(ejecucionSearch.toLowerCase())
+                                );
+
+                                if (proyectosEnEjecucion.length === 0) {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                                            <Hammer className="h-10 w-10 opacity-30" />
+                                            <p className="text-sm">No hay proyectos con cantidades finales registradas.</p>
+                                            <p className="text-xs">Ingrese cantidades finales en la pestaña Ejecución de cada proyecto aprobado.</p>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="divide-y">
+                                        {proyectosEnEjecucion.map(proyecto => {
+                                            const isExpanded = expandedProyecto === proyecto.id;
+                                            const origItems = proyecto.items.filter(i => !i.esExtra);
+                                            const extraItems = proyecto.items.filter(i => i.esExtra);
+                                            const totalOferta = origItems.reduce((acc, i) => acc + (i.valorUnitario || 0) * i.cantidad, 0);
+                                            const totalFinal = origItems.reduce((acc, i) => {
+                                                const cantF = i.cantidadFinal ?? i.cantidad;
+                                                return acc + (i.valorUnitario || 0) * cantF;
+                                            }, 0);
+                                            const totalExtras = extraItems.reduce((acc, i) => acc + (i.valorUnitario || 0) * i.cantidad, 0);
+                                            const variacion = totalFinal - totalOferta;
+
+                                            return (
+                                                <div key={proyecto.id} className="">
+                                                    {/* Project header row */}
+                                                    <button
+                                                        className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex items-center justify-between gap-4"
+                                                        onClick={() => setExpandedProyecto(isExpanded ? null : proyecto.id)}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                                            <div>
+                                                                <p className="font-semibold text-sm">#{proyecto.numero} — {proyecto.cliente.nombre}</p>
+                                                                <p className="text-xs text-muted-foreground">{proyecto.descripcionTrabajo}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-6 text-right shrink-0">
+                                                            <div>
+                                                                <p className="text-[10px] text-muted-foreground uppercase">Oferta</p>
+                                                                <p className="text-sm font-mono">{formatCurrency(totalOferta)}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[10px] text-muted-foreground uppercase">Ejecutado</p>
+                                                                <p className="text-sm font-mono font-semibold">{formatCurrency(totalFinal)}</p>
+                                                            </div>
+                                                            {variacion !== 0 && (
+                                                                <div>
+                                                                    <p className="text-[10px] text-muted-foreground uppercase">Variación</p>
+                                                                    <p className={`text-sm font-mono font-bold ${variacion > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                                        {variacion > 0 ? '+' : ''}{formatCurrency(variacion)}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                            {extraItems.length > 0 && (
+                                                                <div>
+                                                                    <p className="text-[10px] text-muted-foreground uppercase">Extras</p>
+                                                                    <p className="text-sm font-mono font-bold text-amber-600">+{formatCurrency(totalExtras)}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </button>
+
+                                                    {/* Expanded item rows */}
+                                                    {isExpanded && (
+                                                        <div className="bg-muted/20 border-t">
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow className="bg-muted/40">
+                                                                        <TableHead className="text-xs py-2">Item</TableHead>
+                                                                        <TableHead className="text-center text-xs py-2">Tipo</TableHead>
+                                                                        <TableHead className="text-center text-xs py-2">Cant. Oferta</TableHead>
+                                                                        <TableHead className="text-center text-xs py-2">Cant. Final</TableHead>
+                                                                        <TableHead className="text-center text-xs py-2">Δ</TableHead>
+                                                                        <TableHead className="text-right text-xs py-2">V. Unit.</TableHead>
+                                                                        <TableHead className="text-right text-xs py-2">Δ Valor</TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {proyecto.items.map(item => {
+                                                                        const cantF = item.cantidadFinal ?? item.cantidad;
+                                                                        const diff = cantF - item.cantidad;
+                                                                        const deltaVal = diff * (item.valorUnitario || 0);
+                                                                        return (
+                                                                            <TableRow key={item.id} className={item.esExtra ? 'bg-amber-50/50 dark:bg-amber-950/10' : ''}>
+                                                                                <TableCell className="text-xs py-2">
+                                                                                    {item.descripcion}
+                                                                                    {item.esExtra && <span className="ml-2 text-[9px] bg-amber-100 text-amber-700 px-1 rounded">EXTRA</span>}
+                                                                                </TableCell>
+                                                                                <TableCell className="text-center text-xs py-2 text-muted-foreground">{item.tipo === 'SERVICIO' ? 'Serv.' : 'Mat.'}</TableCell>
+                                                                                <TableCell className="text-center text-xs py-2">{item.cantidad}</TableCell>
+                                                                                <TableCell className="text-center text-xs py-2 font-semibold">{cantF}</TableCell>
+                                                                                <TableCell className="text-center py-2">
+                                                                                    {diff === 0 ? (
+                                                                                        <span className="text-xs text-muted-foreground">—</span>
+                                                                                    ) : (
+                                                                                        <span className={`text-xs font-bold px-1 py-0.5 rounded ${
+                                                                                            diff > 0
+                                                                                                ? 'bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400'
+                                                                                                : 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'
+                                                                                        }`}>{diff > 0 ? '+' : ''}{diff}</span>
+                                                                                    )}
+                                                                                </TableCell>
+                                                                                <TableCell className="text-right text-xs py-2">{formatCurrency(item.valorUnitario || 0)}</TableCell>
+                                                                                <TableCell className={`text-right text-xs font-mono font-semibold py-2 ${
+                                                                                    diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-600' : 'text-muted-foreground'
+                                                                                }`}>
+                                                                                    {diff === 0 ? '—' : `${diff > 0 ? '+' : ''}${formatCurrency(deltaVal)}`}
+                                                                                </TableCell>
+                                                                            </TableRow>
+                                                                        );
+                                                                    })}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })()}
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
 
