@@ -52,6 +52,9 @@ export function ServiciosTable({
     const [editNombre, setEditNombre] = useState("");
     const [editCosto, setEditCosto] = useState<number | string>("");
 
+    const ITEMS_PER_PAGE = 50;
+    const [currentPage, setCurrentPage] = useState(1);
+
     const handleEditOpen = (srv: ServicioLogistica) => {
         setEditingServicio(srv);
         setEditNombre(srv.nombre);
@@ -85,7 +88,7 @@ export function ServiciosTable({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {servicios.map((srv) => (
+                        {servicios.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((srv) => (
                             <TableRow key={srv.id}>
                                 <TableCell className="font-mono font-medium">
                                     <Badge variant="outline">{srv.codigo}</Badge>
@@ -157,6 +160,15 @@ export function ServiciosTable({
                         )}
                     </TableBody>
                 </Table>
+            </div>
+            <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                    Mostrando {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, servicios.length)} - {Math.min(currentPage * ITEMS_PER_PAGE, servicios.length)} de {servicios.length} ítems
+                </div>
+                <div className="flex space-x-2">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Anterior</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(servicios.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                </div>
             </div>
         </div>
     );

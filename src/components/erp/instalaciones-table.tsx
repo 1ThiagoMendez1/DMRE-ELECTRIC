@@ -22,6 +22,9 @@ export function InstalacionesTable() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+    const ITEMS_PER_PAGE = 50;
+    const [currentPage, setCurrentPage] = useState(1);
+
     // Aplicar buscador
     const filteredCodes = instalaciones.filter(inst =>
         inst.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -47,7 +50,7 @@ export function InstalacionesTable() {
                         <Input
                             placeholder="Buscar instalación..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                             className="pl-8 w-[250px]"
                         />
                     </div>
@@ -74,7 +77,7 @@ export function InstalacionesTable() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredCodes.map((inst) => {
+                                filteredCodes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((inst) => {
                                     return (
                                         <TableRow key={inst.id} className="hover:bg-muted/50">
                                             <TableCell className="font-bold font-mono">
@@ -104,6 +107,15 @@ export function InstalacionesTable() {
                             )}
                         </TableBody>
                     </Table>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                        Mostrando {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredCodes.length)} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredCodes.length)} de {filteredCodes.length} ítems
+                    </div>
+                    <div className="flex space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Anterior</Button>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(filteredCodes.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                    </div>
                 </div>
             </CardContent>
         </Card>

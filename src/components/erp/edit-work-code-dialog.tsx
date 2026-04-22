@@ -46,7 +46,7 @@ interface EditWorkCodeDialogProps {
 }
 
 export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogProps) {
-    const { updateCodigoTrabajo, inventario, instalaciones, updateInstalacion } = useErp();
+    const { updateCodigoTrabajo, inventario, instalaciones, updateInstalacion, addInstalacion } = useErp();
     const { toast } = useToast();
 
     // Materials Selection State
@@ -210,6 +210,13 @@ export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogPr
                 codigo: instSku,
                 descripcion: values.descripcion,
                 valorCalculado: moAiu
+            });
+        } else if (addInstalacion) {
+            addInstalacion({
+                codigo: instSku,
+                descripcion: values.descripcion,
+                valorCalculado: moAiu,
+                activo: true
             });
         }
         toast({ title: "Código Actualizado", description: "Los cambios se han guardado correctamente y sincronizado en instalación." });

@@ -29,7 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { CreateWorkCodeDialog } from "./create-work-code-dialog";
 import { EditWorkCodeDialog } from "./edit-work-code-dialog";
 import { WorkCodeDetailDialog } from "./work-code-detail-dialog";
-import { InventoryFormDialog } from "./inventory-form-dialog";
+import { EditInventoryItemDialog } from "@/components/erp/edit-inventory-item-dialog";
 
 export function WorkCodesTable() {
     const { codigosTrabajo, addCodigoTrabajo, deleteCodigoTrabajo, inventario, deleteInventarioItem, updateInventarioItem } = useErp();
@@ -39,6 +39,9 @@ export function WorkCodesTable() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editCode, setEditCode] = useState<any>(null);
     const [editInventarioItem, setEditInventarioItem] = useState<any>(null);
+
+    const ITEMS_PER_PAGE = 50;
+    const [currentPage, setCurrentPage] = useState(1);
 
     const extractSuCode = (item: any) => {
         let raw = (item.codigo || item.sku || item.item || '').toUpperCase().trim();
@@ -92,7 +95,7 @@ export function WorkCodesTable() {
                         <Input
                             placeholder="Buscar código..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                             className="pl-8 w-[250px]"
                         />
                     </div>
@@ -127,7 +130,7 @@ export function WorkCodesTable() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredCodes.map((code) => {
+                                filteredCodes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((code) => {
                                     const totalCost = calculateCost(code);
                                     return (
                                         <TableRow
@@ -187,6 +190,15 @@ export function WorkCodesTable() {
                         </TableBody>
                     </Table>
                 </div>
+                <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                        Mostrando {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredCodes.length)} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredCodes.length)} de {filteredCodes.length} ítems
+                    </div>
+                    <div className="flex space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Anterior</Button>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(filteredCodes.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                    </div>
+                </div>
             </CardContent>
 
             <WorkCodeDetailDialog
@@ -201,7 +213,7 @@ export function WorkCodesTable() {
                     onClose={() => setEditCode(null)}
                 />
             )}
-            <InventoryFormDialog
+            <EditInventoryItemDialog
                 open={!!editInventarioItem}
                 onOpenChange={(open) => !open && setEditInventarioItem(null)}
                 initialData={editInventarioItem || {}}
@@ -209,7 +221,6 @@ export function WorkCodesTable() {
                     updateInventarioItem(item);
                     setEditInventarioItem(null);
                 }}
-                availableItems={inventario}
             />
         </Card>
     );

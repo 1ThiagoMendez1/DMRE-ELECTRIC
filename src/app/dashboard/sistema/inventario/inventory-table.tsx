@@ -26,7 +26,7 @@ import {
 import { formatDateES } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { useErp } from "@/components/providers/erp-provider";
-import { InventoryFormDialog } from "@/components/erp/inventory-form-dialog";
+import { EditInventoryItemDialog } from "@/components/erp/edit-inventory-item-dialog";
 import { RegisterInventoryMovementDialog } from "@/components/erp/register-inventory-movement-dialog";
 import { Cotizacion } from "@/types/sistema";
 import { EditWorkCodeDialog } from "@/components/erp/edit-work-code-dialog";
@@ -97,7 +97,7 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
         setExpandedRows(newExpanded);
     };
 
-    const itemsPerPage = 10;
+    const itemsPerPage = 50;
     const [currentPage, setCurrentPage] = useState(1);
 
     const filteredData = data.filter((item) =>
@@ -329,34 +329,14 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
             </div>
 
             {/* Pagination Controls */}
-            <div className="flex items-center justify-end space-x-2 py-4">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePrevPage}
-                    disabled={currentPage === 1}
-                >
-                    Anterior
-                </Button>
+            <div className="flex items-center justify-between py-4">
                 <div className="text-sm text-muted-foreground">
-                    Página {currentPage} de {totalPages || 1}
+                    Mostrando {filteredData.length === 0 ? 0 : Math.min((currentPage - 1) * itemsPerPage + 1, filteredData.length)} - {Math.min(currentPage * itemsPerPage, filteredData.length)} de {filteredData.length} ítems
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleNextPage}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                >
-                    Siguiente
-                </Button>
-            </div>
-
-
-
-            <div className="flex items-center justify-end space-x-2 py-4">
-                <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={currentPage === 1}>Anterior</Button>
-                <div className="text-sm text-muted-foreground">Página {currentPage} de {totalPages || 1}</div>
-                <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0}>Siguiente</Button>
+                <div className="flex items-center space-x-2">
+                    <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={currentPage === 1}>Anterior</Button>
+                    <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0}>Siguiente</Button>
+                </div>
             </div>
 
             {editWorkCode && (
@@ -366,12 +346,11 @@ export function InventoryTable({ data: initialData }: InventoryTableProps) {
                     onClose={() => setEditWorkCode(null)}
                 />
             )}
-            <InventoryFormDialog
+            <EditInventoryItemDialog
                 open={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
                 initialData={currentItem}
                 onSave={handleSave}
-                availableItems={data.filter((i: any) => !i.isTrabajo)}
             />
         </div>
     );

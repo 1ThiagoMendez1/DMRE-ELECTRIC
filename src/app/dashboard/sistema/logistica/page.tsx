@@ -149,6 +149,15 @@ export default function LogisticaPage() {
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
     const [vehicleDetailOpen, setVehicleDetailOpen] = useState(false);
 
+    const ITEMS_PER_PAGE = 50;
+    const [pageMateriales, setPageMateriales] = useState(1);
+    const [pageProveedores, setPageProveedores] = useState(1);
+    const [pageDotacionInv, setPageDotacionInv] = useState(1);
+    const [pageDotacionHist, setPageDotacionHist] = useState(1);
+    const [pageVehiculos, setPageVehiculos] = useState(1);
+    const [pageGastos, setPageGastos] = useState(1);
+    const [pageEjecucion, setPageEjecucion] = useState(1);
+
     const handleItemClick = (item: any) => {
         setSelectedMaterial(item);
         setMaterialDetailOpen(true);
@@ -159,6 +168,57 @@ export default function LogisticaPage() {
         getTrabajosListAction().then(setTrabajosList).catch(console.error);
         getServiciosAction().then(setServicios).catch(console.error);
     }, []);
+
+    const materialesFiltrados = useMemo(() => {
+        const extractSuCode = (item: any) => {
+            let raw = (item.codigo || item.sku || item.item || '').toUpperCase().trim();
+            if (raw.startsWith('SU')) return raw;
+            const match = (item.descripcion || '').toUpperCase().match(/SU-?\s*\d+/);
+            if (match) return match[0].replace(/\s+/g, '');
+            return '';
+        };
+
+        return [
+            ...catalogoItems.filter(i => extractSuCode(i) !== '').map(i => ({ 
+                ...i, 
+                sku: extractSuCode(i), 
+                item: extractSuCode(i), 
+                isTrabajo: false, 
+                originalCode: undefined 
+            })),
+            ...codigosTrabajo.filter(c => extractSuCode(c) !== '').map(c => ({
+                id: c.id,
+                sku: extractSuCode(c),
+                item: extractSuCode(c),
+                descripcion: c.descripcion || (c as any).nombre || '',
+                marca: '-',
+                proveedorId: '',
+                categoria: 'SUMINISTRO',
+                unidad: 'UND',
+                cantidad: 0,
+                tipo: 'COMPUESTO' as const,
+                valorUnitario: c.costoTotal,
+                valorTotal: c.costoTotal,
+                precioProveedor: c.costoTotal,
+                costoMateriales: c.costoTotal,
+                fechaCreacion: c.fechaCreacion,
+                isTrabajo: true,
+                originalCode: c
+            }))
+        ]
+        .sort((a, b) => {
+            const codeA = a.sku || '';
+            const codeB = b.sku || '';
+            const numA = parseInt(codeA.replace(/\D/g, '')) || 0;
+            const numB = parseInt(codeB.replace(/\D/g, '')) || 0;
+            if (numA !== numB) return numB - numA; // Descending sequential
+            return codeA.localeCompare(codeB);
+        })
+        .filter(item =>
+            item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [catalogoItems, codigosTrabajo, searchTerm]);
 
     const handleCreateServicio = async (srv: Omit<ServicioLogistica, "id" | "codigo" | "createdAt">) => {
         const nuevo = await createServicioAction(srv);
@@ -324,7 +384,7 @@ export default function LogisticaPage() {
                                             placeholder="Buscar por nombre o SKU..."
                                             className="pl-8"
                                             value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setPageMateriales(1); }}
                                         />
                                     </div>
                                     <CreateInventoryItemDialog onItemCreated={addInventarioItem} />
@@ -348,56 +408,7 @@ export default function LogisticaPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {(() => {
-                                        const extractSuCode = (item: any) => {
-                                            let raw = (item.codigo || item.sku || item.item || '').toUpperCase().trim();
-                                            if (raw.startsWith('SU')) return raw;
-                                            const match = (item.descripcion || '').toUpperCase().match(/SU-?\s*\d+/);
-                                            if (match) return match[0].replace(/\s+/g, '');
-                                            return '';
-                                        };
-
-                                        return [
-                                            ...catalogoItems.filter(i => extractSuCode(i) !== '').map(i => ({ 
-                                                ...i, 
-                                                sku: extractSuCode(i), 
-                                                item: extractSuCode(i), 
-                                                isTrabajo: false, 
-                                                originalCode: undefined 
-                                            })),
-                                            ...codigosTrabajo.filter(c => extractSuCode(c) !== '').map(c => ({
-                                                id: c.id,
-                                                sku: extractSuCode(c),
-                                                item: extractSuCode(c),
-                                                descripcion: c.descripcion || (c as any).nombre || '',
-                                                marca: '-',
-                                                proveedorId: '',
-                                                categoria: 'SUMINISTRO',
-                                                unidad: 'UND',
-                                                cantidad: 0,
-                                                tipo: 'COMPUESTO' as const,
-                                                valorUnitario: c.costoTotal,
-                                                valorTotal: c.costoTotal,
-                                                precioProveedor: c.costoTotal,
-                                                costoMateriales: c.costoTotal,
-                                                fechaCreacion: c.fechaCreacion,
-                                                isTrabajo: true,
-                                                originalCode: c
-                                            }))
-                                        ]
-                                        .sort((a, b) => {
-                                            const codeA = a.sku || '';
-                                            const codeB = b.sku || '';
-                                            const numA = parseInt(codeA.replace(/\D/g, '')) || 0;
-                                            const numB = parseInt(codeB.replace(/\D/g, '')) || 0;
-                                            if (numA !== numB) return numB - numA; // Descending sequential
-                                            return codeA.localeCompare(codeB);
-                                        })
-                                        .filter(item =>
-                                            item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            (item.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
-                                        );
-                                    })().map((item) => {
+                                    {materialesFiltrados.slice((pageMateriales - 1) * ITEMS_PER_PAGE, pageMateriales * ITEMS_PER_PAGE).map((item) => {
                                             const precioProveedor = item.precioProveedor || item.costoMateriales || 0;
                                             const proveedorInfo = proveedores.find(p => p.id === item.proveedorId);
                                             const totalConsumido = consumosResumen[item.id] || 0;
@@ -444,6 +455,15 @@ export default function LogisticaPage() {
                                         })}
                                 </TableBody>
                             </Table>
+                            <div className="flex items-center justify-between mt-4">
+                                <div className="text-sm text-muted-foreground">
+                                    Mostrando {materialesFiltrados.length === 0 ? 0 : Math.min((pageMateriales - 1) * ITEMS_PER_PAGE + 1, materialesFiltrados.length)} - {Math.min(pageMateriales * ITEMS_PER_PAGE, materialesFiltrados.length)} de {materialesFiltrados.length} ítems
+                                </div>
+                                <div className="flex space-x-2">
+                                    <Button variant="outline" size="sm" onClick={() => setPageMateriales(p => Math.max(1, p - 1))} disabled={pageMateriales === 1}>Anterior</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setPageMateriales(p => p + 1)} disabled={pageMateriales >= Math.ceil(materialesFiltrados.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -529,7 +549,7 @@ export default function LogisticaPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody className="cursor-pointer">
-                                            {proveedores.map((prov) => (
+                                            {proveedores.slice((pageProveedores - 1) * ITEMS_PER_PAGE, pageProveedores * ITEMS_PER_PAGE).map((prov) => (
                                                 <TableRow key={prov.id} className="hover:bg-muted/50" onClick={() => {
                                                     setSelectedSupplier(prov);
                                                     setSupplierDetailOpen(true);
@@ -550,6 +570,15 @@ export default function LogisticaPage() {
                                             ))}
                                         </TableBody>
                                     </Table>
+                                    <div className="flex items-center justify-between mt-4">
+                                        <div className="text-sm text-muted-foreground">
+                                            Mostrando {proveedores.length === 0 ? 0 : Math.min((pageProveedores - 1) * ITEMS_PER_PAGE + 1, proveedores.length)} - {Math.min(pageProveedores * ITEMS_PER_PAGE, proveedores.length)} de {proveedores.length} ítems
+                                        </div>
+                                        <div className="flex space-x-2">
+                                            <Button variant="outline" size="sm" onClick={() => setPageProveedores(p => Math.max(1, p - 1))} disabled={pageProveedores === 1}>Anterior</Button>
+                                            <Button variant="outline" size="sm" onClick={() => setPageProveedores(p => p + 1)} disabled={pageProveedores >= Math.ceil(proveedores.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                                        </div>
+                                    </div>
                                 </CardContent>
                             </Card>
                             {selectedSupplier && (
@@ -627,7 +656,7 @@ export default function LogisticaPage() {
                                         placeholder="Buscar dotación..."
                                         className="pl-8 h-9"
                                         value={dotacionSearch}
-                                        onChange={(e) => setDotacionSearch(e.target.value)}
+                                        onChange={(e) => { setDotacionSearch(e.target.value); setPageDotacionInv(1); }}
                                     />
                                 </div>
                             </CardHeader>
@@ -643,6 +672,7 @@ export default function LogisticaPage() {
                                     <TableBody>
                                         {dotacionItems
                                             .filter(item => item.descripcion.toLowerCase().includes(dotacionSearch.toLowerCase()))
+                                            .slice((pageDotacionInv - 1) * ITEMS_PER_PAGE, pageDotacionInv * ITEMS_PER_PAGE)
                                             .map((item) => {
                                                 const totalStock = item.variantes.reduce((acc, v) => acc + v.cantidadDisponible, 0);
                                                 const stockMin = item.stockMinimo || 10;
@@ -690,6 +720,20 @@ export default function LogisticaPage() {
                                             })}
                                     </TableBody>
                                 </Table>
+                                {(() => {
+                                    const filteredDotacion = dotacionItems.filter(item => item.descripcion.toLowerCase().includes(dotacionSearch.toLowerCase()));
+                                    return (
+                                        <div className="flex items-center justify-between mt-4">
+                                            <div className="text-sm text-muted-foreground">
+                                                Mostrando {filteredDotacion.length === 0 ? 0 : Math.min((pageDotacionInv - 1) * ITEMS_PER_PAGE + 1, filteredDotacion.length)} - {Math.min(pageDotacionInv * ITEMS_PER_PAGE, filteredDotacion.length)} de {filteredDotacion.length} ítems
+                                            </div>
+                                            <div className="flex space-x-2">
+                                                <Button variant="outline" size="sm" onClick={() => setPageDotacionInv(p => Math.max(1, p - 1))} disabled={pageDotacionInv === 1}>Anterior</Button>
+                                                <Button variant="outline" size="sm" onClick={() => setPageDotacionInv(p => p + 1)} disabled={pageDotacionInv >= Math.ceil(filteredDotacion.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </CardContent>
                         </Card>
 
@@ -730,7 +774,7 @@ export default function LogisticaPage() {
                                                 if (dotacionFilter === 'Entregados') return e.estado === 'ENTREGADO';
                                                 return true;
                                             })
-                                            .slice(0, 12)
+                                            .slice((pageDotacionHist - 1) * ITEMS_PER_PAGE, pageDotacionHist * ITEMS_PER_PAGE)
                                             .map((entrega) => {
                                                 const estadoLabel = {
                                                     'ASIGNADO': 'Pendiente de aceptación',
@@ -794,6 +838,25 @@ export default function LogisticaPage() {
                                             })}
                                     </TableBody>
                                 </Table>
+                                {(() => {
+                                    const filteredEntregas = entregas.filter(e => {
+                                        if (dotacionFilter === 'Pendientes') return e.estado === 'ASIGNADO';
+                                        if (dotacionFilter === 'Aceptados') return e.estado === 'ACEPTADO';
+                                        if (dotacionFilter === 'Entregados') return e.estado === 'ENTREGADO';
+                                        return true;
+                                    });
+                                    return (
+                                        <div className="flex items-center justify-between mt-4">
+                                            <div className="text-sm text-muted-foreground">
+                                                Mostrando {filteredEntregas.length === 0 ? 0 : Math.min((pageDotacionHist - 1) * ITEMS_PER_PAGE + 1, filteredEntregas.length)} - {Math.min(pageDotacionHist * ITEMS_PER_PAGE, filteredEntregas.length)} de {filteredEntregas.length} ítems
+                                            </div>
+                                            <div className="flex space-x-2">
+                                                <Button variant="outline" size="sm" onClick={() => setPageDotacionHist(p => Math.max(1, p - 1))} disabled={pageDotacionHist === 1}>Anterior</Button>
+                                                <Button variant="outline" size="sm" onClick={() => setPageDotacionHist(p => p + 1)} disabled={pageDotacionHist >= Math.ceil(filteredEntregas.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </CardContent>
                         </Card>
                     </div>
@@ -854,7 +917,7 @@ export default function LogisticaPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {vehiculos.map((veh) => {
+                                            {vehiculos.slice((pageVehiculos - 1) * ITEMS_PER_PAGE, pageVehiculos * ITEMS_PER_PAGE).map((veh) => {
                                                 const vehicleGastos = gastos.filter(g => g.vehiculoId === veh.id);
                                                 const totalVehicleGastos = vehicleGastos.reduce((acc, g) => acc + g.valor, 0);
 
@@ -936,6 +999,15 @@ export default function LogisticaPage() {
                                             })}
                                         </TableBody>
                                     </Table>
+                                    <div className="flex items-center justify-between mt-4">
+                                        <div className="text-sm text-muted-foreground">
+                                            Mostrando {vehiculos.length === 0 ? 0 : Math.min((pageVehiculos - 1) * ITEMS_PER_PAGE + 1, vehiculos.length)} - {Math.min(pageVehiculos * ITEMS_PER_PAGE, vehiculos.length)} de {vehiculos.length} ítems
+                                        </div>
+                                        <div className="flex space-x-2">
+                                            <Button variant="outline" size="sm" onClick={() => setPageVehiculos(p => Math.max(1, p - 1))} disabled={pageVehiculos === 1}>Anterior</Button>
+                                            <Button variant="outline" size="sm" onClick={() => setPageVehiculos(p => p + 1)} disabled={pageVehiculos >= Math.ceil(vehiculos.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                                        </div>
+                                    </div>
                                 </CardContent>
                             </Card>
 
@@ -973,7 +1045,7 @@ export default function LogisticaPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {gastos.map((gasto) => (
+                                            {gastos.slice((pageGastos - 1) * ITEMS_PER_PAGE, pageGastos * ITEMS_PER_PAGE).map((gasto) => (
                                                 <TableRow key={gasto.id}>
                                                     <TableCell>{format(gasto.fecha, "dd MMM yy", { locale: es })}</TableCell>
                                                     <TableCell className="font-medium">{gasto.vehiculo.placa}</TableCell>
@@ -990,6 +1062,15 @@ export default function LogisticaPage() {
                                             ))}
                                         </TableBody>
                                     </Table>
+                                    <div className="flex items-center justify-between mt-4">
+                                        <div className="text-sm text-muted-foreground">
+                                            Mostrando {gastos.length === 0 ? 0 : Math.min((pageGastos - 1) * ITEMS_PER_PAGE + 1, gastos.length)} - {Math.min(pageGastos * ITEMS_PER_PAGE, gastos.length)} de {gastos.length} ítems
+                                        </div>
+                                        <div className="flex space-x-2">
+                                            <Button variant="outline" size="sm" onClick={() => setPageGastos(p => Math.max(1, p - 1))} disabled={pageGastos === 1}>Anterior</Button>
+                                            <Button variant="outline" size="sm" onClick={() => setPageGastos(p => p + 1)} disabled={pageGastos >= Math.ceil(gastos.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                                        </div>
+                                    </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -1011,7 +1092,7 @@ export default function LogisticaPage() {
                                         placeholder="Buscar proyecto o cliente..."
                                         className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-background"
                                         value={ejecucionSearch}
-                                        onChange={e => setEjecucionSearch(e.target.value)}
+                                        onChange={e => { setEjecucionSearch(e.target.value); setPageEjecucion(1); }}
                                     />
                                 </div>
                             </div>
@@ -1026,6 +1107,8 @@ export default function LogisticaPage() {
                                     c.cliente.nombre.toLowerCase().includes(ejecucionSearch.toLowerCase())
                                 );
 
+                                const paginatedProyectos = proyectosEnEjecucion.slice((pageEjecucion - 1) * ITEMS_PER_PAGE, pageEjecucion * ITEMS_PER_PAGE);
+
                                 if (proyectosEnEjecucion.length === 0) {
                                     return (
                                         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
@@ -1037,9 +1120,10 @@ export default function LogisticaPage() {
                                 }
 
                                 return (
-                                    <div className="divide-y">
-                                        {proyectosEnEjecucion.map(proyecto => {
-                                            const isExpanded = expandedProyecto === proyecto.id;
+                                    <div className="flex flex-col">
+                                        <div className="divide-y">
+                                            {paginatedProyectos.map(proyecto => {
+                                                const isExpanded = expandedProyecto === proyecto.id;
                                             const origItems = proyecto.items.filter(i => !i.esExtra);
                                             const extraItems = proyecto.items.filter(i => i.esExtra);
                                             const totalOferta = origItems.reduce((acc, i) => acc + (i.valorUnitario || 0) * i.cantidad, 0);
@@ -1146,6 +1230,16 @@ export default function LogisticaPage() {
                                                 </div>
                                             );
                                         })}
+                                        </div>
+                                        <div className="flex items-center justify-between mt-4 px-4 pb-4">
+                                            <div className="text-sm text-muted-foreground">
+                                                Mostrando {proyectosEnEjecucion.length === 0 ? 0 : Math.min((pageEjecucion - 1) * ITEMS_PER_PAGE + 1, proyectosEnEjecucion.length)} - {Math.min(pageEjecucion * ITEMS_PER_PAGE, proyectosEnEjecucion.length)} de {proyectosEnEjecucion.length} ítems
+                                            </div>
+                                            <div className="flex space-x-2">
+                                                <Button variant="outline" size="sm" onClick={() => setPageEjecucion(p => Math.max(1, p - 1))} disabled={pageEjecucion === 1}>Anterior</Button>
+                                                <Button variant="outline" size="sm" onClick={() => setPageEjecucion(p => p + 1)} disabled={pageEjecucion >= Math.ceil(proyectosEnEjecucion.length / ITEMS_PER_PAGE)}>Siguiente</Button>
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })()}
