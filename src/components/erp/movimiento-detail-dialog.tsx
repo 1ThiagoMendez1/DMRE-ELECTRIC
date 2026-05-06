@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { MovimientoFinanciero, TipoMovimiento, CategoriaMovimiento } from "@/types/sistema";
 import { formatCurrency } from "@/lib/utils";
-import { Pencil, Eye } from "lucide-react";
+import { Pencil, Eye, FileText, ExternalLink } from "lucide-react";
 
 interface MovimientoDetailDialogProps {
     movimiento: MovimientoFinanciero;
@@ -125,9 +125,10 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                             <SelectContent>
                                 <SelectItem value="NOMINA">Nómina</SelectItem>
                                 <SelectItem value="PROVEEDORES">Proveedores</SelectItem>
+                                <SelectItem value="SUMINISTRO">Suministro</SelectItem>
+                                <SelectItem value="INSTALACION">Instalación</SelectItem>
                                 <SelectItem value="SERVICIOS">Servicios</SelectItem>
                                 <SelectItem value="IMPUESTOS">Impuestos</SelectItem>
-                                <SelectItem value="PRESTAMOS">Préstamos</SelectItem>
                                 <SelectItem value="VENTAS">Ventas</SelectItem>
                                 <SelectItem value="OTROS">Otros</SelectItem>
                             </SelectContent>
@@ -173,6 +174,25 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                             <Label className="text-right">Cuenta</Label>
                             <div className="col-span-3 text-sm font-medium border p-2 rounded-md bg-muted/50">
                                 {movimiento.cuenta.nombre} ({movimiento.cuenta.tipo})
+                            </div>
+                        </div>
+                    )}
+
+                    {movimiento.comprobanteUrl && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">Soporte</Label>
+                            <div className="col-span-3">
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full flex items-center justify-between gap-2 border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                    onClick={() => window.open(movimiento.comprobanteUrl, '_blank')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4" />
+                                        <span>Ver Documento PDF</span>
+                                    </div>
+                                    <ExternalLink className="h-3 w-3" />
+                                </Button>
                             </div>
                         </div>
                     )}

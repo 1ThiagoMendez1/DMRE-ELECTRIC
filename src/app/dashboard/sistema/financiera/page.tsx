@@ -22,7 +22,8 @@ import {
     FileText,
     MoreHorizontal,
     Pencil,
-    AlertTriangle
+    AlertTriangle,
+    ShoppingCart
 } from "lucide-react";
 import {
     Card,
@@ -67,11 +68,14 @@ import { FacturaHistoryDialog } from "@/components/erp/factura-history-dialog";
 import { CreateObligacionDialog } from "@/components/erp/create-obligacion-dialog";
 import { ObligacionDetailDialog } from "@/components/erp/obligacion-detail-dialog";
 
+import { BillingModule } from "@/components/erp/billing-module";
+import { ComprasModule } from "@/components/erp/compras-module";
+import { ProjectProfitabilityModule } from "@/components/erp/project-profitability-module";
+
 import { useToast } from "@/hooks/use-toast";
 import { useErp } from "@/components/providers/erp-provider";
 import { formatCurrency, cn } from "@/lib/utils";
 import { CuentaBancaria, MovimientoFinanciero, ObligacionFinanciera } from "@/types/sistema";
-import { BillingModule } from "@/components/erp/billing-module";
 
 export default function FinancieraPage() {
     const { toast } = useToast();
@@ -83,7 +87,8 @@ export default function FinancieraPage() {
         updateCuentaBancaria,
         addMovimientoFinanciero,
         addObligacionFinanciera,
-        updateObligacionFinanciera
+        updateObligacionFinanciera,
+        cotizaciones
     } = useErp();
 
     // Map movements to ensure it has valor/concepto if DB uses monto/descripcion
@@ -131,7 +136,10 @@ export default function FinancieraPage() {
     // );
 
     // Calculate totals
-    const totalSaldo = cuentas.reduce((acc, curr) => acc + curr.saldoActual, 0);
+    const totalSaldo = cuentas.reduce((acc, curr) => {
+        if (curr.tipo === 'CREDITO') return acc - curr.saldoActual;
+        return acc + curr.saldoActual;
+    }, 0);
     const totalIngresos = movimientos
         .filter(m => m.tipo === 'INGRESO')
         .reduce((acc, m) => acc + m.valor, 0);
@@ -190,6 +198,8 @@ export default function FinancieraPage() {
                     <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
                     <TabsTrigger value="facturacion">Facturación</TabsTrigger>
                     <TabsTrigger value="obligaciones">Obligaciones</TabsTrigger>
+                    <TabsTrigger value="compras">Compras</TabsTrigger>
+                    <TabsTrigger value="rentabilidad">Análisis de Proyectos</TabsTrigger>
                 </TabsList>
 
                 {/* --- CUENTAS TAB --- */}
@@ -253,41 +263,66 @@ export default function FinancieraPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {cuentas.map((account) => (
-                                        <TableRow key={account.id}>
-                                            <TableCell className="font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    {account.tipo === 'BANCO' ? <Landmark className="h-4 w-4 text-muted-foreground" /> : <Wallet className="h-4 w-4 text-muted-foreground" />}
-                                                    {account.nombre}
-                                                    {account.banco && <span className="text-xs text-muted-foreground">({account.banco})</span>}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">{account.tipo}</Badge>
-                                            </TableCell>
-                                            <TableCell className="font-mono text-xs">{account.numeroCuenta || "N/A"}</TableCell>
-                                            <TableCell className="text-right font-bold">{formatCurrency(account.saldoActual)}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <EditAccountDialog cuenta={account} onAccountUpdated={handleUpdateAccount} />
-                                                    <CuentaHistoryDialog
-                                                        cuenta={account}
-                                                        movimientos={movimientos}
-                                                        trigger={
-                                                            <Button variant="ghost" size="icon" title="Ver Historial">
-                                                                <History className="h-4 w-4" />
-                                                            </Button>
-                                                        }
-                                                    />
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {cuentas.map((account) => {
+                                        const isCredit = account.tipo === 'CREDITO';
+                                        return (
+                                            <TableRow key={account.id}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                        {account.tipo === 'BANCO' ? <Landmark className="h-4 w-4 text-muted-foreground" /> : 
+                                                         account.tipo === 'CREDITO' ? <CreditCard className="h-4 w-4 text-primary" /> :
+                                                         <Wallet className="h-4 w-4 text-muted-foreground" />}
+                                                        <div className="flex flex-col">
+                                                            <span>{account.nombre}</span>
+                                                            {account.banco && <span className="text-[10px] text-muted-foreground">{account.banco}</span>}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className={cn(isCredit && "border-primary text-primary")}>
+                                                        {account.tipo === 'CREDITO' ? 'CRÉDITO' : account.tipo}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs">
+                                                    <div className="flex flex-col">
+                                                        <span>{account.numeroCuenta || "N/A"}</span>
+                                                        {isCredit && account.cupoTotal && (
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                Cupo: {formatCurrency(account.cupoTotal)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className={cn("text-right font-bold", isCredit ? "text-red-600" : "text-green-600")}>
+                                                    {formatCurrency(account.saldoActual)}
+                                                    {isCredit && account.cupoTotal && (
+                                                        <div className="text-[10px] font-normal text-muted-foreground">
+                                                            Disp: {formatCurrency(account.cupoTotal - account.saldoActual)}
+                                                        </div>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <EditAccountDialog cuenta={account} onAccountUpdated={handleUpdateAccount} />
+                                                        <CuentaHistoryDialog
+                                                            cuenta={account}
+                                                            movimientos={movimientos}
+                                                            trigger={
+                                                                <Button variant="ghost" size="icon" title="Ver Historial">
+                                                                    <History className="h-4 w-4" />
+                                                                </Button>
+                                                            }
+                                                        />
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </CardContent>
                     </Card>
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
                         <Card className="border-l-4 border-l-green-500">
                             <CardContent className="p-4">
                                 <div className="text-sm text-muted-foreground">Total en Bancos</div>
@@ -300,10 +335,22 @@ export default function FinancieraPage() {
                                 <div className="text-xl font-bold text-amber-600">{formatCurrency(cuentas.filter(c => c.tipo === 'EFECTIVO').reduce((a, c) => a + c.saldoActual, 0))}</div>
                             </CardContent>
                         </Card>
-                        <Card className="border-l-4 border-l-primary">
+                        <Card className="border-l-4 border-l-red-500 bg-red-50/30">
                             <CardContent className="p-4">
-                                <div className="text-sm text-muted-foreground">Saldo Total</div>
-                                <div className="text-xl font-bold">{formatCurrency(totalSaldo)}</div>
+                                <div className="text-sm text-muted-foreground flex items-center gap-1">
+                                    <TrendingDown className="h-3 w-3 text-red-500" />
+                                    Pasivos / Crédito
+                                </div>
+                                <div className="text-xl font-bold text-red-600">
+                                    {formatCurrency(cuentas.filter(c => c.tipo === 'CREDITO').reduce((a, c) => a + c.saldoActual, 0))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-l-4 border-l-primary bg-primary/5">
+                            <CardContent className="p-4">
+                                <div className="text-sm text-muted-foreground">Total Disponible</div>
+                                <div className="text-xl font-bold text-primary">{formatCurrency(totalSaldo)}</div>
+                                <div className="text-[10px] text-muted-foreground">Activos - Pasivos</div>
                             </CardContent>
                         </Card>
                     </div>
@@ -315,7 +362,11 @@ export default function FinancieraPage() {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <CardTitle>Historial de Transacciones</CardTitle>
-                                <CreateTransactionDialog cuentas={cuentas} onTransactionCreated={handleCreateTransaction} />
+                                <CreateTransactionDialog 
+                                    cuentas={cuentas} 
+                                    cotizaciones={cotizaciones}
+                                    onTransactionCreated={handleCreateTransaction} 
+                                />
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -436,6 +487,13 @@ export default function FinancieraPage() {
                 {/* --- FACTURACION TAB --- */}
                 <TabsContent value="facturacion" className="space-y-4">
                     <BillingModule />
+                </TabsContent>
+
+                <TabsContent value="compras" className="space-y-4">
+                    <ComprasModule />
+                </TabsContent>
+                <TabsContent value="rentabilidad" className="space-y-4">
+                    <ProjectProfitabilityModule />
                 </TabsContent>
             </Tabs>
         </div>

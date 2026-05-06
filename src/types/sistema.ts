@@ -248,17 +248,23 @@ export interface CuentaBancaria {
     tipo: TipoCuenta;
     banco?: string;
     numeroCuenta?: string;
-    tipoCuenta?: string; // AHORROS, CORRIENTE
+    tipoCuenta?: string; // AHORROS, CORRIENTE, CREDITO
     titular?: string;
     saldoInicial?: number;
     saldoActual: number;
     activa?: boolean;
     principal?: boolean;
     notas?: string;
+    // Credit account details
+    cupoTotal?: number;
+    cupoDisponible?: number;
+    fechaCorte?: number; // Day of the month
+    fechaPago?: number;  // Day of the month
+    tasaInteres?: number;
 }
 
 export type TipoMovimiento = 'INGRESO' | 'EGRESO';
-export type CategoriaMovimiento = 'NOMINA' | 'PROVEEDORES' | 'SERVICIOS' | 'IMPUESTOS' | 'PRESTAMOS' | 'VENTAS' | 'OTROS';
+export type CategoriaMovimiento = 'NOMINA' | 'PROVEEDORES' | 'SERVICIOS' | 'IMPUESTOS' | 'PRESTAMOS' | 'VENTAS' | 'INSTALACION' | 'SUMINISTRO' | 'OTROS';
 
 export interface MovimientoFinanciero {
     id: string;
@@ -275,6 +281,11 @@ export interface MovimientoFinanciero {
     facturaId?: string;
     trabajoId?: string;
     cuentaPorPagarId?: string;
+    compraId?: string;
+    obligacionId?: string;
+    // Credit specific
+    cuotas?: number;
+    cuotaActual?: number;
     // Documents
     numeroDocumento?: string;
     comprobanteUrl?: string;
@@ -313,6 +324,27 @@ export interface PagoObligacion {
     interes?: number;
     capital?: number;
     saldoRestante: number;
+}
+
+export interface CompraFinanciera {
+    id: string;
+    cotizacionId?: string;
+    cotizacion?: Cotizacion;
+    cotizacionProveedorId?: string;
+    cotizacionProveedor?: CotizacionProveedor;
+    numeroFactura: string;
+    iva: number;
+    valorFactura: number;
+    fecha: Date;
+    valorPago: number;
+    fechaPago?: Date;
+    saldo: number;
+    diasCredito: number;
+    metodoPago?: string;
+    soporteUrl?: string;
+    cuotas?: number;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 
@@ -396,12 +428,38 @@ export interface CuentaPorPagar {
     observaciones?: string;
 }
 
+export type EstadoCotizacionProveedor = 'BORRADOR' | 'ENVIADA' | 'APROBADA' | 'RECHAZADA';
+
+export interface CotizacionProveedorItem {
+    id: string;
+    cotizacionProveedorId: string;
+    inventarioId?: string;
+    descripcion: string;
+    cantidad: number;
+    unidad: string;
+    valorUnitarioOfrecido?: number;
+    valorTotalOfrecido?: number;
+}
+
+export interface CotizacionProveedor {
+    id: string;
+    numero: string; // CM-001
+    cotizacionId: string; // Original client quote
+    proveedorId?: string;
+    proveedor?: Proveedor;
+    estado: EstadoCotizacionProveedor;
+    fecha: Date;
+    fechaAprobacion?: Date;
+    items: CotizacionProveedorItem[];
+    observaciones?: string;
+}
+
 export type EstadoOrdenCompra = 'PENDIENTE' | 'ENVIADA' | 'PARCIAL' | 'RECIBIDA' | 'CANCELADA';
 
 export interface DetalleCompra {
     id: string;
     ordenCompraId: string;
-    inventarioId: string;
+    inventarioId?: string;
     descripcion: string;
     cantidad: number;
     valorUnitario: number; // Historical price
@@ -412,6 +470,7 @@ export interface DetalleCompra {
 export interface OrdenCompra {
     id: string;
     numero: string; // OC-001
+    cotizacionProveedorId?: string; // Link to the approved RFQ
     proveedorId: string;
     proveedor: Proveedor;
     fechaEmision: Date;

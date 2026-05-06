@@ -53,8 +53,9 @@ export function BillingModule() {
 
         const ids = facturas
             .map(f => {
-                // Extract number only if it matches standard format Fac-XXXX
-                const match = f.id.match(/^Fac-(\d+)$/i);
+                // Extract number only if it matches standard format Fac-XXXX or FAC-YYYY-XXXX
+                const numeroStr = f.numero || f.id || "";
+                const match = numeroStr.match(/(?:fac-|fac-\d{4}-)(\d+)/i);
                 if (match && match[1]) {
                     return parseInt(match[1], 10);
                 }
@@ -69,7 +70,7 @@ export function BillingModule() {
     // Filter Logic
     const filteredFacturas = useMemo(() => {
         return facturas.filter(f =>
-            f.id.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+            (f.numero || f.id).toLowerCase().includes(invoiceSearch.toLowerCase()) ||
             f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
             f.cotizacion?.numero?.toLowerCase().includes(invoiceSearch.toLowerCase())
         );
@@ -98,12 +99,12 @@ export function BillingModule() {
     // Handlers
     const handleCreateInvoice = (newInvoice: Factura) => {
         addFactura(newInvoice);
-        toast({ title: "Factura Creada", description: `Factura ${newInvoice.id} creada correctamente.` });
+        toast({ title: "Factura Creada", description: `Factura ${newInvoice.numero || newInvoice.id} creada correctamente.` });
     };
 
     const handleInvoiceUpdate = (updated: Factura) => {
         updateFactura(updated);
-        toast({ title: "Factura Actualizada", description: `Factura ${updated.id} actualizada correctamente.` });
+        toast({ title: "Factura Actualizada", description: `Factura ${updated.numero || updated.id} actualizada correctamente.` });
     };
 
     // Overdue Check (Run once or when facturas change)
@@ -248,7 +249,7 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                     const isOverdue = new Date() > new Date(fac.fechaVencimiento) && fac.estado !== 'PAGADA';
                     return (
                         <TableRow key={fac.id} className={cn(rowClassName, isOverdue && "bg-red-50/50 dark:bg-red-950/10")}>
-                            <TableCell className="font-mono font-bold">{fac.id}</TableCell>
+                            <TableCell className="font-mono font-bold">{fac.numero || fac.id}</TableCell>
                             <TableCell>
                                 <div className="flex flex-col">
                                     <span className="font-medium">{fac.cotizacion?.cliente?.nombre || "Cliente General"}</span>

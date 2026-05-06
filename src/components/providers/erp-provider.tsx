@@ -7,7 +7,8 @@ import {
     GastoVehiculo, CodigoTrabajo, OrdenCompra,
     CuentaBancaria, MovimientoFinanciero, NovedadNomina, Empleado,
     ObligacionFinanciera, LiquidacionNomina,
-    TareaAgenda, Role, Permission, Instalacion
+    TareaAgenda, Role, Permission, Instalacion, CotizacionProveedor,
+    CompraFinanciera
 } from "@/types/sistema";
 
 // Import Server Actions
@@ -29,7 +30,9 @@ import { getUsers, updateUserPermissionsAction, deleteUserAction, toggleUserStat
 import { getTareasAction, createTareaAction, updateTareaAction, deleteTareaAction } from "@/app/dashboard/sistema/agenda/actions";
 import { getRolesWithPermissionsAction, getPermissionsAction, createRoleAction, updateRolePermissionsAction } from "@/app/dashboard/sistema/roles/actions";
 import { getOrdenesCompraAction, createOrdenCompraAction, updateOrdenCompraAction } from "@/app/dashboard/sistema/suministro/ordenes-actions";
+import { getCotizacionesProveedorAction, createCotizacionProveedorAction, updateCotizacionProveedorEstadoAction, updateCotizacionProveedorItemPricesAction } from "@/app/dashboard/sistema/suministro/cotizaciones-proveedor-actions";
 import { getConsumosResumenAction, createConsumoAction } from "@/app/dashboard/sistema/inventario/materiales-consumo-actions";
+import { getComprasAction, createCompraAction, updateCompraAction, deleteCompraAction } from "@/app/dashboard/sistema/financiera/compras-actions";
 import { createClient } from "@/utils/supabase/client";
 import { getInitialErpDataAction } from "@/actions/erp-actions";
 import { useToast } from "@/hooks/use-toast";
@@ -56,6 +59,7 @@ interface ErpContextType {
     codigosTrabajo: CodigoTrabajo[];
     instalaciones: Instalacion[];
     ordenesCompra: OrdenCompra[];
+    cotizacionesProveedor: CotizacionProveedor[];
     cuentasBancarias: CuentaBancaria[];
     movimientosFinancieros: MovimientoFinanciero[];
     obligacionesFinancieras: ObligacionFinanciera[];
@@ -66,6 +70,7 @@ interface ErpContextType {
     roles: Role[];
     permissions: Permission[];
     consumosResumen: Record<string, number>;
+    comprasFinanciera: CompraFinanciera[];
 
     // Loading states
     isLoading: boolean;
@@ -139,6 +144,11 @@ interface ErpContextType {
     addObligacionFinanciera: (obl: ObligacionFinanciera) => void;
     updateObligacionFinanciera: (updated: ObligacionFinanciera) => void;
     deleteObligacionFinanciera: (id: string) => void;
+    // Compra Financiera Actions
+    addCompraFinanciera: (compra: Omit<CompraFinanciera, "id" | "saldo">) => Promise<void>;
+    updateCompraFinanciera: (id: string, compra: Partial<CompraFinanciera>) => Promise<void>;
+    deleteCompraFinanciera: (id: string) => Promise<void>;
+    // Novedad Actions
     addNovedadNomina: (nov: NovedadNomina) => void;
     updateNovedadNomina: (updated: NovedadNomina) => void;
     deleteNovedadNomina: (id: string) => void;
@@ -159,6 +169,11 @@ interface ErpContextType {
     // Orden Compra Actions
     addOrdenCompra: (oc: any) => Promise<void>;
     updateOrdenCompra: (id: string, oc: any) => Promise<void>;
+
+    // Cotizaciones Proveedor Actions
+    addCotizacionProveedor: (cot: Omit<CotizacionProveedor, "id" | "fechaAprobacion" | "items">, items: any[]) => Promise<void>;
+    updateCotizacionProveedorEstado: (id: string, estado: string, proveedorId?: string) => Promise<void>;
+    updateCotizacionProveedorItemPrices: (cotizacionProveedorId: string, itemPrices: Array<{ id: string; valorUnitario: number; valorTotal: number }>) => Promise<void>;
 
     // Consumo Material Actions
     addConsumoMaterial: (input: { inventarioId?: string; descripcionMaterial?: string; cotizacionId?: string; cantidad: number; unidad: string; descripcion?: string }) => Promise<void>;
@@ -202,12 +217,14 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const [codigosTrabajo, setCodigosTrabajo] = useState<CodigoTrabajo[]>([]);
     const [instalaciones, setInstalaciones] = useState<Instalacion[]>([]);
     const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([]);
+    const [cotizacionesProveedor, setCotizacionesProveedor] = useState<CotizacionProveedor[]>([]);
     const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
     const [movimientosFinancieros, setMovimientosFinancieros] = useState<MovimientoFinanciero[]>([]);
     const [obligacionesFinancieras, setObligacionesFinancieras] = useState<ObligacionFinanciera[]>([]);
     const [novedadesNomina, setNovedadesNomina] = useState<NovedadNomina[]>([]);
     const [empleados, setEmpleados] = useState<Empleado[]>([]);
     const [liquidacionesNomina, setLiquidacionesNomina] = useState<LiquidacionNomina[]>([]);
+    const [comprasFinanciera, setComprasFinanciera] = useState<CompraFinanciera[]>([]);
 
     // Control System States
     const [agenda, setAgenda] = useState<TareaAgenda[]>([]);
@@ -241,16 +258,19 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setEmpleados(data.empleados);
             setOrdenesCompra(data.ordenesCompra);
             setInstalaciones(data.instalaciones);
+            setComprasFinanciera(data.comprasFinanciera);
 
-            // Fetch Control System Data
-            const [agendaData, rolesData, permsData] = await Promise.all([
+            // Fetch Control System Data and Others
+            const [agendaData, rolesData, permsData, cotProvData] = await Promise.all([
                 getTareasAction(),
                 getRolesWithPermissionsAction(),
-                getPermissionsAction()
+                getPermissionsAction(),
+                getCotizacionesProveedorAction()
             ]);
             setAgenda(agendaData);
             setRoles(rolesData);
             setPermissions(permsData);
+            setCotizacionesProveedor(cotProvData);
 
             // Load consumos resumen
             const consumosData = await getConsumosResumenAction();
@@ -315,7 +335,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             vehiculos,
             facturas,
             empleados,
-            cuentasBancarias
+            cuentasBancarias,
+            comprasFinanciera
         };
 
         Object.entries(cacheData).forEach(([key, value]) => {
@@ -662,6 +683,31 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         } catch (error) { console.error("Error deleting obligacion:", error); }
     };
 
+    // COMPRAS FINANCIERA ACTIONS
+    const addCompraFinanciera = async (compra: Omit<CompraFinanciera, "id" | "saldo">) => {
+        try {
+            const saved = await createCompraAction(compra as any);
+            setComprasFinanciera(prev => [saved, ...prev]);
+            toast({ title: "Compra registrada", description: "La compra ha sido guardada exitosamente." });
+        } catch (error) { console.error("Error adding compra:", error); }
+    };
+
+    const updateCompraFinanciera = async (id: string, compra: Partial<CompraFinanciera>) => {
+        try {
+            const saved = await updateCompraAction(id, compra);
+            setComprasFinanciera(prev => prev.map(c => c.id === id ? saved : c));
+            toast({ title: "Compra actualizada", description: "Los cambios han sido guardados." });
+        } catch (error) { console.error("Error updating compra:", error); }
+    };
+
+    const deleteCompraFinanciera = async (id: string) => {
+        try {
+            await deleteCompraAction(id);
+            setComprasFinanciera(prev => prev.filter(c => c.id !== id));
+            toast({ title: "Compra eliminada", description: "El registro ha sido removido." });
+        } catch (error) { console.error("Error deleting compra:", error); }
+    };
+
     const addNovedadNomina = async (nov: NovedadNomina) => {
         try {
             const { id, ...rest } = nov;
@@ -844,6 +890,42 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         } catch (error) { console.error("Error updating OC:", error); }
     };
 
+    const addCotizacionProveedor = async (cot: Omit<CotizacionProveedor, "id" | "fechaAprobacion" | "items">, items: any[]) => {
+        try {
+            const saved = await createCotizacionProveedorAction(cot, items);
+            setCotizacionesProveedor(prev => [saved, ...prev]);
+        } catch (error) { console.error("Error adding cotizacion proveedor:", error); }
+    };
+
+    const updateCotizacionProveedorEstado = async (id: string, estado: string, proveedorId?: string) => {
+        try {
+            await updateCotizacionProveedorEstadoAction(id, estado, proveedorId);
+            setCotizacionesProveedor(prev => prev.map(c => c.id === id ? { ...c, estado: estado as any, proveedorId: proveedorId || c.proveedorId } : c));
+        } catch (error) { console.error("Error updating cotizacion proveedor estado:", error); }
+    };
+
+    const updateCotizacionProveedorItemPrices = async (
+        cotizacionProveedorId: string,
+        itemPrices: Array<{ id: string; valorUnitario: number; valorTotal: number }>
+    ) => {
+        try {
+            await updateCotizacionProveedorItemPricesAction(itemPrices);
+            // Actualizar el estado local con los nuevos precios
+            setCotizacionesProveedor(prev => prev.map(c => {
+                if (c.id !== cotizacionProveedorId) return c;
+                return {
+                    ...c,
+                    items: c.items.map(item => {
+                        const priceUpdate = itemPrices.find(p => p.id === item.id);
+                        if (!priceUpdate) return item;
+                        return { ...item, valorUnitarioOfrecido: priceUpdate.valorUnitario, valorTotalOfrecido: priceUpdate.valorTotal };
+                    })
+                };
+            }));
+        } catch (error) { console.error("Error updating item prices:", error); }
+    };
+
+
     const logout = async () => {
         const supabase = createClient();
         try {
@@ -870,8 +952,9 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             facturas, cotizaciones, clientes, users, currentUser,
             inventario, proveedores, vehiculos, dotacionItems,
             entregasDotacion, cuentasPorPagar, gastosVehiculos,
-            codigosTrabajo, instalaciones, ordenesCompra,
+            codigosTrabajo, instalaciones, ordenesCompra, cotizacionesProveedor,
             cuentasBancarias, movimientosFinancieros, obligacionesFinancieras, novedadesNomina, empleados,
+            comprasFinanciera,
 
             // Loading
             isLoading,
@@ -894,6 +977,11 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             deleteCuentaPorPagar,
             addCodigoTrabajo, updateCodigoTrabajo, deleteCodigoTrabajo,
             addInstalacion, updateInstalacion, deleteInstalacion,
+
+            addCompraFinanciera,
+            updateCompraFinanciera,
+            deleteCompraFinanciera,
+
             // New Actions
             addCuentaBancaria, updateCuentaBancaria, addMovimientoFinanciero, updateMovimientoFinanciero,
             addObligacionFinanciera, updateObligacionFinanciera, deleteObligacionFinanciera,
@@ -906,6 +994,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addRole, updateRolePermission, toggleUserStatus,
 
             addOrdenCompra, updateOrdenCompra,
+            addCotizacionProveedor, updateCotizacionProveedorEstado, updateCotizacionProveedorItemPrices,
             consumosResumen, addConsumoMaterial, refreshConsumosResumen,
 
             // Refresh

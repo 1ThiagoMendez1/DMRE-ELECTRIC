@@ -114,7 +114,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                     Nueva Factura
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[550px]">
                 <DialogHeader>
                     <DialogTitle>Crear Nueva Factura</DialogTitle>
                     <DialogDescription>
@@ -150,8 +150,10 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="cotizacion" className="text-right">Cotización</Label>
                             <Select value={selectedCotizacionId} onValueChange={setSelectedCotizacionId}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="Vincular a Oferta..." />
+                                <SelectTrigger className="col-span-3 h-auto min-h-[40px] py-2 px-3 text-left">
+                                    <div className="flex-1 text-left line-clamp-2">
+                                        <SelectValue placeholder="Vincular a Oferta..." />
+                                    </div>
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="MANUAL">-- Sin Oferta Vinculada --</SelectItem>
@@ -162,10 +164,10 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                         const pendiente = Math.max(0, c.total - yaFacturado);
 
                                         return (
-                                            <SelectItem key={c.id} value={c.id}>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="font-bold">{c.numero} - {c.descripcionTrabajo}</span>
-                                                    <span className="text-[10px] text-muted-foreground">
+                                            <SelectItem key={c.id} value={c.id} className="items-start">
+                                                <div className="flex flex-col gap-1 text-left w-full pr-4">
+                                                    <span className="font-bold text-sm leading-tight">{c.numero} - {c.descripcionTrabajo}</span>
+                                                    <span className="text-[10px] text-muted-foreground whitespace-normal leading-tight">
                                                         Total: {formatCurrency(c.total)} | Facturado: {formatCurrency(yaFacturado)} | Queda: <span className="text-orange-600 font-bold">{formatCurrency(pendiente)}</span>
                                                     </span>
                                                 </div>

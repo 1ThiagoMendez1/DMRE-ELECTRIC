@@ -119,6 +119,9 @@ function mapMovimientoToUI(db: any): MovimientoFinanciero {
         registradoPor: db.registrado_por,
         aprobado: db.aprobado ?? false,
         aprobadoPor: db.aprobado_por,
+        cotizacionId: db.cotizacion_id,
+        cuotas: db.cuotas,
+        cuotaActual: db.cuota_actual,
     };
 }
 
@@ -140,6 +143,9 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
         registrado_por: ui.registradoPor,
         aprobado: ui.aprobado,
         aprobado_por: ui.aprobadoPor,
+        cotizacion_id: ui.cotizacionId === 'none' ? null : ui.cotizacionId,
+        cuotas: ui.cuotas,
+        cuota_actual: ui.cuotaActual,
     };
 }
 

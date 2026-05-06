@@ -33,7 +33,7 @@ import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
 import { Landmark, Wallet, History, Search, X } from "lucide-react";
 import { CuentaBancaria, MovimientoFinanciero } from "@/types/sistema";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
@@ -153,8 +153,20 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                 valor: formatCurrency(m.valor)
             }));
 
-        return { trendData, categoryData, expensesTable, categoryTable };
-    }, [filteredMovimientos]);
+        // 4. Credit Specific Metrics
+        const isCredit = cuenta.tipo === 'CREDITO';
+        const creditMetrics = isCredit ? {
+            utilization: cuenta.cupoTotal ? (cuenta.saldoActual / cuenta.cupoTotal) * 100 : 0,
+            available: cuenta.cupoTotal ? cuenta.cupoTotal - cuenta.saldoActual : 0,
+            monthlyInterest: cuenta.saldoActual * ((cuenta.tasaInteres || 0) / 100),
+            projectedDebt: cuenta.saldoActual * (1 + (cuenta.tasaInteres || 0) / 100),
+            debtChangePercent: trendData.length >= 2 
+                ? ((trendData[trendData.length-1].egresos - trendData[0].egresos) / (trendData[0].egresos || 1)) * 100 
+                : 0
+        } : null;
+
+        return { trendData, categoryData, expensesTable, categoryTable, creditMetrics };
+    }, [filteredMovimientos, cuenta]);
 
     const clearFilters = () => {
         setSearchTerm("");
@@ -257,6 +269,7 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                                         <TableHead className="w-[180px]">Fecha y Hora</TableHead>
                                         <TableHead>Concepto</TableHead>
                                         <TableHead>Categoría</TableHead>
+                                        <TableHead>Cuota</TableHead>
                                         <TableHead>Tipo</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                     </TableRow>
@@ -276,6 +289,13 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant="outline" className="text-xs">{mov.categoria}</Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {mov.cuotas ? (
+                                                        <span className="text-xs font-mono">
+                                                            {mov.cuotaActual || 1}/{mov.cuotas}
+                                                        </span>
+                                                    ) : "—"}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant={mov.tipo === 'INGRESO' ? 'default' : 'secondary'} className={mov.tipo === 'EGRESO' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'}>
@@ -306,6 +326,63 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                             </div>
                         ) : (
                             <>
+                                {cuenta.tipo === 'CREDITO' && analyticsData.creditMetrics && (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <Card className="bg-primary/5 border-primary/20">
+                                            <CardHeader className="py-2">
+                                                <CardTitle className="text-xs font-medium uppercase text-muted-foreground">Utilización de Cupo</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="py-2">
+                                                <div className="text-2xl font-bold">{analyticsData.creditMetrics.utilization.toFixed(1)}%</div>
+                                                <div className="w-full bg-muted h-1.5 mt-2 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className={cn(
+                                                            "h-full transition-all",
+                                                            analyticsData.creditMetrics.utilization > 80 ? "bg-red-500" : 
+                                                            analyticsData.creditMetrics.utilization > 50 ? "bg-amber-500" : "bg-green-500"
+                                                        )}
+                                                        style={{ width: `${Math.min(analyticsData.creditMetrics.utilization, 100)}%` }}
+                                                    />
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardHeader className="py-2">
+                                                <CardTitle className="text-xs font-medium uppercase text-muted-foreground">Interés Mensual Est.</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="py-2">
+                                                <div className="text-2xl font-bold text-red-600">{formatCurrency(analyticsData.creditMetrics.monthlyInterest)}</div>
+                                                <p className="text-[10px] text-muted-foreground">Basado en tasa del {cuenta.tasaInteres}%</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardHeader className="py-2">
+                                                <CardTitle className="text-xs font-medium uppercase text-muted-foreground">Proyección Próximo Mes</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="py-2">
+                                                <div className="text-2xl font-bold">{formatCurrency(analyticsData.creditMetrics.projectedDebt)}</div>
+                                                <p className="text-[10px] text-muted-foreground">Saldo + Interés esperado</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardHeader className="py-2">
+                                                <CardTitle className="text-xs font-medium uppercase text-muted-foreground">Días para Corte/Pago</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="py-2">
+                                                <div className="flex justify-between items-end">
+                                                    <div>
+                                                        <div className="text-lg font-bold">Día {cuenta.fechaCorte}</div>
+                                                        <div className="text-[10px] text-muted-foreground">Corte</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-lg font-bold">Día {cuenta.fechaPago}</div>
+                                                        <div className="text-[10px] text-muted-foreground">Pago</div>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
                                 {/* Row 1: Pie Chart + Category Table */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Pie Chart - Gastos por Categoría */}
@@ -402,8 +479,8 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
                                                     />
                                                     <Legend />
-                                                    <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                                    <Bar dataKey="egresos" name="Egresos" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                                    <Bar dataKey="ingresos" name={cuenta.tipo === 'CREDITO' ? "Pagos / Abonos" : "Ingresos"} fill="#10b981" radius={[4, 4, 0, 0]} />
+                                                    <Bar dataKey="egresos" name={cuenta.tipo === 'CREDITO' ? "Compras / Cargos" : "Egresos"} fill="#ef4444" radius={[4, 4, 0, 0]} />
                                                 </BarChart>
                                             </ResponsiveContainer>
                                         </div>

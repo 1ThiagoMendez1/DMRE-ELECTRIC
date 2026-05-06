@@ -37,11 +37,12 @@ function PortalViewContent() {
     const [comments, setComments] = useState<ComentarioCotizacion[]>([]);
     const [newComment, setNewComment] = useState("");
     const [loading, setLoading] = useState(true);
-    const [secureDocs, setSecureDocs] = useState<{ legalDocs: any[], polizas: any[] } | null>(null);
+    const [secureDocs, setSecureDocs] = useState<{ legalDocs: any[], polizas: any[], ordenesCompra: any[] } | null>(null);
     const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
     const docLegalInputRef = useRef<HTMLInputElement>(null);
     const docPolizaInputRef = useRef<HTMLInputElement>(null);
+    const docOrdenCompraInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const shouldAutoScrollRef = useRef(true);
@@ -70,7 +71,7 @@ function PortalViewContent() {
     const loadSecureDocs = async (quoteId: string) => {
         const docs = await getSecureCotizacionDocumentsAction(quoteId);
         if (docs) {
-            setSecureDocs({ legalDocs: docs.legalDocs, polizas: docs.polizas });
+            setSecureDocs({ legalDocs: docs.legalDocs, polizas: docs.polizas, ordenesCompra: docs.ordenesCompra });
         }
     };
 
@@ -130,7 +131,7 @@ function PortalViewContent() {
         return () => clearInterval(pollInterval);
     }, [id]);
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros') => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros' | 'OrdenesDeCompra') => {
         const file = e.target.files?.[0];
         if (!file || !quote) return;
 
@@ -354,6 +355,43 @@ function PortalViewContent() {
                                                 </div>
                                                 <Button size="icon" variant="ghost" className="shrink-0" asChild>
                                                     <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" title="Ver Póliza">
+                                                        <Eye className="h-4 w-4" />
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <Separator className="bg-emerald-500/10" />
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                                            <FileText className="h-4 w-4 text-emerald-600" /> Órdenes de Compra
+                                        </h4>
+                                        <div>
+                                            <input type="file" ref={docOrdenCompraInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'OrdenesDeCompra')} />
+                                            <Button variant="outline" size="sm" onClick={() => docOrdenCompraInputRef.current?.click()} disabled={isUploadingDoc}>
+                                                {isUploadingDoc ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                                                Subir O.C.
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {secureDocs.ordenesCompra?.map((doc: any) => (
+                                            <div key={doc.id} className="flex items-center justify-between p-3 border rounded-md bg-background hover:border-emerald-500/40 transition-colors">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded">
+                                                        <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <p className="text-sm font-medium truncate">{doc.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{doc.size} • Verificado DMRE</p>
+                                                    </div>
+                                                </div>
+                                                <Button size="icon" variant="ghost" className="shrink-0" asChild>
+                                                    <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" title="Ver Orden de Compra">
                                                         <Eye className="h-4 w-4" />
                                                     </a>
                                                 </Button>

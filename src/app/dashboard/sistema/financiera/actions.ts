@@ -160,7 +160,7 @@ export async function createFacturaAction(factura: Omit<Factura, "id">): Promise
 
     revalidatePath("/dashboard/sistema/financiera");
     revalidatePath("/dashboard/sistema/comercial");
-    return mapToUI(data);
+    return mapToUI(data, data.cotizaciones);
 }
 
 export async function updateFacturaAction(id: string, factura: Partial<Factura>): Promise<Factura> {
@@ -171,7 +171,13 @@ export async function updateFacturaAction(id: string, factura: Partial<Factura>)
         .from("facturas")
         .update(dbData)
         .eq("id", id)
-        .select()
+        .select(`
+            *,
+            cotizaciones (
+                id, numero, total, estado, created_at,
+                clientes (id, nombre, documento, telefono, direccion)
+            )
+        `)
         .single();
 
     if (error) {
@@ -181,7 +187,7 @@ export async function updateFacturaAction(id: string, factura: Partial<Factura>)
 
     revalidatePath("/dashboard/sistema/financiera");
     revalidatePath("/dashboard/sistema/comercial");
-    return mapToUI(data);
+    return mapToUI(data, data.cotizaciones);
 }
 
 export async function deleteFacturaAction(id: string): Promise<boolean> {

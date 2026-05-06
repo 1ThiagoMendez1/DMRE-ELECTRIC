@@ -56,6 +56,7 @@ import { generateQuotePDF, generateActaPDF, ActaData } from "@/utils/pdf-generat
 import { useErp } from "@/components/providers/erp-provider";
 import { ProductSelectorDialog } from "./product-selector-dialog";
 import { QuotePreview } from "./quote-preview";
+import { GestionComprasPanel } from "./compras/gestion-compras-panel";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/client";
 import { getHistorialAction, addHistorialEntryAction } from "@/app/dashboard/sistema/cotizacion/actions";
@@ -219,7 +220,7 @@ export function TrabajoHistoryDialog({
 }: TrabajoHistoryDialogProps) {
     const { inventario, codigosTrabajo, instalaciones, addConsumoMaterial, currentUser } = useErp();
     const [isOpen, setIsOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'historial'>(defaultTab);
+    const [activeTab, setActiveTab] = useState<'detalles' | 'items' | 'ejecucion' | 'preview' | 'documentos' | 'compras' | 'historial'>(defaultTab);
     const [newNote, setNewNote] = useState("");
     const [newProgress, setNewProgress] = useState<EstadoCotizacion>(trabajo.estado);
     const [progressPercent, setProgressPercent] = useState<number>(trabajo.progreso || 0);
@@ -395,10 +396,12 @@ export function TrabajoHistoryDialog({
     // --- DOCUMENT TAB STATE ---
     const [documentosLegales, setDocumentosLegales] = useState<{ name: string, url: string, size: number, created_at: string }[]>([]);
     const [polizasSeguros, setPolizasSeguros] = useState<{ name: string, url: string, size: number, created_at: string }[]>([]);
+    const [ordenesCompra, setOrdenesCompra] = useState<{ name: string, url: string, size: number, created_at: string }[]>([]);
     const [isLoadingDocs, setIsLoadingDocs] = useState(false);
     const [isUploadingDoc, setIsUploadingDoc] = useState(false);
     const docLegalInputRef = useRef<HTMLInputElement>(null);
     const docPolizaInputRef = useRef<HTMLInputElement>(null);
+    const docOrdenInputRef = useRef<HTMLInputElement>(null);
     const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string } | null>(null);
 
     // Job Execution Details State
@@ -599,6 +602,10 @@ export function TrabajoHistoryDialog({
                 .from('Documentost_rabajos')
                 .list(`Polizasyseguros/${trabajo.id}`, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
 
+            const { data: ordenesFiles } = await supabase.storage
+                .from('Documentost_rabajos')
+                .list(`OrdenesDeCompra/${trabajo.id}`, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+
             if (legalFiles) {
                 setDocumentosLegales(legalFiles.filter(f => f.name !== '.emptyFolderPlaceholder').map(f => ({
                     name: f.name,
@@ -612,6 +619,15 @@ export function TrabajoHistoryDialog({
                 setPolizasSeguros(polizaFiles.filter(f => f.name !== '.emptyFolderPlaceholder').map(f => ({
                     name: f.name,
                     url: supabase.storage.from('Documentost_rabajos').getPublicUrl(`Polizasyseguros/${trabajo.id}/${f.name}`).data.publicUrl,
+                    size: f.metadata?.size || 0,
+                    created_at: f.created_at || ''
+                })));
+            }
+
+            if (ordenesFiles) {
+                setOrdenesCompra(ordenesFiles.filter(f => f.name !== '.emptyFolderPlaceholder').map(f => ({
+                    name: f.name,
+                    url: supabase.storage.from('Documentost_rabajos').getPublicUrl(`OrdenesDeCompra/${trabajo.id}/${f.name}`).data.publicUrl,
                     size: f.metadata?.size || 0,
                     created_at: f.created_at || ''
                 })));
@@ -630,7 +646,7 @@ export function TrabajoHistoryDialog({
         }
     }, [activeTab, isOpen]);
 
-    const handleDocUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros') => {
+    const handleDocUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros' | 'OrdenesDeCompra') => {
         const files = event.target.files;
         if (!files || files.length === 0) return;
 
@@ -658,7 +674,7 @@ export function TrabajoHistoryDialog({
         }
     };
 
-    const handleDeleteDoc = async (fileName: string, category: 'Documentacion' | 'Polizasyseguros') => {
+    const handleDeleteDoc = async (fileName: string, category: 'Documentacion' | 'Polizasyseguros' | 'OrdenesDeCompra') => {
         try {
             const { error } = await supabase.storage
                 .from('Documentost_rabajos')
@@ -1147,6 +1163,7 @@ export function TrabajoHistoryDialog({
                         {showExecution && <TabsTrigger value="ejecucion" className="flex-1 sm:flex-none">Ejecución</TabsTrigger>}
                         <TabsTrigger value="preview" className="flex-1 sm:flex-none">Vista PDF</TabsTrigger>
                         {trabajo.estado === 'APROBADA' && <TabsTrigger value="documentos" className="flex-1 sm:flex-none">Documentos</TabsTrigger>}
+                        {trabajo.estado === 'APROBADA' && <TabsTrigger value="compras" className="flex-1 sm:flex-none">Compras</TabsTrigger>}
                         <TabsTrigger value="historial" className="flex-1 sm:flex-none">Historial</TabsTrigger>
                     </TabsList>
 
@@ -3044,6 +3061,95 @@ export function TrabajoHistoryDialog({
                             </Card>
                         </div>
 
+                        {/* ÓRDENES DE COMPRA (Third card below the other two, full width or adjust grid) */}
+                        <div className="mt-6">
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Banknote className="h-5 w-5 text-green-600" />
+                                        Órdenes de Compra
+                                    </CardTitle>
+                                    <CardDescription>Documentos de aprobación formal y órdenes de compra enviadas por el cliente</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Upload zone */}
+                                    <div
+                                        onClick={() => !isUploadingDoc && docOrdenInputRef.current?.click()}
+                                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${isUploadingDoc
+                                            ? 'border-muted-foreground/15 bg-muted/30 cursor-not-allowed'
+                                            : 'border-muted-foreground/25 hover:border-green-500/50 hover:bg-green-50/50 dark:hover:bg-green-950/20'
+                                            }`}
+                                    >
+                                        {isUploadingDoc ? (
+                                            <>
+                                                <Loader2 className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2 animate-spin" />
+                                                <p className="text-sm font-medium text-muted-foreground">Subiendo...</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                                                <p className="text-sm font-medium">Click para subir órdenes de compra</p>
+                                                <p className="text-xs text-muted-foreground mt-1">PDF, imágenes, Word, Excel y más</p>
+                                            </>
+                                        )}
+                                        <input
+                                            ref={docOrdenInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            accept="*/*"
+                                            multiple
+                                            onChange={(e) => handleDocUpload(e, 'OrdenesDeCompra')}
+                                        />
+                                    </div>
+
+                                    {/* File list */}
+                                    {isLoadingDocs ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                            <span className="ml-2 text-sm text-muted-foreground">Cargando documentos...</span>
+                                        </div>
+                                    ) : ordenesCompra.length === 0 ? (
+                                        <div className="text-center py-6">
+                                            <FileText className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+                                            <p className="text-sm text-muted-foreground">No hay órdenes de compra cargadas</p>
+                                        </div>
+                                    ) : (
+                                        <ScrollArea className="h-[220px]">
+                                            <div className="space-y-2 pr-3">
+                                                {ordenesCompra.map((doc, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg border bg-card hover:bg-accent/30 transition-colors group">
+                                                        {getDocFileIcon(doc.name)}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium truncate" title={doc.name.replace(/^\d+_/, '')}>
+                                                                {doc.name.replace(/^\d+_/, '')}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {formatFileSize(doc.size)}
+                                                                {doc.created_at && ` • ${format(new Date(doc.created_at), "dd MMM yyyy", { locale: es })}`}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPreviewDoc({ url: doc.url, name: doc.name.replace(/^\d+_/, '') })} title="Vista previa">
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                                <a href={doc.url} target="_blank" rel="noopener noreferrer" title="Descargar">
+                                                                    <Download className="h-4 w-4" />
+                                                                </a>
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteDoc(doc.name, 'OrdenesDeCompra')} title="Eliminar">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+
                         {/* DOCUMENT PREVIEW DIALOG */}
                         <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
                             <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
@@ -3135,6 +3241,13 @@ export function TrabajoHistoryDialog({
                             </div>
                         </ScrollArea>
                     </TabsContent>
+                    
+                    {/* COMPRAS TAB */}
+                    {trabajo.estado === 'APROBADA' && (
+                        <TabsContent value="compras" className="flex-1 overflow-auto space-y-4 mt-4 p-1">
+                            <GestionComprasPanel cotizacion={trabajo} />
+                        </TabsContent>
+                    )}
                 </Tabs>
                 
                 {/* Product/Service Selector Dialog Global */}

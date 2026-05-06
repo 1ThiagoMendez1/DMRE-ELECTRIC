@@ -10,6 +10,7 @@ function mapToUI(db: any, items: any[] = []): OrdenCompra {
         id: db.id,
         numero: db.numero,
         proveedorId: db.proveedor_id,
+        cotizacionProveedorId: db.cotizacion_proveedor_id,
         proveedor: db.proveedores ? {
             id: db.proveedores.id,
             nombre: db.proveedores.nombre,
@@ -68,6 +69,7 @@ export async function createOrdenCompraAction(ocInput: any): Promise<OrdenCompra
     // 1. Insert Order
     const dbOrder = {
         proveedor_id: rest.proveedorId,
+        cotizacion_proveedor_id: rest.cotizacionProveedorId,
         numero: rest.numero,
         fecha_emision: rest.fechaEmision,
         fecha_entrega_estimada: rest.fechaEntregaEstimada,

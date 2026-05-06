@@ -13,7 +13,7 @@ import { Cotizacion, ComentarioCotizacion } from "@/types/sistema";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useErp } from "@/components/providers/erp-provider";
-import { getSecureCotizacionDocumentsAction, getPublicCotizacionAction } from "@/app/dashboard/sistema/cotizacion/actions";
+import { getSecureCotizacionDocumentsAction, getPublicCotizacionAction, uploadPublicCotizacionDocumentAction } from "@/app/dashboard/sistema/cotizacion/actions";
 
 interface ComercialInteractionPanelProps {
     cotizacionId: string;
@@ -29,8 +29,13 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
 
     // Instead of mock, we'll use the quote's embedded comments or start empty.
     const [comments, setComments] = useState<ComentarioCotizacion[]>([]);
-    const [secureDocs, setSecureDocs] = useState<{ legalDocs: any[], polizas: any[] } | null>(null);
+    const [secureDocs, setSecureDocs] = useState<{ legalDocs: any[], polizas: any[], ordenesCompra: any[] } | null>(null);
     const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+    const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+    
+    const docLegalInputRef = useRef<HTMLInputElement>(null);
+    const docPolizaInputRef = useRef<HTMLInputElement>(null);
+    const docOrdenCompraInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const shouldAutoScrollRef = useRef(true);
@@ -68,7 +73,7 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
                 // The backend action checks for APROBADA state, we load what the client sees
                 const docs = await getSecureCotizacionDocumentsAction(id);
                 if (docs) {
-                    setSecureDocs({ legalDocs: docs.legalDocs, polizas: docs.polizas });
+                    setSecureDocs({ legalDocs: docs.legalDocs, polizas: docs.polizas, ordenesCompra: docs.ordenesCompra });
                 }
             } catch (error) {
                 console.error("Failed to load secure documents", error);
@@ -115,6 +120,44 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
             setSecureDocs(null);
         }
     }, [cotizacionId, cotizaciones]);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'Documentacion' | 'Polizasyseguros' | 'OrdenesDeCompra') => {
+        const file = e.target.files?.[0];
+        if (!file || !quote) return;
+
+        setIsUploadingDoc(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Reusing the public action since it's perfectly safe for admin to use it too
+            await uploadPublicCotizacionDocumentAction(quote.numero, category, formData);
+
+            toast({
+                title: "Archivo subido correctamente",
+                description: "El documento se ha cargado a la cotización.",
+            });
+
+            // Reload the documents to show the newly uploaded one
+            if (quote.id) {
+                const docs = await getSecureCotizacionDocumentsAction(quote.numero || quote.id);
+                if (docs) {
+                    setSecureDocs({ legalDocs: docs.legalDocs, polizas: docs.polizas, ordenesCompra: docs.ordenesCompra });
+                }
+            }
+
+        } catch (error: any) {
+            console.error("Error uploading", error);
+            toast({
+                title: "Error al subir",
+                description: error.message || "Ocurrió un error al subir el documento.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUploadingDoc(false);
+            if (e.target) e.target.value = '';
+        }
+    };
 
 
     const handleSendComment = () => {
@@ -307,6 +350,48 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
                                                         </div>
                                                         <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8" asChild>
                                                             <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" title="Ver Póliza">
+                                                                <Eye className="h-4 w-4" />
+                                                            </a>
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <Separator className="bg-emerald-500/10" />
+
+                                    {/* Orden de Compra */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                                                <FileText className="h-4 w-4 text-emerald-600" /> Órdenes de Compra
+                                            </h4>
+                                            <div>
+                                                <input type="file" ref={docOrdenCompraInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'OrdenesDeCompra')} />
+                                                <Button variant="outline" size="sm" onClick={() => docOrdenCompraInputRef.current?.click()} disabled={isUploadingDoc}>
+                                                    {isUploadingDoc ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                                                    Subir O.C.
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        {secureDocs.ordenesCompra?.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground italic">No se han cargado órdenes de compra.</p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {secureDocs.ordenesCompra?.map((doc: any) => (
+                                                    <div key={doc.id} className="flex items-center justify-between p-3 border rounded-md bg-background hover:border-emerald-500/40 transition-colors">
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded">
+                                                                <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                            </div>
+                                                            <div className="truncate">
+                                                                <p className="text-xs font-medium truncate">{doc.name}</p>
+                                                                <p className="text-[10px] text-muted-foreground">{doc.size}</p>
+                                                            </div>
+                                                        </div>
+                                                        <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8" asChild>
+                                                            <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" title="Ver Orden de Compra">
                                                                 <Eye className="h-4 w-4" />
                                                             </a>
                                                         </Button>

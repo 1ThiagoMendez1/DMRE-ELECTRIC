@@ -562,16 +562,18 @@ export async function getSecureCotizacionDocumentsAction(trackingCode: string) {
 
     const legalDocs = await fetchFolder(`Documentacion/${cotizacion.id}`);
     const polizas = await fetchFolder(`Polizasyseguros/${cotizacion.id}`);
+    const ordenesCompra = await fetchFolder(`OrdenesDeCompra/${cotizacion.id}`);
 
     return {
         cotizacionId: cotizacion.id,
         legalDocs,
-        polizas
+        polizas,
+        ordenesCompra
     };
 }
 
 // Securely allows a client to upload a document to their specific quotation folder via the Portal
-export async function uploadPublicCotizacionDocumentAction(trackingCode: string, category: 'Documentacion' | 'Polizasyseguros', formData: FormData) {
+export async function uploadPublicCotizacionDocumentAction(trackingCode: string, category: 'Documentacion' | 'Polizasyseguros' | 'OrdenesDeCompra', formData: FormData) {
     const supabase = await createClient(); // Service role bypasses RLS
 
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trackingCode);

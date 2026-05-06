@@ -37,6 +37,12 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
     const [saldo, setSaldo] = useState(cuenta.saldoActual.toString());
     const [banco, setBanco] = useState(cuenta.banco || "");
 
+    // Credit fields
+    const [cupoTotal, setCupoTotal] = useState(cuenta.cupoTotal?.toString() || "");
+    const [fechaCorte, setFechaCorte] = useState(cuenta.fechaCorte?.toString() || "");
+    const [fechaPago, setFechaPago] = useState(cuenta.fechaPago?.toString() || "");
+    const [tasaInteres, setTasaInteres] = useState(cuenta.tasaInteres?.toString() || "");
+
     useEffect(() => {
         if (open) {
             setNombre(cuenta.nombre);
@@ -44,6 +50,10 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
             setTipo(cuenta.tipo);
             setSaldo(cuenta.saldoActual.toString());
             setBanco(cuenta.banco || "");
+            setCupoTotal(cuenta.cupoTotal?.toString() || "");
+            setFechaCorte(cuenta.fechaCorte?.toString() || "");
+            setFechaPago(cuenta.fechaPago?.toString() || "");
+            setTasaInteres(cuenta.tasaInteres?.toString() || "");
         }
     }, [open, cuenta]);
 
@@ -54,9 +64,13 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
             ...cuenta,
             nombre,
             numeroCuenta: numero,
-            banco: banco || (tipo === 'BANCO' ? nombre : undefined), // Default bank name to account name if empty and is bank
+            banco: banco || (tipo === 'BANCO' || tipo === 'CREDITO' ? nombre : undefined),
             tipo,
             saldoActual: parseFloat(saldo),
+            cupoTotal: tipo === 'CREDITO' ? parseFloat(cupoTotal) : undefined,
+            fechaCorte: tipo === 'CREDITO' ? parseInt(fechaCorte) : undefined,
+            fechaPago: tipo === 'CREDITO' ? parseInt(fechaPago) : undefined,
+            tasaInteres: tipo === 'CREDITO' ? parseFloat(tasaInteres) : undefined,
         };
 
         onAccountUpdated(updatedAccount);
@@ -79,7 +93,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                         Modifica los detalles de la cuenta.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="tipo-edit" className="text-right">
                             Tipo
@@ -91,7 +105,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                             <SelectContent>
                                 <SelectItem value="BANCO">Cuenta Bancaria</SelectItem>
                                 <SelectItem value="EFECTIVO">Caja / Efectivo</SelectItem>
-                                <SelectItem value="CREDITO">Crédito</SelectItem>
+                                <SelectItem value="CREDITO">Tarjeta / Crédito</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -107,7 +121,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                         />
                     </div>
 
-                    {tipo === 'BANCO' && (
+                    {(tipo === 'BANCO' || tipo === 'CREDITO') && (
                         <>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="banco-edit" className="text-right">
@@ -134,9 +148,69 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                         </>
                     )}
 
+                    {tipo === 'CREDITO' && (
+                        <>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="cupo-edit" className="text-right">
+                                    Cupo Total
+                                </Label>
+                                <Input
+                                    id="cupo-edit"
+                                    type="number"
+                                    placeholder="0"
+                                    value={cupoTotal}
+                                    onChange={(e) => setCupoTotal(e.target.value)}
+                                    className="col-span-3"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="corte-edit" className="text-right text-xs">
+                                    Día Corte
+                                </Label>
+                                <Input
+                                    id="corte-edit"
+                                    type="number"
+                                    placeholder="DD"
+                                    min="1"
+                                    max="31"
+                                    value={fechaCorte}
+                                    onChange={(e) => setFechaCorte(e.target.value)}
+                                    className="col-span-1"
+                                />
+                                <Label htmlFor="pago-edit" className="text-right text-xs">
+                                    Día Pago
+                                </Label>
+                                <Input
+                                    id="pago-edit"
+                                    type="number"
+                                    placeholder="DD"
+                                    min="1"
+                                    max="31"
+                                    value={fechaPago}
+                                    onChange={(e) => setFechaPago(e.target.value)}
+                                    className="col-span-1"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="interes-edit" className="text-right text-xs">
+                                    Tasa (%)
+                                </Label>
+                                <Input
+                                    id="interes-edit"
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="2.5"
+                                    value={tasaInteres}
+                                    onChange={(e) => setTasaInteres(e.target.value)}
+                                    className="col-span-3"
+                                />
+                            </div>
+                        </>
+                    )}
+
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="saldo-edit" className="text-right">
-                            Saldo
+                            {tipo === 'CREDITO' ? 'Deuda Actual' : 'Saldo Actual'}
                         </Label>
                         <Input
                             id="saldo-edit"
