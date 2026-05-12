@@ -41,8 +41,10 @@ const formSchema = z.object({
     cuentaDestinoId: z.string().optional(),
     categoria: z.string().optional().or(z.literal("")),
     tercero: z.string().optional().or(z.literal("")),
+    identificacion: z.string().optional().or(z.literal("")),
     concepto: z.string().min(3, "Concepto requerido"),
     valor: z.coerce.number().min(1, "Valor debe ser mayor a 0"),
+    fecha: z.string().optional(),
     cuotas: z.coerce.number().optional(),
     cuotaActual: z.coerce.number().optional(),
     cotizacionId: z.string().optional().or(z.literal("")),
@@ -98,7 +100,9 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
             categoria: "OTROS",
             concepto: "",
             valor: 0,
+            fecha: new Date().toISOString().split('T')[0],
             tercero: "",
+            identificacion: "",
             cuotas: 1,
             cuotaActual: 1,
             cotizacionId: "",
@@ -182,13 +186,14 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
 
     function onSubmit(values: z.infer<typeof formSchema>) {
         const cuenta = cuentas.find(c => c.id === values.cuentaId);
+        const txDate = values.fecha ? new Date(values.fecha + "T12:00:00") : new Date();
 
         if (values.tipo === "TRANSFERENCIA") {
             const cuentaDestino = cuentas.find(c => c.id === values.cuentaDestinoId);
             
             const egreso = {
                 id: `MOV-${Math.floor(Math.random() * 10000)}`,
-                fecha: new Date(),
+                fecha: txDate,
                 tipo: "EGRESO",
                 cuentaId: values.cuentaId,
                 cuenta: cuenta,
@@ -200,7 +205,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
             
             const ingreso = {
                 id: `MOV-${Math.floor(Math.random() * 10000)}`,
-                fecha: new Date(),
+                fecha: txDate,
                 tipo: "INGRESO",
                 cuentaId: values.cuentaDestinoId as string,
                 cuenta: cuentaDestino,
@@ -216,12 +221,13 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
         } else {
             const newTx = {
                 id: `MOV-${Math.floor(Math.random() * 10000)}`,
-                fecha: new Date(),
+                fecha: txDate,
                 tipo: values.tipo,
                 cuentaId: values.cuentaId,
                 cuenta: cuenta,
                 categoria: values.categoria as CategoriaMovimiento,
                 tercero: values.tercero,
+                identificacion: values.identificacion,
                 concepto: values.concepto,
                 valor: values.valor,
                 cuotas: values.cuotas,
@@ -243,7 +249,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                     <Plus className="mr-2 h-4 w-4" /> Registrar Movimiento
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="w-[95vw] sm:max-w-[500px] md:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Registrar Transacción</DialogTitle>
                     <DialogDescription>
@@ -252,7 +258,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="tipo"
@@ -428,19 +434,38 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                         )}
                                     />
                                 ) : (
-                                    <FormField
-                                        control={form.control}
-                                        name="tercero"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Tercero (Beneficiario/Pagador)</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="Nombre del tercero" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <>
+                                        <FormField
+                                            control={form.control}
+                                            name="tercero"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Tercero (Beneficiario/Pagador)</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="Nombre del tercero" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="identificacion"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Identificación</FormLabel>
+                                                    <FormControl>
+                                                        <Input 
+                                                            placeholder="CC/NIT del tercero" 
+                                                            {...field} 
+                                                            disabled={form.watch("categoria") !== "OTROS"}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </>
                                 )}
 
                             </>
@@ -462,19 +487,34 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                             )}
                         />
 
-                        <FormField
-                            control={form.control}
-                            name="valor"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Valor</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" placeholder="0" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="fecha"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Fecha</FormLabel>
+                                        <FormControl>
+                                            <Input type="date" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="valor"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Valor</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder="0" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
                         <FormField
                             control={form.control}
@@ -530,7 +570,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                             const selectedAccount = cuentas.find(c => c.id === form.watch("cuentaId"));
                             if (selectedAccount?.tipo === 'CREDITO') {
                                 return (
-                                    <div className="grid grid-cols-2 gap-4 border p-3 rounded-md bg-primary/5">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-3 rounded-md bg-primary/5">
                                         <FormField
                                             control={form.control}
                                             name="cuotaActual"

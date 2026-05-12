@@ -108,7 +108,9 @@ export default function FinancieraPage() {
 
     // Filtro aplicado
     const movimientosFiltrados = movimientos.filter(mov => {
-        if (filterFecha && format(new Date(mov.fecha), "yyyy-MM-dd") !== filterFecha) return false;
+        const d = new Date(mov.fecha);
+        const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+        if (filterFecha && format(localD, "yyyy-MM-dd") !== filterFecha) return false;
         if (filterTipo !== "TODOS" && mov.tipo !== filterTipo) return false;
         if (filterCategoria !== "TODOS" && mov.categoria !== filterCategoria) return false;
         if (filterCuenta !== "TODOS" && mov.cuentaId !== filterCuenta) return false;
@@ -464,9 +466,12 @@ export default function FinancieraPage() {
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                    {movimientosFiltrados.map((mov) => (
+                                    {movimientosFiltrados.map((mov) => {
+                                        const d = new Date(mov.fecha);
+                                        const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+                                        return (
                                         <TableRow key={mov.id}>
-                                            <TableCell>{format(new Date(mov.fecha), "dd MMM yyyy", { locale: es })}</TableCell>
+                                            <TableCell>{format(localD, "dd MMM yyyy", { locale: es })}</TableCell>
                                             <TableCell>
                                                 <Badge variant={mov.tipo === 'INGRESO' ? 'default' : 'secondary'} className={mov.tipo === 'EGRESO' ? 'bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400'}>
                                                     {mov.tipo}
@@ -490,7 +495,7 @@ export default function FinancieraPage() {
                                                 />
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    )})}
                                 </TableBody>
                             </Table>
                         </CardContent>

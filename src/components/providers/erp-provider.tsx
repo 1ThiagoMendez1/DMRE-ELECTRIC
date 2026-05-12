@@ -666,6 +666,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const { id, ...rest } = obl;
             const saved = await createObligacionFinancieraAction(rest as any);
             setObligacionesFinancieras(prev => [saved, ...prev]);
+            await loadAllData(); // Refresh to update movimientos and cuentas
         } catch (error) { console.error("Error adding obligacion:", error); }
     };
 
@@ -688,6 +689,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         try {
             const saved = await createCompraAction(compra as any);
             setComprasFinanciera(prev => [saved, ...prev]);
+            await loadAllData(); // Refresh to update movimientos and cuentas
             toast({ title: "Compra registrada", description: "La compra ha sido guardada exitosamente." });
         } catch (error) { console.error("Error adding compra:", error); }
     };

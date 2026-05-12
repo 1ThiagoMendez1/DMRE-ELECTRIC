@@ -6,6 +6,7 @@ import { es } from "date-fns/locale";
 import { CreditCard, Pencil, DollarSign, Calendar, RefreshCcw, TrendingDown, Wallet } from "lucide-react";
 import { registrarPagoObligacionAction, getObligacionFinancieraByIdAction } from "@/app/dashboard/sistema/financiera/obligaciones-actions";
 import { toast } from "@/hooks/use-toast";
+import { useErp } from "@/components/providers/erp-provider";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -25,6 +26,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ObligacionFinanciera } from "@/types/sistema";
@@ -53,6 +61,9 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
     const [pagoTipo, setPagoTipo] = useState<TipoPago>('CUOTA');
     const [pagoValor, setPagoValor] = useState("");
     const [pagoFecha, setPagoFecha] = useState(new Date().toISOString().split('T')[0]);
+    const [cuentaId, setCuentaId] = useState("");
+
+    const { cuentasBancarias, refreshData: refreshErpData } = useErp();
 
     // Auto-calculated fields display
     const [calcInteres, setCalcInteres] = useState(0);
@@ -160,14 +171,17 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                 valor: valor,
                 interes: calcInteres,
                 capital: calcCapital,
-                saldoRestante: nuevoSaldo > 0 ? nuevoSaldo : 0
+                saldoRestante: nuevoSaldo > 0 ? nuevoSaldo : 0,
+                cuentaBancariaId: cuentaId || undefined
             });
 
             setLocalObligacion(updatedObligacion);
             onObligacionUpdated(updatedObligacion);
 
             setPagoValor("");
+            setCuentaId("");
             setSaldo(updatedObligacion.saldoCapital.toString());
+            await refreshErpData();
             toast({ title: "Pago registrado", description: "El abono ha sido guardado correctamente." });
         } catch (error) {
             console.error("Error registering payment:", error);
@@ -310,6 +324,21 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                             <Label>Valor Total a Pagar</Label>
                                             <Input type="number" placeholder="0" value={pagoValor} onChange={e => setPagoValor(e.target.value)} />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <Label>Cuenta de Salida (Opcional)</Label>
+                                        <Select onValueChange={setCuentaId} value={cuentaId}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Seleccione cuenta bancaria" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {cuentasBancarias.map((cuenta) => (
+                                                    <SelectItem key={cuenta.id} value={cuenta.id}>
+                                                        {cuenta.nombre} ({formatCurrency(cuenta.saldoActual)})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
 

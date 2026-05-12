@@ -58,6 +58,7 @@ const compraSchema = z.object({
     fechaPago: z.date().optional(),
     diasCredito: z.string().refine((val) => !isNaN(Number(val)), { message: "Días debe ser un número." }),
     metodoPago: z.string().optional(),
+    cuentaId: z.string().optional().or(z.literal("")),
     cuotas: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
         message: "El número de cuotas debe ser al menos 1.",
     }),
@@ -73,7 +74,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
     const [soporteUrl, setSoporteUrl] = useState<string | "">(compra?.soporteUrl || "");
     const [fileName, setFileName] = useState<string | "">(compra?.soporteUrl ? "Soporte cargado" : "");
     const { toast } = useToast();
-    const { addCompraFinanciera, updateCompraFinanciera, cotizaciones, cotizacionesProveedor } = useErp();
+    const { addCompraFinanciera, updateCompraFinanciera, cotizaciones, cotizacionesProveedor, cuentasBancarias } = useErp();
     const supabase = createClient();
 
     // Filter approved supplier quotes (CM-XXXX)
@@ -97,6 +98,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
             fechaPago: compra?.fechaPago ? new Date(compra.fechaPago) : undefined,
             diasCredito: compra ? String(compra.diasCredito) : "0",
             metodoPago: compra?.metodoPago || "TRANSFERENCIA",
+            cuentaId: "",
             cuotas: compra ? String(compra.cuotas) : "1",
         },
     });
@@ -114,6 +116,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                 fechaPago: compra.fechaPago ? new Date(compra.fechaPago) : undefined,
                 diasCredito: String(compra.diasCredito),
                 metodoPago: compra.metodoPago,
+                cuentaId: "",
                 cuotas: String(compra.cuotas || 1),
             });
             setSoporteUrl(compra.soporteUrl || "");
@@ -133,6 +136,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
             fechaPago: values.fechaPago,
             diasCredito: Number(values.diasCredito),
             metodoPago: values.metodoPago,
+            cuentaId: values.cuentaId || undefined,
             soporteUrl: soporteUrl,
             cuotas: Number(values.cuotas),
         };
@@ -479,6 +483,39 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                         <FormMessage />
                                     </FormItem>
                                 )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="cuentaId"
+                                render={({ field }) => {
+                                    const valorPagoStr = form.watch("valorPago");
+                                    const isPaid = !isNaN(Number(valorPagoStr)) && Number(valorPagoStr) > 0;
+                                    
+                                    if (!isPaid) return <div className="col-span-1" />; // Placeholder if not paid
+
+                                    return (
+                                        <FormItem>
+                                            <FormLabel>Cuenta de Salida (Opcional)</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleccione la cuenta bancaria" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {cuentasBancarias.map((cuenta) => (
+                                                        <SelectItem key={cuenta.id} value={cuenta.id}>
+                                                            {cuenta.nombre} ({formatCurrency(cuenta.saldoActual)})
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>De donde salieron los fondos.</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    );
+                                }}
                             />
                         </div>
 

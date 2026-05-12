@@ -104,7 +104,8 @@ export async function getComprasAction(): Promise<CompraFinanciera[]> {
 
 export async function createCompraAction(compra: Omit<CompraFinanciera, "id" | "saldo">): Promise<CompraFinanciera> {
     const supabase = await createClient();
-    const dbData = mapToDB(compra);
+    const { cuentaId, ...compraSinCuenta } = compra;
+    const dbData = mapToDB(compraSinCuenta);
 
     const { data, error } = await supabase
         .from("compras_financiera")
@@ -115,6 +116,27 @@ export async function createCompraAction(compra: Omit<CompraFinanciera, "id" | "
     if (error) {
         console.error("Error creating compra:", error);
         throw new Error(`Failed to create compra: ${error.message}`);
+    }
+
+    if (cuentaId && compra.valorPago && compra.valorPago > 0) {
+        const { error: movError } = await supabase.from("movimientos_financieros").insert({
+            tipo: "EGRESO",
+            categoria: "PROVEEDORES",
+            concepto: "Pago de Compra",
+            descripcion: `Pago de factura ${compra.numeroFactura || data.numero_factura}`,
+            valor: compra.valorPago,
+            fecha: compra.fechaPago || compra.fecha,
+            cuenta_id: cuentaId
+        });
+
+        if (movError) {
+            console.error("Error inserting movement:", movError);
+        }
+
+        await supabase.rpc("update_cuenta_saldo", {
+            cuenta_uuid: cuentaId,
+            delta_valor: -compra.valorPago
+        });
     }
 
     revalidatePath("/dashboard/sistema/financiera");

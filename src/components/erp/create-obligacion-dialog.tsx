@@ -14,7 +14,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { ObligacionFinanciera } from "@/types/sistema";
+import { useErp } from "@/components/providers/erp-provider";
+import { formatCurrency } from "@/lib/utils";
 
 interface CreateObligacionDialogProps {
     onObligacionCreated: (obligacion: ObligacionFinanciera) => void;
@@ -29,6 +38,9 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
     const [tasa, setTasa] = useState(""); // E.A.
     const [plazo, setPlazo] = useState("");
     const [fecha, setFecha] = useState("");
+    const [cuentaId, setCuentaId] = useState("");
+    
+    const { cuentasBancarias } = useErp();
 
     const calculateCuota = (P: number, ea: number, n: number) => {
         if (ea === 0) return P / n;
@@ -52,7 +64,8 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
             plazoMeses: n,
             saldoCapital: P, // Initially full amount
             valorCuota: cuota,
-            fechaInicio: new Date(fecha)
+            fechaInicio: new Date(fecha),
+            cuentaId: cuentaId || undefined
         };
 
         onObligacionCreated(newObligacion);
@@ -63,6 +76,7 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
         setTasa("");
         setPlazo("");
         setFecha("");
+        setCuentaId("");
     };
 
     return (
@@ -133,6 +147,21 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
                             onChange={(e) => setFecha(e.target.value)}
                             className="col-span-3"
                         />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Cuenta Receptora (Opcional)</Label>
+                        <Select onValueChange={setCuentaId} value={cuentaId}>
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Seleccione una cuenta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {cuentasBancarias.map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                        {c.nombre} ({formatCurrency(c.saldoActual)})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
                 <DialogFooter>

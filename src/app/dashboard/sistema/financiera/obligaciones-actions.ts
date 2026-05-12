@@ -172,6 +172,27 @@ export async function createObligacionFinancieraAction(obligacion: Omit<Obligaci
         throw new Error("Failed to create obligacion_financiera");
     }
 
+    if (obligacion.cuentaId && obligacion.montoPrestado > 0) {
+        const { error: movError } = await supabase.from("movimientos_financieros").insert({
+            tipo: "INGRESO",
+            categoria: "PRESTAMOS",
+            concepto: "Desembolso de Obligación",
+            descripcion: `Préstamo de ${obligacion.entidad}`,
+            valor: obligacion.montoPrestado,
+            fecha: obligacion.fechaInicio,
+            cuenta_id: obligacion.cuentaId
+        });
+
+        if (movError) {
+            console.error("Error inserting movement:", movError);
+        }
+
+        await supabase.rpc("update_cuenta_saldo", {
+            cuenta_uuid: obligacion.cuentaId,
+            delta_valor: obligacion.montoPrestado
+        });
+    }
+
     revalidatePath("/dashboard/sistema/financiera");
     return mapObligacionToUI(data);
 }

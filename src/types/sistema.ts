@@ -275,6 +275,7 @@ export interface MovimientoFinanciero {
     cuenta?: Partial<CuentaBancaria>; // Relation
     categoria: CategoriaMovimiento;
     tercero?: string;
+    identificacion?: string;
     concepto?: string;
     descripcion?: string;
     valor: number;
@@ -342,6 +343,7 @@ export interface CompraFinanciera {
     saldo: number;
     diasCredito: number;
     metodoPago?: string;
+    cuentaId?: string;
     soporteUrl?: string;
     cuotas?: number;
     createdAt?: Date;

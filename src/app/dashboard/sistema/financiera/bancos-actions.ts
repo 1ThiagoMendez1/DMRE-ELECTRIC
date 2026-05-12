@@ -109,6 +109,7 @@ function mapMovimientoToUI(db: any): MovimientoFinanciero {
         descripcion: db.descripcion,
         valor: Number(db.valor) || 0,
         tercero: db.tercero,
+        identificacion: db.identificacion,
         cuentaId: db.cuenta_id,
         // Extended fields
         facturaId: db.factura_id,
@@ -126,14 +127,20 @@ function mapMovimientoToUI(db: any): MovimientoFinanciero {
 }
 
 function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
+    let conceptoFinal = ui.concepto || "";
+    if (ui.identificacion && ui.identificacion.trim() !== "") {
+        conceptoFinal += ` (ID: ${ui.identificacion})`;
+    }
+
     return {
         fecha: ui.fecha,
         tipo: ui.tipo,
         categoria: ui.categoria,
-        concepto: ui.concepto,
+        concepto: conceptoFinal,
         descripcion: ui.descripcion,
         valor: ui.valor,
         tercero: ui.tercero,
+        // identificacion: ui.identificacion, // Removed to avoid PGRST204 crash
         cuenta_id: ui.cuentaId,
         factura_id: ui.facturaId,
         trabajo_id: ui.trabajoId,
