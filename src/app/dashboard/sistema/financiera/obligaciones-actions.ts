@@ -32,7 +32,8 @@ function mapObligacionToUI(db: any): ObligacionFinanciera {
             valor: Number(p.valor),
             interes: Number(p.interes),
             capital: Number(p.capital),
-            saldoRestante: Number(p.saldo_restante)
+            saldoRestante: Number(p.saldo_restante),
+            comprobanteUrl: p.comprobante_url
         })) : []
     };
 }
@@ -106,6 +107,7 @@ export async function registrarPagoObligacionAction(pago: {
     capital: number;
     saldoRestante: number;
     cuentaBancariaId?: string; // Optional: to record transaction
+    comprobanteUrl?: string;
 }): Promise<ObligacionFinanciera> {
     const supabase = await createClient();
 
@@ -118,7 +120,8 @@ export async function registrarPagoObligacionAction(pago: {
             valor: pago.valor,
             interes: pago.interes,
             capital: pago.capital,
-            saldo_restante: pago.saldoRestante
+            saldo_restante: pago.saldoRestante,
+            comprobante_url: pago.comprobanteUrl
         });
 
     if (payError) throw new Error("Error registrando pago: " + payError.message);
@@ -132,7 +135,8 @@ export async function registrarPagoObligacionAction(pago: {
             descripcion: `Abono a obligación ${pago.obligacionId}`,
             valor: pago.valor,
             fecha: getSafeMiddayUTC(pago.fecha),
-            cuenta_id: pago.cuentaBancariaId
+            cuenta_id: pago.cuentaBancariaId,
+            comprobante_url: pago.comprobanteUrl
         });
 
         // Update bank balance trigger handles the rest or we do RPC
@@ -161,7 +165,8 @@ export async function registrarPagoObligacionAction(pago: {
             valor: Number(p.valor),
             interes: Number(p.interes),
             capital: Number(p.capital),
-            saldoRestante: Number(p.saldo_restante)
+            saldoRestante: Number(p.saldo_restante),
+            comprobanteUrl: p.comprobante_url
         })) : []
     };
 }

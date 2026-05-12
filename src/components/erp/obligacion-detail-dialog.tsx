@@ -3,10 +3,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CreditCard, Pencil, DollarSign, Calendar, RefreshCcw, TrendingDown, Wallet } from "lucide-react";
+import { CreditCard, Pencil, DollarSign, Calendar, RefreshCcw, TrendingDown, Wallet, Upload, ExternalLink } from "lucide-react";
 import { registrarPagoObligacionAction, getObligacionFinancieraByIdAction } from "@/app/dashboard/sistema/financiera/obligaciones-actions";
 import { toast } from "@/hooks/use-toast";
 import { useErp } from "@/components/providers/erp-provider";
+import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -62,6 +63,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
     const [pagoValor, setPagoValor] = useState("");
     const [pagoFecha, setPagoFecha] = useState(new Date().toISOString().split('T')[0]);
     const [cuentaId, setCuentaId] = useState("");
+    const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
 
     const { cuentasBancarias, refreshData: refreshErpData } = useErp();
 
@@ -165,6 +167,28 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
 
         setIsLoading(true);
         try {
+            let comprobanteUrl = undefined;
+            if (comprobanteFile) {
+                const supabase = createClient();
+                const fileExt = comprobanteFile.name.split('.').pop();
+                const fileName = `obligacion-${localObligacion.id}-${Date.now()}.${fileExt}`;
+                const filePath = `obligaciones/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from("documentos")
+                    .upload(filePath, comprobanteFile);
+
+                if (uploadError) {
+                    throw new Error("Error subiendo el comprobante: " + uploadError.message);
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from("documentos")
+                    .getPublicUrl(filePath);
+
+                comprobanteUrl = publicUrl;
+            }
+
             const updatedObligacion = await registrarPagoObligacionAction({
                 obligacionId: localObligacion.id,
                 fecha: new Date(pagoFecha),
@@ -172,7 +196,8 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                 interes: calcInteres,
                 capital: calcCapital,
                 saldoRestante: nuevoSaldo > 0 ? nuevoSaldo : 0,
-                cuentaBancariaId: cuentaId || undefined
+                cuentaBancariaId: cuentaId || undefined,
+                comprobanteUrl: comprobanteUrl
             });
 
             setLocalObligacion(updatedObligacion);
@@ -180,6 +205,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
 
             setPagoValor("");
             setCuentaId("");
+            setComprobanteFile(null);
             setSaldo(updatedObligacion.saldoCapital.toString());
             await refreshErpData();
             toast({ title: "Pago registrado", description: "El abono ha sido guardado correctamente." });
@@ -340,6 +366,21 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    <div>
+                                        <Label>Comprobante de Pago (Opcional)</Label>
+                                        <Input 
+                                            type="file" 
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files.length > 0) {
+                                                    setComprobanteFile(e.target.files[0]);
+                                                } else {
+                                                    setComprobanteFile(null);
+                                                }
+                                            }}
+                                            className="cursor-pointer"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="bg-background p-4 rounded-md border shadow-sm space-y-2">
@@ -373,12 +414,13 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                         <TableHead className="text-right">Interés</TableHead>
                                         <TableHead className="text-right">Capital</TableHead>
                                         <TableHead className="text-right">Saldo Restante</TableHead>
+                                        <TableHead className="text-center w-[80px]">Soporte</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {(!localObligacion.pagos || localObligacion.pagos.length === 0) ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                 No hay pagos registrados aún.
                                             </TableCell>
                                         </TableRow>
@@ -393,6 +435,15 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                                 <TableCell className="text-right text-red-500">{pago.interes ? formatCurrency(pago.interes) : '-'}</TableCell>
                                                 <TableCell className="text-right text-green-600">{pago.capital ? formatCurrency(pago.capital) : '-'}</TableCell>
                                                 <TableCell className="text-right font-mono text-xs">{formatCurrency(pago.saldoRestante)}</TableCell>
+                                                <TableCell className="text-center">
+                                                    {pago.comprobanteUrl ? (
+                                                        <Button variant="ghost" size="icon" asChild>
+                                                            <a href={pago.comprobanteUrl} target="_blank" rel="noopener noreferrer">
+                                                                <ExternalLink className="h-4 w-4 text-blue-600" />
+                                                            </a>
+                                                        </Button>
+                                                    ) : '-'}
+                                                </TableCell>
                                             </TableRow>
                                         )})
                                     )}

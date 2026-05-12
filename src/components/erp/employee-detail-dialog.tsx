@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
-import { Empleado, LiquidacionNomina, NovedadNomina } from "@/types/sistema";
+import { Empleado, LiquidacionNomina, NovedadNomina, MovimientoFinanciero } from "@/types/sistema";
 import { createClient } from "@/utils/supabase/client";
 
 interface EmployeeDetailDialogProps {
@@ -25,6 +25,7 @@ interface EmployeeDetailDialogProps {
     empleado: Empleado | null;
     liquidaciones: LiquidacionNomina[];
     novedades: NovedadNomina[];
+    movimientosFinancieros: MovimientoFinanciero[];
     onUpdate: (updated: Empleado) => void;
 }
 
@@ -34,6 +35,7 @@ export function EmployeeDetailDialog({
     empleado,
     liquidaciones,
     novedades,
+    movimientosFinancieros,
     onUpdate
 }: EmployeeDetailDialogProps) {
     const { toast } = useToast();
@@ -52,6 +54,16 @@ export function EmployeeDetailDialog({
 
     const empLiquidaciones = liquidaciones.filter(l => l.empleadoId === empleado.id);
     const empNovedades = novedades.filter(n => n.empleadoId === empleado.id);
+    
+    // Traer todos los pagos desde financiera (MovimientosFinancieros con categoría NOMINA y referencia al empleado)
+    const empPagosFinancieros = movimientosFinancieros.filter(m => 
+        m.categoria === 'NOMINA' && 
+        (
+            m.referencia === `EMP-${empleado.id}` || 
+            m.descripcion?.includes(`EMP-${empleado.id}`) ||
+            m.tercero === empleado.nombreCompleto
+        )
+    );
 
     const handleSave = () => {
         const updated = {
@@ -237,13 +249,13 @@ export function EmployeeDetailDialog({
                         <div className="grid grid-cols-3 gap-4 pt-4">
                             <Card className="bg-primary/5">
                                 <CardContent className="pt-4 text-center">
-                                    <p className="text-2xl font-bold">{empLiquidaciones.length}</p>
-                                    <p className="text-xs text-muted-foreground">Pagos Realizados</p>
+                                    <p className="text-2xl font-bold">{empPagosFinancieros.length}</p>
+                                    <p className="text-xs text-muted-foreground">Pagos Realizados (Financiera)</p>
                                 </CardContent>
                             </Card>
                             <Card className="bg-green-500/5">
                                 <CardContent className="pt-4 text-center">
-                                    <p className="text-2xl font-bold text-green-600">{formatCurrency(empLiquidaciones.reduce((a: number, l) => a + (l.netoPagar || 0), 0))}</p>
+                                    <p className="text-2xl font-bold text-green-600">{formatCurrency(empPagosFinancieros.reduce((a: number, m) => a + (m.valor || 0), 0))}</p>
                                     <p className="text-xs text-muted-foreground">Total Pagado</p>
                                 </CardContent>
                             </Card>
@@ -257,12 +269,43 @@ export function EmployeeDetailDialog({
                     </TabsContent>
 
                     {/* PAGOS TAB */}
-                    <TabsContent value="pagos" className="flex-1 overflow-auto py-4">
+                    <TabsContent value="pagos" className="flex-1 overflow-auto py-4 space-y-6">
+                        {/* Pagos desde Financiera */}
                         <Card>
-                            <CardHeader><CardTitle className="text-sm">Historial de Pagos de Nómina</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-sm">Pagos Ejecutados (Financiera)</CardTitle></CardHeader>
+                            <CardContent>
+                                {empPagosFinancieros.length === 0 ? (
+                                    <p className="text-muted-foreground text-center py-8">No hay pagos registrados en financiera para este empleado.</p>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Fecha</TableHead>
+                                                <TableHead>Concepto/Descripción</TableHead>
+                                                <TableHead>Valor Pagado</TableHead>
+                                                <TableHead>Cuenta Origen</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {empPagosFinancieros.map(pago => (
+                                                <TableRow key={pago.id}>
+                                                    <TableCell>{format(new Date(pago.fecha), "dd/MM/yyyy")}</TableCell>
+                                                    <TableCell>{pago.descripcion || pago.concepto}</TableCell>
+                                                    <TableCell className="font-bold text-green-600">{formatCurrency(pago.valor)}</TableCell>
+                                                    <TableCell>{pago.cuenta?.nombre || "N/A"}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader><CardTitle className="text-sm">Historial de Desprendibles de Nómina</CardTitle></CardHeader>
                             <CardContent>
                                 {empLiquidaciones.length === 0 ? (
-                                    <p className="text-muted-foreground text-center py-8">No hay pagos registrados.</p>
+                                    <p className="text-muted-foreground text-center py-8">No hay desprendibles registrados.</p>
                                 ) : (
                                     <Table>
                                         <TableHeader>

@@ -19,6 +19,7 @@
  *     estado          text NOT NULL DEFAULT 'PROGRAMADO',
  *     notas_internas  text,
  *     notificado_whatsapp boolean DEFAULT false,
+ *     costo_contratista numeric,
  *     created_at      timestamptz DEFAULT now()
  * );
  * ---------------------------------------------------------------
@@ -37,13 +38,14 @@ function mapToUI(db: any): AsignacionProgramador {
         direccionObra: db.direccion_obra ?? undefined,
         nombreProyecto: db.nombre_proyecto ?? undefined,
         clienteNombre: db.cliente_nombre ?? undefined,
-        fecha: new Date(db.fecha),
+        fecha: new Date(`${db.fecha}T12:00:00`),
         horaInicio: db.hora_inicio,
         horaFin: db.hora_fin ?? undefined,
         rol: db.rol ?? undefined,
         estado: db.estado,
         notasInternas: db.notas_internas ?? undefined,
         notificadoWhatsapp: db.notificado_whatsapp ?? false,
+        costoContratista: db.costo_contratista ?? undefined,
         createdAt: db.created_at ? new Date(db.created_at) : undefined,
         // Joined relations
         empleado: db.empleado ? {
@@ -70,7 +72,7 @@ function mapToDB(ui: Partial<AsignacionProgramador>) {
         nombre_proyecto: ui.nombreProyecto ?? null,
         cliente_nombre: ui.clienteNombre ?? null,
         fecha: ui.fecha instanceof Date
-            ? ui.fecha.toISOString().split("T")[0]
+            ? `${ui.fecha.getFullYear()}-${String(ui.fecha.getMonth() + 1).padStart(2, '0')}-${String(ui.fecha.getDate()).padStart(2, '0')}`
             : ui.fecha,
         hora_inicio: ui.horaInicio,
         hora_fin: ui.horaFin ?? null,
@@ -78,6 +80,7 @@ function mapToDB(ui: Partial<AsignacionProgramador>) {
         estado: ui.estado ?? "PROGRAMADO",
         notas_internas: ui.notasInternas ?? null,
         notificado_whatsapp: ui.notificadoWhatsapp ?? false,
+        costo_contratista: ui.costoContratista ?? null,
     };
 }
 

@@ -219,6 +219,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
             onTransactionCreated(egreso);
             setTimeout(() => onTransactionCreated(ingreso), 300);
         } else {
+            const emp = assignedEmployees.find(e => e.nombre === values.tercero);
             const newTx = {
                 id: `MOV-${Math.floor(Math.random() * 10000)}`,
                 fecha: txDate,
@@ -233,7 +234,8 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                 cuotas: values.cuotas,
                 cuotaActual: values.cuotaActual,
                 cotizacionId: values.cotizacionId,
-                comprobanteUrl: values.comprobanteUrl
+                comprobanteUrl: values.comprobanteUrl,
+                referencia: emp ? `EMP-${emp.id}` : undefined
             };
             onTransactionCreated(newTx);
         }
@@ -387,7 +389,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                 />
 
 
-                                {form.watch("categoria") === "NOMINA" ? (
+                                {form.watch("categoria") === "NOMINA" && form.watch("cotizacionId") && form.watch("cotizacionId") !== "none" ? (
                                     <FormField
                                         control={form.control}
                                         name="tercero"
@@ -407,13 +409,11 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                                         }
                                                     }} 
                                                     value={field.value}
-                                                    disabled={!form.watch("cotizacionId") || form.watch("cotizacionId") === "none"}
                                                 >
                                                     <FormControl>
                                                         <SelectTrigger>
                                                             <SelectValue placeholder={
-                                                                loadingEmployees ? "Cargando..." : 
-                                                                (!form.watch("cotizacionId") || form.watch("cotizacionId") === "none") ? "Seleccione oferta primero" : "Seleccione empleado"
+                                                                loadingEmployees ? "Cargando..." : "Seleccione empleado"
                                                             } />
                                                         </SelectTrigger>
                                                     </FormControl>

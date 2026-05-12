@@ -78,7 +78,8 @@ export default function TalentoHumanoPage() {
         payNomina,
         cuentasBancarias,
         liquidacionesNomina: liquidacionesContext,
-        addLiquidacion
+        addLiquidacion,
+        movimientosFinancieros // Added
     } = useErp();
 
     // const [empleados, setEmpleados] = useState(initialEmpleados); // Replaced by context
@@ -263,6 +264,26 @@ export default function TalentoHumanoPage() {
     }, [weekOffset]);
     const weekDays = useMemo(() => eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) }), [weekStart]);
 
+    // Programador Filters
+    const [progFilterProyecto, setProgFilterProyecto] = useState("");
+    const [progFilterFecha, setProgFilterFecha] = useState("");
+    const [progFilterEmpleado, setProgFilterEmpleado] = useState("");
+
+    const filteredAsignaciones = useMemo(() => {
+        return asignaciones.filter(a => {
+            const emp = a.empleado || empleados.find(e => e.id === a.empleadoId);
+            const matchProyecto = !progFilterProyecto || 
+                (a.nombreProyecto || "").toLowerCase().includes(progFilterProyecto.toLowerCase()) || 
+                (a.clienteNombre || "").toLowerCase().includes(progFilterProyecto.toLowerCase());
+            const matchEmpleado = !progFilterEmpleado || 
+                (emp?.nombreCompleto || "").toLowerCase().includes(progFilterEmpleado.toLowerCase());
+            const matchFecha = !progFilterFecha || 
+                format(a.fecha, "yyyy-MM-dd") === progFilterFecha;
+                
+            return matchProyecto && matchEmpleado && matchFecha;
+        });
+    }, [asignaciones, empleados, progFilterProyecto, progFilterEmpleado, progFilterFecha]);
+
     // Form state
     const [fEmpleados, setFEmpleados] = useState<string[]>([]);
     const [fEmpSearch, setFEmpSearch] = useState("");
@@ -273,6 +294,7 @@ export default function TalentoHumanoPage() {
     const [fRol, setFRol] = useState("");
     const [fEstado, setFEstado] = useState<EstadoAsignacion>("PROGRAMADO");
     const [fNotas, setFNotas] = useState("");
+    const [fCostosContratista, setFCostosContratista] = useState<Record<string, number>>({});
 
     // Auto-filled from cotizacion
     const [fDireccion, setFDireccion] = useState("");
@@ -308,6 +330,7 @@ export default function TalentoHumanoPage() {
         setFEmpleados([]); setFEmpSearch(""); setFCotizacion(""); setFFecha(new Date().toISOString().split("T")[0]);
         setFHoraInicio("08:00"); setFHoraFin(""); setFRol(""); setFEstado("PROGRAMADO");
         setFNotas(""); setFDireccion(""); setFProyecto(""); setFCliente("");
+        setFCostosContratista({});
         setEditingAsign(null);
     };
 
@@ -322,6 +345,7 @@ export default function TalentoHumanoPage() {
         setFRol(a.rol || "");
         setFEstado(a.estado);
         setFNotas(a.notasInternas || "");
+        setFCostosContratista(a.costoContratista ? { [a.empleadoId]: a.costoContratista } : {});
         setFDireccion(a.direccionObra || "");
         setFProyecto(a.nombreProyecto || "");
         setFCliente(a.clienteNombre || "");
@@ -348,13 +372,14 @@ export default function TalentoHumanoPage() {
 
             if (editingAsign) {
                 // Edit mode: single record update
-                const updated = await updateAsignacionAction(editingAsign.id, { ...basePayload, empleadoId: fEmpleados[0] });
+                const empId = fEmpleados[0];
+                const updated = await updateAsignacionAction(editingAsign.id, { ...basePayload, empleadoId: empId, costoContratista: fCostosContratista[empId] || undefined });
                 setAsignaciones(prev => prev.map(a => a.id === updated.id ? updated : a));
                 toast({ title: "Asignación actualizada" });
             } else {
                 // Create mode: one record per selected employee (parallel)
                 const results = await Promise.all(
-                    fEmpleados.map(empId => createAsignacionAction({ ...basePayload, empleadoId: empId }))
+                    fEmpleados.map(empId => createAsignacionAction({ ...basePayload, empleadoId: empId, costoContratista: fCostosContratista[empId] || undefined }))
                 );
                 setAsignaciones(prev => [...results, ...prev]);
                 toast({
@@ -395,9 +420,9 @@ export default function TalentoHumanoPage() {
 
     // KPIs
     const today = new Date();
-    const asignacionesSemana = asignaciones.filter(a => a.fecha >= weekStart && a.fecha <= weekDays[6]);
-    const asignacionesPendientes = asignaciones.filter(a => a.estado === "PROGRAMADO" || a.estado === "CONFIRMADO");
-    const empleadosHoy = new Set(asignaciones.filter(a => isSameDay(a.fecha, today)).map(a => a.empleadoId)).size;
+    const asignacionesSemana = filteredAsignaciones.filter(a => a.fecha >= weekStart && a.fecha <= weekDays[6]);
+    const asignacionesPendientes = filteredAsignaciones.filter(a => a.estado === "PROGRAMADO" || a.estado === "CONFIRMADO");
+    const empleadosHoy = new Set(filteredAsignaciones.filter(a => isSameDay(a.fecha, today)).map(a => a.empleadoId)).size;
 
     // Cotizaciones aprobadas
     const ofertasActivas = useMemo(() => cotizaciones.filter(c => ["APROBADA", "EN_REVISION", "ENVIADA"].includes(c.estado)), [cotizaciones]);
@@ -686,7 +711,8 @@ export default function TalentoHumanoPage() {
                     </div>
 
                     {/* Header actions */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Button variant="outline" size="icon" onClick={() => setWeekOffset(w => w - 1)}><ChevronLeft className="h-4 w-4" /></Button>
                             <span className="text-sm font-medium min-w-[200px] text-center">
@@ -728,21 +754,51 @@ export default function TalentoHumanoPage() {
                                             )}
                                         </div>
 
-                                        {/* Chips de seleccionados */}
+                                        {/* Empleados seleccionados y cobros */}
                                         {fEmpleados.length > 0 && (
-                                            <div className="flex flex-wrap gap-1">
+                                            <div className="flex flex-col gap-2 mt-2">
                                                 {fEmpleados.map(id => {
                                                     const emp = empleados.find(e => e.id === id);
+                                                    const isContratista = emp?.tipoVinculacion === 'CONTRATISTA' || emp?.tipoVinculacion === 'PRESTACIÓN DE SERVICIOS';
                                                     return (
-                                                        <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                                                            {getInitials(emp?.nombreCompleto || "?")}
-                                                            <span className="max-w-[100px] truncate">{emp?.nombreCompleto}</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setFEmpleados(prev => prev.filter(x => x !== id))}
-                                                                className="ml-0.5 hover:text-destructive font-bold"
-                                                            >×</button>
-                                                        </span>
+                                                        <div key={id} className="flex items-center justify-between p-2 rounded-md border bg-muted/20">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                                                                    {getInitials(emp?.nombreCompleto || "?")}
+                                                                </div>
+                                                                <span className="text-sm font-medium">{emp?.nombreCompleto}</span>
+                                                                {isContratista && (
+                                                                    <Badge variant="outline" className="text-[10px] ml-1">Contratista</Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                {isContratista && (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Costo:</Label>
+                                                                        <div className="relative">
+                                                                            <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">$</span>
+                                                                            <Input 
+                                                                                type="number" 
+                                                                                className="h-7 w-24 pl-5 text-xs" 
+                                                                                placeholder="0"
+                                                                                value={fCostosContratista[id] || ''}
+                                                                                onChange={(e) => setFCostosContratista(prev => ({ ...prev, [id]: Number(e.target.value) }))}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setFEmpleados(prev => prev.filter(x => x !== id));
+                                                                        setFCostosContratista(prev => { const newObj = {...prev}; delete newObj[id]; return newObj; });
+                                                                    }}
+                                                                    className="text-muted-foreground hover:text-destructive p-1 rounded hover:bg-muted"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     );
                                                 })}
                                             </div>
@@ -824,6 +880,66 @@ export default function TalentoHumanoPage() {
                                         </div>
                                     )}
 
+                                    {/* Contexto de la Oferta */}
+                                    {fCotizacion && (
+                                        <div className="space-y-4 pt-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Trabajos / Ítems en la Oferta</Label>
+                                                <div className="border rounded-md max-h-[150px] overflow-y-auto bg-muted/5">
+                                                    <Table className="text-xs">
+                                                        <TableHeader>
+                                                            <TableRow>
+                                                                <TableHead>Descripción</TableHead>
+                                                                <TableHead className="text-right">Cant.</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {cotizaciones.find(c => c.id === fCotizacion)?.items?.map((item, idx) => (
+                                                                <TableRow key={item.id || idx}>
+                                                                    <TableCell className="font-medium">{item.descripcion}</TableCell>
+                                                                    <TableCell className="text-right">{item.cantidad}</TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                            {(!cotizaciones.find(c => c.id === fCotizacion)?.items || cotizaciones.find(c => c.id === fCotizacion)?.items.length === 0) && (
+                                                                <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground py-2">No hay ítems registrados.</TableCell></TableRow>
+                                                            )}
+                                                        </TableBody>
+                                                    </Table>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Personal ya programado en esta Oferta</Label>
+                                                <div className="border rounded-md max-h-[150px] overflow-y-auto bg-muted/5">
+                                                    <Table className="text-xs">
+                                                        <TableHeader>
+                                                            <TableRow>
+                                                                <TableHead>Fecha</TableHead>
+                                                                <TableHead>Persona</TableHead>
+                                                                <TableHead>Rol</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {asignaciones.filter(a => a.cotizacionId === fCotizacion).sort((a,b)=>a.fecha.getTime()-b.fecha.getTime()).map(a => {
+                                                                const emp = a.empleado || empleados.find(e => e.id === a.empleadoId);
+                                                                return (
+                                                                    <TableRow key={a.id}>
+                                                                        <TableCell>{format(a.fecha, "dd MMM", {locale: es})}</TableCell>
+                                                                        <TableCell className="font-medium">{emp?.nombreCompleto}</TableCell>
+                                                                        <TableCell>{a.rol || "—"}</TableCell>
+                                                                    </TableRow>
+                                                                )
+                                                            })}
+                                                            {asignaciones.filter(a => a.cotizacionId === fCotizacion).length === 0 && (
+                                                                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-2">Nadie programado aún.</TableCell></TableRow>
+                                                            )}
+                                                        </TableBody>
+                                                    </Table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Dirección manual override */}
                                     <div className="space-y-1">
                                         <Label>Dirección de Obra</Label>
@@ -887,8 +1003,44 @@ export default function TalentoHumanoPage() {
                                         }
                                     </Button>
                                 </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                        
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-2 items-center bg-muted/30 p-2 rounded-md border border-border/50">
+                            <div className="flex items-center text-sm font-medium text-muted-foreground mr-2">
+                                <Search className="h-4 w-4 mr-2" /> Filtros:
+                            </div>
+                            <Input
+                                placeholder="Proyecto / Cliente..."
+                                value={progFilterProyecto}
+                                onChange={(e) => setProgFilterProyecto(e.target.value)}
+                                className="h-8 max-w-[200px] text-sm"
+                            />
+                            <Input
+                                placeholder="Empleado..."
+                                value={progFilterEmpleado}
+                                onChange={(e) => setProgFilterEmpleado(e.target.value)}
+                                className="h-8 max-w-[200px] text-sm"
+                            />
+                            <Input
+                                type="date"
+                                value={progFilterFecha}
+                                onChange={(e) => setProgFilterFecha(e.target.value)}
+                                className="h-8 max-w-[150px] text-sm"
+                            />
+                            {(progFilterProyecto || progFilterEmpleado || progFilterFecha) && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => { setProgFilterProyecto(""); setProgFilterEmpleado(""); setProgFilterFecha(""); }}
+                                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    Limpiar Filtros
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Weekly calendar */}
@@ -899,7 +1051,7 @@ export default function TalentoHumanoPage() {
                     ) : (
                         <div className="grid grid-cols-7 gap-2">
                             {weekDays.map(day => {
-                                const dayAsigns = asignaciones.filter(a => isSameDay(a.fecha, day));
+                                const dayAsigns = filteredAsignaciones.filter(a => isSameDay(a.fecha, day));
                                 const isCurrentDay = isToday(day);
                                 return (
                                     <div key={day.toISOString()} className={`rounded-lg border min-h-[200px] ${isCurrentDay ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
@@ -933,6 +1085,8 @@ export default function TalentoHumanoPage() {
                                                         {a.rol && <p className="text-muted-foreground truncate">{a.rol}</p>}
                                                         {/* Proyecto */}
                                                         {a.nombreProyecto && <p className="text-muted-foreground truncate text-[10px]">{a.nombreProyecto}</p>}
+                                                        {/* Costo Contratista */}
+                                                        {a.costoContratista ? <p className="text-muted-foreground truncate text-[10px] font-medium text-amber-600">Cobro: {formatCurrency(a.costoContratista)}</p> : null}
                                                         {/* Dirección */}
                                                         {a.direccionObra && (
                                                             <a
@@ -976,8 +1130,8 @@ export default function TalentoHumanoPage() {
                         </div>
                     )}
 
-                    {/* All assignments list (future/past outside week) */}
-                    {asignaciones.filter(a => !isSameDay(a.fecha, weekStart) && !weekDays.some(d => isSameDay(a.fecha, d))).length > 0 && (
+                    {/* All assignments list */}
+                    {filteredAsignaciones.length > 0 && (
                         <Card>
                             <CardHeader><CardTitle className="text-sm">Todas las Asignaciones</CardTitle></CardHeader>
                             <CardContent>
@@ -994,7 +1148,7 @@ export default function TalentoHumanoPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {asignaciones.sort((a, b) => a.fecha.getTime() - b.fecha.getTime()).map(a => {
+                                        {filteredAsignaciones.sort((a, b) => a.fecha.getTime() - b.fecha.getTime()).map(a => {
                                             const emp = a.empleado || empleados.find(e => e.id === a.empleadoId);
                                             const cfg = ESTADO_CONFIG[a.estado];
                                             return (
@@ -1008,6 +1162,7 @@ export default function TalentoHumanoPage() {
                                                             <div>
                                                                 <p className="font-medium text-sm">{emp?.nombreCompleto}</p>
                                                                 {a.rol && <p className="text-xs text-muted-foreground">{a.rol}</p>}
+                                                                {a.costoContratista ? <p className="text-xs font-medium text-amber-600">Cobro: {formatCurrency(a.costoContratista)}</p> : null}
                                                             </div>
                                                         </div>
                                                     </TableCell>
@@ -1108,6 +1263,7 @@ export default function TalentoHumanoPage() {
                 empleado={selectedEmployee}
                 liquidaciones={liquidaciones}
                 novedades={novedades}
+                movimientosFinancieros={movimientosFinancieros} // Added
                 onUpdate={handleEmployeeUpdate}
             />
         </div>

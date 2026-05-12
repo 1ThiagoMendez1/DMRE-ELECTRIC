@@ -279,6 +279,7 @@ export interface MovimientoFinanciero {
     concepto?: string;
     descripcion?: string;
     valor: number;
+    referencia?: string; // Add referencia field
     // Foreign Keys
     facturaId?: string;
     trabajoId?: string;
@@ -326,6 +327,7 @@ export interface PagoObligacion {
     interes?: number;
     capital?: number;
     saldoRestante: number;
+    comprobanteUrl?: string;
 }
 
 export interface CompraFinanciera {
@@ -798,5 +800,6 @@ export interface AsignacionProgramador {
     estado: EstadoAsignacion;
     notasInternas?: string;
     notificadoWhatsapp?: boolean;
+    costoContratista?: number;
     createdAt?: Date;
 }

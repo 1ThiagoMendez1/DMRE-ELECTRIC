@@ -110,6 +110,7 @@ function mapMovimientoToUI(db: any): MovimientoFinanciero {
         valor: Number(db.valor) || 0,
         tercero: db.tercero,
         identificacion: db.identificacion,
+        referencia: db.referencia, // Added
         cuentaId: db.cuenta_id,
         // Extended fields
         facturaId: db.factura_id,
@@ -140,6 +141,7 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
         descripcion: ui.descripcion,
         valor: ui.valor,
         tercero: ui.tercero,
+        referencia: ui.referencia, // Added
         // identificacion: ui.identificacion, // Removed to avoid PGRST204 crash
         cuenta_id: ui.cuentaId,
         factura_id: ui.facturaId,
