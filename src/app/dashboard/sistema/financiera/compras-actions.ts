@@ -60,11 +60,10 @@ function mapToUI(db: any): CompraFinanciera {
 function getSafeMiddayUTC(dateStrOrObj: Date | string | undefined | null): string | undefined {
     if (!dateStrOrObj) return undefined;
     const d = new Date(dateStrOrObj);
-    // Para evitar cualquier salto de día, forzamos YYYY-MM-DDT12:00:00.000Z
-    // extrayendo los componentes locales.
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    // Extraer componentes UTC para no sufrir desfases por zona horaria
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}T12:00:00.000Z`;
 }
 
