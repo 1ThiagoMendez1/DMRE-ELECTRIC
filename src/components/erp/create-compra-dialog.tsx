@@ -62,6 +62,14 @@ const compraSchema = z.object({
     cuotas: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
         message: "El número de cuotas debe ser al menos 1.",
     }),
+}).superRefine((data, ctx) => {
+    if (Number(data.valorPago) > 0 && (!data.cuentaId || data.cuentaId === "")) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Seleccione una cuenta bancaria de origen para el pago registrado.",
+            path: ["cuentaId"],
+        });
+    }
 });
 
 interface CreateCompraDialogProps {

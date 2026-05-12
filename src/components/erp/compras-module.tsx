@@ -123,11 +123,14 @@ export function ComprasModule() {
                                     const saldo = compra.valorFactura - compra.valorPago;
                                     const isPaid = saldo <= 0;
                                     const isPartial = saldo > 0 && compra.valorPago > 0;
+                                    
+                                    const d = new Date(compra.fecha);
+                                    const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
 
                                     return (
                                         <TableRow key={compra.id}>
                                             <TableCell className="font-medium">
-                                                {format(new Date(compra.fecha), "dd/MM/yyyy")}
+                                                {format(localD, "dd/MM/yyyy")}
                                             </TableCell>
                                             <TableCell>{compra.numeroFactura}</TableCell>
                                             <TableCell>

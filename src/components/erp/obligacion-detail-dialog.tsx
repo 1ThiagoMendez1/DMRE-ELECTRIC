@@ -383,15 +383,18 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        localObligacion.pagos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((pago) => (
+                                        localObligacion.pagos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((pago) => {
+                                            const d = new Date(pago.fecha);
+                                            const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+                                            return (
                                             <TableRow key={pago.id}>
-                                                <TableCell>{format(new Date(pago.fecha), "dd MMM yyyy", { locale: es })}</TableCell>
+                                                <TableCell>{format(localD, "dd MMM yyyy", { locale: es })}</TableCell>
                                                 <TableCell className="text-right font-bold">{formatCurrency(pago.valor)}</TableCell>
                                                 <TableCell className="text-right text-red-500">{pago.interes ? formatCurrency(pago.interes) : '-'}</TableCell>
                                                 <TableCell className="text-right text-green-600">{pago.capital ? formatCurrency(pago.capital) : '-'}</TableCell>
                                                 <TableCell className="text-right font-mono text-xs">{formatCurrency(pago.saldoRestante)}</TableCell>
                                             </TableRow>
-                                        ))
+                                        )})
                                     )}
                                 </TableBody>
                             </Table>

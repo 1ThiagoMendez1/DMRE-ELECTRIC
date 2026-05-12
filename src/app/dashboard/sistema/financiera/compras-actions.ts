@@ -57,6 +57,17 @@ function mapToUI(db: any): CompraFinanciera {
     };
 }
 
+function getSafeMiddayUTC(dateStrOrObj: Date | string | undefined | null): string | undefined {
+    if (!dateStrOrObj) return undefined;
+    const d = new Date(dateStrOrObj);
+    // Para evitar cualquier salto de día, forzamos YYYY-MM-DDT12:00:00.000Z
+    // extrayendo los componentes locales.
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}T12:00:00.000Z`;
+}
+
 function mapToDB(ui: Partial<CompraFinanciera>) {
     const raw: Record<string, any> = {
         cotizacion_id: ui.cotizacionId,
@@ -64,9 +75,9 @@ function mapToDB(ui: Partial<CompraFinanciera>) {
         numero_factura: ui.numeroFactura,
         iva: ui.iva,
         valor_factura: ui.valorFactura,
-        fecha: ui.fecha,
+        fecha: getSafeMiddayUTC(ui.fecha),
         valor_pago: ui.valorPago,
-        fecha_pago: ui.fechaPago,
+        fecha_pago: getSafeMiddayUTC(ui.fechaPago),
         dias_credito: ui.diasCredito,
         metodo_pago: ui.metodoPago,
         soporte_url: ui.soporteUrl,
@@ -125,7 +136,7 @@ export async function createCompraAction(compra: Omit<CompraFinanciera, "id" | "
             concepto: "Pago de Compra",
             descripcion: `Pago de factura ${compra.numeroFactura || data.numero_factura}`,
             valor: compra.valorPago,
-            fecha: compra.fechaPago || compra.fecha,
+            fecha: getSafeMiddayUTC(compra.fechaPago || compra.fecha),
             cuenta_id: cuentaId
         });
 

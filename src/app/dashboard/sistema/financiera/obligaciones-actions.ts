@@ -37,6 +37,15 @@ function mapObligacionToUI(db: any): ObligacionFinanciera {
     };
 }
 
+function getSafeMiddayUTC(dateStrOrObj: Date | string | undefined | null): string | undefined {
+    if (!dateStrOrObj) return undefined;
+    const d = new Date(dateStrOrObj);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}T12:00:00.000Z`;
+}
+
 function mapObligacionToDB(ui: Partial<ObligacionFinanciera>) {
     return {
         tipo: ui.tipo,
@@ -45,8 +54,8 @@ function mapObligacionToDB(ui: Partial<ObligacionFinanciera>) {
         monto_original: ui.montoPrestado,
         tasa_interes: ui.tasaInteres,
         plazo_meses: ui.plazoMeses,
-        fecha_inicio: ui.fechaInicio,
-        fecha_fin: ui.fechaFin,
+        fecha_inicio: getSafeMiddayUTC(ui.fechaInicio),
+        fecha_fin: getSafeMiddayUTC(ui.fechaFin),
         valor_cuota: ui.valorCuota,
         cuotas_pagadas: ui.cuotasPagadas,
         saldo_capital: ui.saldoCapital,
@@ -105,7 +114,7 @@ export async function registrarPagoObligacionAction(pago: {
         .from("obligaciones_pagos")
         .insert({
             obligacion_id: pago.obligacionId,
-            fecha: pago.fecha,
+            fecha: getSafeMiddayUTC(pago.fecha),
             valor: pago.valor,
             interes: pago.interes,
             capital: pago.capital,
@@ -122,7 +131,7 @@ export async function registrarPagoObligacionAction(pago: {
             concepto: "Pago Cuota Obligación",
             descripcion: `Abono a obligación ${pago.obligacionId}`,
             valor: pago.valor,
-            fecha: pago.fecha,
+            fecha: getSafeMiddayUTC(pago.fecha),
             cuenta_id: pago.cuentaBancariaId
         });
 
