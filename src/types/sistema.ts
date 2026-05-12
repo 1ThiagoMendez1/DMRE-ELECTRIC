@@ -227,6 +227,7 @@ export interface Factura {
     iva?: number;
     valorPagado?: number;
     observaciones?: string;
+    archivoUrl?: string; // Para almacenar URL del soporte PDF
 }
 
 // 2. FINANCIERA
@@ -555,6 +556,7 @@ export interface Empleado {
     telefonoEmergencia?: string;
     area?: string;
     tipoContrato?: string;
+    tipoVinculacion?: string;   // "EMPLEADO DIRECTO" | "CONTRATISTA" | "PRESTACIÓN DE SERVICIOS" | "TEMPORAL"
     fechaRetiro?: Date;
     auxilioTransporte?: boolean;
     eps?: string;
@@ -772,4 +774,27 @@ export interface Instalacion {
     creadoPor?: string;
     fechaCreacion?: Date;
     activo?: boolean;
+}
+
+// 12. PROGRAMADOR (Asignación de personal a ofertas)
+export type EstadoAsignacion = 'PROGRAMADO' | 'CONFIRMADO' | 'EN_CAMINO' | 'COMPLETADO' | 'CANCELADO';
+
+export interface AsignacionProgramador {
+    id: string;
+    empleadoId: string;
+    empleado?: Empleado;
+    cotizacionId: string;
+    cotizacion?: Cotizacion;
+    // Denormalized for fast display (populated at creation from the cotizacion)
+    direccionObra?: string;
+    nombreProyecto?: string;
+    clienteNombre?: string;
+    fecha: Date;
+    horaInicio: string;   // "HH:mm" 24h format
+    horaFin?: string;
+    rol?: string;         // e.g. "Electricista principal", "Ayudante"
+    estado: EstadoAsignacion;
+    notasInternas?: string;
+    notificadoWhatsapp?: boolean;
+    createdAt?: Date;
 }

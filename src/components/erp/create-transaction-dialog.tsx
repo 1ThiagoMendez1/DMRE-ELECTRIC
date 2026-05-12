@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -105,6 +105,46 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
             comprobanteUrl: ""
         },
     });
+
+    const [assignedEmployees, setAssignedEmployees] = useState<{id: string, nombre: string, salario: number}[]>([]);
+    const [loadingEmployees, setLoadingEmployees] = useState(false);
+
+    const watchCategoria = form.watch("categoria");
+    const watchCotizacionId = form.watch("cotizacionId");
+
+    useEffect(() => {
+        if (watchCategoria === "NOMINA" && watchCotizacionId && watchCotizacionId !== "none") {
+            setLoadingEmployees(true);
+            supabase
+                .from("asignaciones_programador")
+                .select(`
+                    empleado_id,
+                    empleados ( id, nombre_completo, salario_base )
+                `)
+                .eq("cotizacion_id", watchCotizacionId)
+                .then(({ data, error }) => {
+                    setLoadingEmployees(false);
+                    if (!error && data) {
+                        const emps = new Map();
+                        data.forEach((row: any) => {
+                            if (row.empleados && !emps.has(row.empleados.id)) {
+                                emps.set(row.empleados.id, {
+                                    id: row.empleados.id,
+                                    nombre: row.empleados.nombre_completo,
+                                    salario: Number(row.empleados.salario_base) || 0
+                                });
+                            }
+                        });
+                        setAssignedEmployees(Array.from(emps.values()));
+                    } else {
+                        setAssignedEmployees([]);
+                    }
+                });
+        } else {
+            setAssignedEmployees([]);
+        }
+    }, [watchCategoria, watchCotizacionId, supabase]);
+
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -341,19 +381,68 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                 />
 
 
-                                <FormField
-                                    control={form.control}
-                                    name="tercero"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Tercero (Beneficiario/Pagador)</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Nombre del tercero" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                {form.watch("categoria") === "NOMINA" ? (
+                                    <FormField
+                                        control={form.control}
+                                        name="tercero"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Empleado (Tercero)</FormLabel>
+                                                <Select 
+                                                    onValueChange={(val) => {
+                                                        field.onChange(val);
+                                                        const emp = assignedEmployees.find(e => e.nombre === val);
+                                                        if (emp) {
+                                                            form.setValue("valor", emp.salario);
+                                                            // Opcionalmente pre-llenar concepto si está vacío
+                                                            if (!form.getValues("concepto")) {
+                                                                form.setValue("concepto", `Pago Nómina - ${emp.nombre}`);
+                                                            }
+                                                        }
+                                                    }} 
+                                                    value={field.value}
+                                                    disabled={!form.watch("cotizacionId") || form.watch("cotizacionId") === "none"}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder={
+                                                                loadingEmployees ? "Cargando..." : 
+                                                                (!form.watch("cotizacionId") || form.watch("cotizacionId") === "none") ? "Seleccione oferta primero" : "Seleccione empleado"
+                                                            } />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {assignedEmployees.length === 0 && !loadingEmployees ? (
+                                                            <SelectItem value="none_disabled" disabled>No hay empleados programados</SelectItem>
+                                                        ) : (
+                                                            assignedEmployees.map(e => (
+                                                                <SelectItem key={e.id} value={e.nombre}>
+                                                                    {e.nombre} - {formatCurrency(e.salario)}
+                                                                </SelectItem>
+                                                            ))
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                ) : (
+                                    <FormField
+                                        control={form.control}
+                                        name="tercero"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Tercero (Beneficiario/Pagador)</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="Nombre del tercero" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                )}
+
                             </>
                         )}
 

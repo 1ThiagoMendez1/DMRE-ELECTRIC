@@ -91,6 +91,13 @@ export default function FinancieraPage() {
         cotizaciones
     } = useErp();
 
+    // Filtros para Movimientos
+    const [filterFecha, setFilterFecha] = useState("");
+    const [filterTipo, setFilterTipo] = useState("TODOS");
+    const [filterCategoria, setFilterCategoria] = useState("TODOS");
+    const [filterCuenta, setFilterCuenta] = useState("TODOS");
+
+
     // Map movements to ensure it has valor/concepto if DB uses monto/descripcion
     const movimientos = movementsRaw.map(m => ({
         ...m,
@@ -98,6 +105,16 @@ export default function FinancieraPage() {
         concepto: m.concepto || m.descripcion || "Sin concepto",
         cuenta: m.cuenta || cuentas.find(c => c.id === m.cuentaId) || { nombre: "Cuenta Desconocida" }
     })) as any[];
+
+    // Filtro aplicado
+    const movimientosFiltrados = movimientos.filter(mov => {
+        if (filterFecha && format(new Date(mov.fecha), "yyyy-MM-dd") !== filterFecha) return false;
+        if (filterTipo !== "TODOS" && mov.tipo !== filterTipo) return false;
+        if (filterCategoria !== "TODOS" && mov.categoria !== filterCategoria) return false;
+        if (filterCuenta !== "TODOS" && mov.cuentaId !== filterCuenta) return false;
+        return true;
+    });
+
 
     // --- LOGIC MOVED TO BILLING MODULE ---
     // nextInvoiceId, filteredFacturas, handlers, useEffect
@@ -360,13 +377,70 @@ export default function FinancieraPage() {
                 <TabsContent value="movimientos" className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                 <CardTitle>Historial de Transacciones</CardTitle>
                                 <CreateTransactionDialog 
                                     cuentas={cuentas} 
                                     cotizaciones={cotizaciones}
                                     onTransactionCreated={handleCreateTransaction} 
                                 />
+                            </div>
+                            
+                            {/* Barra de Filtros */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Fecha</label>
+                                    <Input 
+                                        type="date" 
+                                        value={filterFecha} 
+                                        onChange={(e) => setFilterFecha(e.target.value)} 
+                                        className="h-8"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Tipo</label>
+                                    <select 
+                                        className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={filterTipo}
+                                        onChange={(e) => setFilterTipo(e.target.value)}
+                                    >
+                                        <option value="TODOS">Todos</option>
+                                        <option value="INGRESO">Ingreso</option>
+                                        <option value="EGRESO">Egreso</option>
+                                        <option value="TRANSFERENCIA">Transferencia</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Categoría</label>
+                                    <select 
+                                        className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={filterCategoria}
+                                        onChange={(e) => setFilterCategoria(e.target.value)}
+                                    >
+                                        <option value="TODOS">Todas</option>
+                                        <option value="VENTAS">Ventas</option>
+                                        <option value="NOMINA">Nómina</option>
+                                        <option value="PROVEEDORES">Proveedores</option>
+                                        <option value="SUMINISTRO">Suministro</option>
+                                        <option value="INSTALACION">Instalación</option>
+                                        <option value="SERVICIOS">Servicios</option>
+                                        <option value="IMPUESTOS">Impuestos</option>
+                                        <option value="OTROS">Otros</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Cuenta</label>
+                                    <select 
+                                        className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={filterCuenta}
+                                        onChange={(e) => setFilterCuenta(e.target.value)}
+                                    >
+                                        <option value="TODOS">Todas las Cuentas</option>
+                                        {cuentas.map(c => (
+                                            <option key={c.id} value={c.id}>{c.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -383,22 +457,29 @@ export default function FinancieraPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {movimientos.map((mov) => (
+                                    {movimientosFiltrados.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="h-24 text-center">
+                                                No se encontraron movimientos con los filtros seleccionados.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                    {movimientosFiltrados.map((mov) => (
                                         <TableRow key={mov.id}>
-                                            <TableCell>{format(mov.fecha, "dd MMM yyyy", { locale: es })}</TableCell>
+                                            <TableCell>{format(new Date(mov.fecha), "dd MMM yyyy", { locale: es })}</TableCell>
                                             <TableCell>
                                                 <Badge variant={mov.tipo === 'INGRESO' ? 'default' : 'secondary'} className={mov.tipo === 'EGRESO' ? 'bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400'}>
                                                     {mov.tipo}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="capitalize">{mov.categoria.toLowerCase()}</TableCell>
+                                            <TableCell className="capitalize">{mov.categoria?.toLowerCase() || 'N/A'}</TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
                                                     <span className="font-medium">{mov.concepto}</span>
                                                     <span className="text-xs text-muted-foreground">{mov.tercero}</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{mov.cuenta.nombre}</TableCell>
+                                            <TableCell>{mov.cuenta?.nombre || 'N/A'}</TableCell>
                                             <TableCell className={cn("text-right font-medium", mov.tipo === 'INGRESO' ? "text-green-600" : "text-red-600")}>
                                                 {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.valor)}
                                             </TableCell>

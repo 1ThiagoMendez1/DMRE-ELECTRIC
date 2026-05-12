@@ -133,7 +133,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
 
         const newItem: InventarioItem = {
             id: `INV-${Date.now()}`,
-            item: `IT-${Date.now()}`,
+            item: values.sku,
             sku: values.sku,
             descripcion: values.descripcion,
             categoria: values.categoria as CategoriaItem,

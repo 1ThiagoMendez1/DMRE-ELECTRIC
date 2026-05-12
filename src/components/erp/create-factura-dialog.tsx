@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Loader2, FileText, Upload, X } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -36,17 +38,54 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
     const { facturas, clientes } = useErp();
     const [clienteId, setClienteId] = useState("");
     const [selectedCotizacionId, setSelectedCotizacionId] = useState("MANUAL");
-    const [numero, setNumero] = useState(nextId || "");
+    const [numero, setNumero] = useState("");
     const [fechaEmision, setFechaEmision] = useState("");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [valor, setValor] = useState("");
     const [estado, setEstado] = useState<"PENDIENTE" | "PARCIAL" | "PAGADA">("PENDIENTE");
+    const [archivoUrl, setArchivoUrl] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
+    const supabase = createClient();
+
 
     useEffect(() => {
-        if (open && nextId) {
-            setNumero(nextId);
+        // Removed auto-fill logic so it stays empty with a placeholder
+    }, [open]);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'application/pdf') {
+            alert("Solo se permiten archivos PDF");
+            return;
         }
-    }, [open, nextId]);
+
+        try {
+            setIsUploading(true);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `factura_${numero}_${Math.random()}.${fileExt}`;
+            const filePath = `facturas/${fileName}`;
+
+            const { error: uploadError, data } = await supabase.storage
+                .from('imagenes')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('imagenes')
+                .getPublicUrl(filePath);
+
+            setArchivoUrl(publicUrl);
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            alert("Error al subir el archivo");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
 
     const handleSave = () => {
         if (!clienteId || !numero || !fechaEmision || !valor) return;
@@ -92,8 +131,10 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
             anticipoRecibido: 0,
             retencionRenta: 0,
             retencionIca: 0,
-            retencionIva: 0
+            retencionIva: 0,
+            archivoUrl: archivoUrl
         };
+
 
         onFacturaCreated(newFactura);
         setOpen(false);
@@ -104,7 +145,9 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
         setFechaVencimiento("");
         setValor("");
         setEstado("PENDIENTE");
+        setArchivoUrl("");
     };
+
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -127,9 +170,11 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                         <Input
                             id="numero"
                             value={numero}
-                            readOnly
-                            className="col-span-3 bg-muted font-mono"
+                            onChange={(e) => setNumero(e.target.value)}
+                            placeholder="Ej. FAC-1001"
+                            className="col-span-3 font-mono"
                         />
+
                     </div>
 
                     <div className="grid grid-cols-4 items-center gap-4">
@@ -225,6 +270,49 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                 <SelectItem value="PAGADA">Pagada</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div className="grid grid-cols-4 items-start gap-4">
+                        <Label className="text-right mt-2">Soporte (PDF)</Label>
+                        <div className="col-span-3 flex flex-col gap-2">
+                            {archivoUrl ? (
+                                <div className="flex items-center justify-between p-2 border rounded-md bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                        <span className="text-xs truncate max-w-[200px]">Documento cargado</span>
+                                    </div>
+                                    <Button 
+                                        type="button" 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6"
+                                        onClick={() => setArchivoUrl("")}
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <Input
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={handleFileUpload}
+                                        disabled={isUploading}
+                                        className="cursor-pointer pr-10"
+                                    />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                        {isUploading ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Upload className="h-4 w-4" />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            <p className="text-[10px] text-muted-foreground italic">
+                                Sube el documento físico escaneado o electrónico en formato PDF.
+                            </p>
+                        </div>
                     </div>
                 </div>
                 <DialogFooter>

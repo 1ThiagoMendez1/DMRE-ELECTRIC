@@ -291,11 +291,11 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                     <div>
                                         <Label className="mb-2 block">Tipo de Movimiento</Label>
                                         <RadioGroup defaultValue="CUOTA" value={pagoTipo} onValueChange={(v) => setPagoTipo(v as TipoPago)} className="flex gap-4">
-                                            <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-muted bg-white">
+                                            <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-muted bg-background">
                                                 <RadioGroupItem value="CUOTA" id="r1" />
                                                 <Label htmlFor="r1" className="cursor-pointer">Pago de Cuota</Label>
                                             </div>
-                                            <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-muted bg-white">
+                                            <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-muted bg-background">
                                                 <RadioGroupItem value="ABONO_CAPITAL" id="r2" />
                                                 <Label htmlFor="r2" className="cursor-pointer">Abono a Capital</Label>
                                             </div>
@@ -313,7 +313,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-4 rounded-md border shadow-sm space-y-2">
+                                <div className="bg-background p-4 rounded-md border shadow-sm space-y-2">
                                     <p className="font-semibold text-sm border-b pb-2 mb-2">Desglose del Pago</p>
                                     <div className="flex justify-between text-sm">
                                         <span>Intereses:</span>
@@ -335,7 +335,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                         </div>
 
                         {/* HISTORY TABLE */}
-                        <div className="flex-1 overflow-auto rounded-md border bg-white">
+                        <div className="flex-1 overflow-auto rounded-md border bg-background">
                             <Table>
                                 <TableHeader>
                                     <TableRow>

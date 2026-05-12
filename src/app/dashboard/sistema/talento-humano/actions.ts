@@ -27,6 +27,7 @@ function mapToUI(db: any): Empleado {
         telefonoEmergencia: db.telefono_emergencia,
         area: db.area,
         tipoContrato: db.tipo_contrato,
+        tipoVinculacion: db.tipo_vinculacion,
         fechaRetiro: db.fecha_retiro ? new Date(db.fecha_retiro) : undefined,
         auxilioTransporte: db.auxilio_transporte,
         eps: db.eps,
@@ -60,6 +61,7 @@ function mapToDB(ui: Partial<Empleado>) {
         cargo: ui.cargo,
         area: ui.area,
         tipo_contrato: ui.tipoContrato || "INDEFINIDO",
+        tipo_vinculacion: ui.tipoVinculacion,
         fecha_ingreso: ui.fechaIngreso,
         fecha_retiro: ui.fechaRetiro,
         salario_base: ui.salarioBase,
@@ -82,18 +84,23 @@ async function getNextCode(supabase: any) {
     const { data } = await supabase
         .from("empleados")
         .select("codigo")
-        .ilike("codigo", "EMP-%")
-        .order("codigo", { ascending: false })
-        .limit(1);
+        .ilike("codigo", "EMP-%");
 
-    let nextNum = 1;
-    if (data && data.length > 0 && data[0].codigo) {
-        const parts = data[0].codigo.split("-");
-        if (parts.length === 2) {
-            const num = parseInt(parts[1], 10);
-            if (!isNaN(num)) nextNum = num + 1;
+    let maxNum = 0;
+    if (data && data.length > 0) {
+        for (const row of data) {
+            if (!row.codigo) continue;
+            const parts = row.codigo.split("-");
+            if (parts.length === 2) {
+                const num = parseInt(parts[1], 10);
+                if (!isNaN(num) && num > maxNum) {
+                    maxNum = num;
+                }
+            }
         }
     }
+    
+    const nextNum = maxNum + 1;
     return `EMP-${nextNum.toString().padStart(3, "0")}`;
 }
 
