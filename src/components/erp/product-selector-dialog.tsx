@@ -322,7 +322,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-semibold truncate">{item.descripcion}</span>
+                                                    <span className="font-semibold truncate" title={item.descripcion}>{item.descripcion}</span>
                                                     <Badge variant={item.tipo === 'PRODUCTO' ? 'outline' : item.subTipo === 'INSTALACION' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
                                                         {item.tipo === 'PRODUCTO' ? 'Producto' : item.subTipo === 'INSTALACION' ? 'Instalación' : 'APU'}
                                                     </Badge>
@@ -332,7 +332,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                                                         {item.codigo}
                                                     </span>
                                                     {item._extraText && (
-                                                        <span className="truncate max-w-[250px]">{item._extraText}</span>
+                                                        <span className="truncate max-w-[250px]" title={item._extraText}>{item._extraText}</span>
                                                     )}
                                                     {(item.cantidad || 0) > 0 && (
                                                         <Badge variant="outline" className="text-[10px] ml-2 bg-green-500/10 text-green-600 border-green-500/20">
