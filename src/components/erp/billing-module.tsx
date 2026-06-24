@@ -22,6 +22,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { CreateFacturaDialog } from "@/components/erp/create-factura-dialog";
 import { FacturarTrabajosDialog } from "@/components/erp/facturar-trabajos-dialog";
@@ -35,6 +36,7 @@ export function BillingModule() {
     const { facturas, addFactura, updateFactura, cotizaciones, cuentasBancarias } = useErp();
     const { toast } = useToast();
     const [invoiceSearch, setInvoiceSearch] = useState("");
+    const [facturasFilter, setFacturasFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("NORMAL");
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
         vencidas: false,
         pendientes: false,
@@ -69,12 +71,18 @@ export function BillingModule() {
 
     // Filter Logic
     const filteredFacturas = useMemo(() => {
-        return facturas.filter(f =>
-            (f.numero || f.id).toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-            f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-            f.cotizacion?.numero?.toLowerCase().includes(invoiceSearch.toLowerCase())
-        );
-    }, [facturas, invoiceSearch]);
+        return facturas.filter(f => {
+            const matchesSearch = (f.numero || f.id).toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+                f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+                f.cotizacion?.numero?.toLowerCase().includes(invoiceSearch.toLowerCase());
+            
+            // Si la factura no tiene cotizacion, asumimos que es normal por defecto a menos que queramos aislarla
+            const tipo = f.cotizacion?.tipo || 'NORMAL';
+            const matchesType = facturasFilter === 'TODAS' || tipo === facturasFilter;
+
+            return matchesSearch && matchesType;
+        });
+    }, [facturas, invoiceSearch, facturasFilter]);
 
     // Grouping Logic
     const groups = useMemo(() => {
@@ -135,6 +143,13 @@ export function BillingModule() {
                                 onChange={(e) => setInvoiceSearch(e.target.value)}
                             />
                         </div>
+                        <Tabs value={facturasFilter} onValueChange={(v) => setFacturasFilter(v as any)}>
+                            <TabsList className="h-10">
+                                <TabsTrigger value="NORMAL">Normales</TabsTrigger>
+                                <TabsTrigger value="SIMPLIFICADA">Simples</TabsTrigger>
+                                <TabsTrigger value="TODAS">Todas</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
                         <FacturarTrabajosDialog
                             onFacturaCreated={handleCreateInvoice}
                             nextId={nextInvoiceId}

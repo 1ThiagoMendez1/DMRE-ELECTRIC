@@ -125,6 +125,7 @@ export default function CommercialPage() {
 
     // --- DASHBOARD STATE ---
     const [activeTab, setActiveTab] = useState("resumen");
+    const [ofertasFilter, setOfertasFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("TODAS");
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: startOfYear(new Date()),
         to: endOfYear(new Date()),
@@ -153,7 +154,7 @@ export default function CommercialPage() {
     };
 
     const dashboardFilteredQuotes = useMemo(() => {
-        return cotizaciones.filter(q => filterData(q.fecha, q.cliente.id));
+        return cotizaciones.filter(q => q.tipo !== 'SIMPLIFICADA' && filterData(q.fecha, q.cliente.id));
     }, [dateRange, selectedClientFilter, cotizaciones]);
 
     // 1. Revenue Over Time (Approved Quotes)
@@ -236,14 +237,24 @@ export default function CommercialPage() {
 
     const filteredQuotes = useMemo(() => {
         return cotizaciones.filter(q =>
-            q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
+            q.estado !== 'APROBADA' &&
+            (ofertasFilter === 'TODAS' || q.tipo === ofertasFilter) &&
+            (q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
         );
-    }, [searchTerm, cotizaciones]);
+    }, [searchTerm, cotizaciones, ofertasFilter]);
 
     const filteredProjects = useMemo(() => {
         return cotizaciones.filter(q =>
-            q.estado === 'APROBADA' &&
+            q.estado === 'APROBADA' && q.tipo !== 'SIMPLIFICADA' &&
+            (q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+    }, [searchTerm, cotizaciones]);
+
+    const filteredSimplifiedProjects = useMemo(() => {
+        return cotizaciones.filter(q =>
+            q.estado === 'APROBADA' && q.tipo === 'SIMPLIFICADA' &&
             (q.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 q.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()))
         );
@@ -278,6 +289,7 @@ export default function CommercialPage() {
                     <TabsTrigger value="ofertas" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><Briefcase className="h-4 w-4" /> <span className="hidden sm:inline">Ofertas</span></TabsTrigger>
                     <TabsTrigger value="cotizaciones" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><FileText className="h-4 w-4" /> <span className="hidden sm:inline">Cotizaciones</span></TabsTrigger>
                     <TabsTrigger value="proyectos" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><Briefcase className="h-4 w-4" /> <span className="hidden sm:inline">Proyectos</span></TabsTrigger>
+                    <TabsTrigger value="proyectos_simples" className="gap-2 flex-shrink-0 data-[state=active]:bg-background"><Briefcase className="h-4 w-4" /> <span className="hidden sm:inline">Proy. Simplificados</span></TabsTrigger>
                     <TabsTrigger value="interaccion" className="gap-2 flex-shrink-0 relative data-[state=active]:bg-background">
                         <MessageCircle className="h-4 w-4" />
                         <span className="hidden sm:inline">Interacción Cliente</span>
@@ -463,7 +475,7 @@ export default function CommercialPage() {
                         <CardHeader>
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                 <CardTitle>Control de Ofertas</CardTitle>
-                                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                                <div className="flex flex-col lg:flex-row items-center gap-4 w-full md:w-auto">
                                     <div className="relative w-full sm:w-64">
                                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                         <Input
@@ -473,6 +485,13 @@ export default function CommercialPage() {
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
                                     </div>
+                                    <Tabs value={ofertasFilter} onValueChange={(v) => setOfertasFilter(v as any)} className="w-full sm:w-auto">
+                                        <TabsList className="grid w-full grid-cols-3 h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                                            <TabsTrigger value="TODAS">Todas</TabsTrigger>
+                                            <TabsTrigger value="NORMAL">Normal</TabsTrigger>
+                                            <TabsTrigger value="SIMPLIFICADA">Simplificada</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
                                     <Button onClick={() => setActiveTab("cotizaciones")} className="w-full sm:w-auto">
                                         <Plus className="mr-2 h-4 w-4" /> Nuevo Proyecto
                                     </Button>
@@ -625,6 +644,132 @@ export default function CommercialPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {filteredProjects.map((quote) => (
+                                            <TableRow key={quote.id} className="hover:bg-muted/50 transition-colors">
+                                                <TableCell className="font-mono text-xs whitespace-nowrap px-4 sm:px-2">{quote.numero}</TableCell>
+                                                <TableCell className="whitespace-nowrap hidden sm:table-cell">
+                                                    <TrabajoHistoryDialog
+                                                        trabajo={quote}
+                                                        onTrabajoUpdated={(updated) => updateCotizacion(updated)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="min-w-[150px] sm:min-w-[200px] px-4 sm:px-2">
+                                                    <div className="flex flex-col">
+                                                        <span className="truncate text-sm" title={quote.descripcionTrabajo}>{quote.descripcionTrabajo}</span>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <Badge variant="outline" className="w-fit text-[10px]">{quote.tipo}</Badge>
+                                                            <span className="text-[10px] text-muted-foreground sm:hidden truncate max-w-[100px]">{quote.cliente.nombre}</span>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">
+                                                    {format(quote.fecha, "dd/MM/yyyy", { locale: es })}
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground whitespace-nowrap hidden lg:table-cell">
+                                                    {format(quote.fechaActualizacion || quote.fecha, "dd/MM/yyyy", { locale: es })}
+                                                </TableCell>
+                                                <TableCell className="w-[100px] sm:w-[120px] whitespace-nowrap hidden sm:table-cell">
+                                                    <div className="flex flex-col gap-1">
+                                                        <Progress value={quote.progreso || getProgressValue(quote.estado)} className="h-2" />
+                                                        <span className="text-[10px] text-muted-foreground text-right">{quote.progreso || getProgressValue(quote.estado)}%</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs sm:text-sm whitespace-nowrap px-4 sm:px-2">{formatCurrency(quote.total)}</TableCell>
+                                                <TableCell className="whitespace-nowrap px-4 sm:px-2">
+                                                    <Badge className={getStatusColor(quote.estado)} variant="secondary">
+                                                        {quote.estado.replace('_', ' ')}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap px-4 sm:px-2">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <TrabajoHistoryDialog
+                                                            trabajo={quote}
+                                                            onTrabajoUpdated={(updated) => updateCotizacion(updated)}
+                                                            defaultTab="items"
+                                                            trigger={
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                </Button>
+                                                            }
+                                                        />
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            title="Eliminar"
+                                                            onClick={() => {
+                                                                if (confirm(`¿Eliminar trabajo ${quote.numero}?`)) {
+                                                                    deleteCotizacion(quote.id);
+                                                                    toast({ title: "Eliminado", description: "Trabajo eliminado correctamente" });
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                            title="Generar PDF"
+                                                            onClick={() => generateQuotePDF(quote)}
+                                                        >
+                                                            <FileText className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* --- PROYECTOS SIMPLIFICADOS TAB --- */}
+                <TabsContent value="proyectos_simples" className="space-y-4 px-1 sm:px-0">
+                    <Card className="overflow-hidden">
+                        <CardHeader>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <CardTitle>Control de Proyectos Simplificados</CardTitle>
+                                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                                    <div className="relative w-full sm:w-64">
+                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Buscar proyecto o cliente..."
+                                            className="pl-8 w-full"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <Button onClick={() => setActiveTab("cotizaciones")} className="w-full sm:w-auto">
+                                        <Plus className="mr-2 h-4 w-4" /> Nuevo Proyecto
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0 sm:p-6 pb-4">
+                            <div className="overflow-x-auto w-full max-w-[100vw]">
+                                <Table className="min-w-[800px] w-full">
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="whitespace-nowrap px-4 sm:px-2">ID</TableHead>
+                                            <TableHead className="whitespace-nowrap hidden sm:table-cell">Cliente</TableHead>
+                                            <TableHead className="whitespace-nowrap px-4 sm:px-2">Descripción</TableHead>
+                                            <TableHead className="whitespace-nowrap hidden md:table-cell">Fecha Creación</TableHead>
+                                            <TableHead className="whitespace-nowrap hidden lg:table-cell">Última Actualización</TableHead>
+                                            <TableHead className="whitespace-nowrap hidden sm:table-cell">Progreso</TableHead>
+                                            <TableHead className="whitespace-nowrap px-4 sm:px-2">Valor</TableHead>
+                                            <TableHead className="whitespace-nowrap px-4 sm:px-2">Estado</TableHead>
+                                            <TableHead className="text-center whitespace-nowrap px-4 sm:px-2">Acciones</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredSimplifiedProjects.map((quote) => (
                                             <TableRow key={quote.id} className="hover:bg-muted/50 transition-colors">
                                                 <TableCell className="font-mono text-xs whitespace-nowrap px-4 sm:px-2">{quote.numero}</TableCell>
                                                 <TableCell className="whitespace-nowrap hidden sm:table-cell">
