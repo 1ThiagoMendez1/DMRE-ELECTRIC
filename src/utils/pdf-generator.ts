@@ -580,8 +580,27 @@ export const generateQuotePDF = (
         const rightColW = gridWidth - leftColW; // Right column for meta info
         const labelW = 30; // Increased label width to avoid overlap
 
-        const rowH = 6;
         const startY = currentY;
+
+        // Calculate dynamic heights for left rows
+        doc.setFontSize(8);
+        const getRequiredHeight = (text: string) => {
+            const lines = doc.splitTextToSize(text || "", leftColW - labelW - 4).length;
+            return Math.max(6, lines * 3.5 + 2.5);
+        };
+
+        const h1 = getRequiredHeight(cotizacion.cliente.nombre);
+        const h2 = getRequiredHeight(cotizacion.cliente.documento);
+        const h3 = getRequiredHeight(cotizacion.cliente.direccion);
+        const h4 = getRequiredHeight(cotizacion.cliente.correo);
+        const h5 = getRequiredHeight(cotizacion.cliente.telefono);
+
+        const rowY1 = startY;
+        const rowY2 = startY + h1;
+        const rowY3 = startY + h1 + h2;
+        const rowY4 = startY + h1 + h2 + h3;
+        const rowY5 = startY + h1 + h2 + h3 + h4;
+        const bottomY = startY + h1 + h2 + h3 + h4 + h5;
 
         // Helper to draw a cell
         const drawCell = (x: number, y: number, w: number, h: number, label: string, value: string, fontStyle: 'bold' | 'normal' | 'italic' | 'bolditalic' = 'normal', fontSize: number = 8, textColor: [number, number, number] = [0, 0, 0], valXOffset: number = labelW) => {
@@ -594,7 +613,7 @@ export const generateQuotePDF = (
             doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(0, 0, 0);
-            doc.text(label, x + 2, y + 4.5);
+            doc.text(label, x + 2, y + h/2 + 1.2);
 
             doc.setFont('helvetica', fontStyle);
             doc.setFontSize(fontSize);
@@ -603,57 +622,59 @@ export const generateQuotePDF = (
             // Draw value
             const valX = x + valXOffset;
             const valText = doc.splitTextToSize(value || "", w - valXOffset - 4);
-            doc.text(valText, valX + 2, y + 4.5);
+            const textY = y + (h - (valText.length * 3.5)) / 2 + 2.8;
+            doc.text(valText, valX + 2, textY);
         };
 
         // --- LEFT SIDE: CLIENT INFO (5 Rows) ---
-
-        drawCell(gridStartX, startY, leftColW, rowH, "Cliente", cotizacion.cliente.nombre);
-        drawCell(gridStartX, startY + rowH, leftColW, rowH, "C.C / NIT", cotizacion.cliente.documento);
-        drawCell(gridStartX, startY + rowH * 2, leftColW, rowH, "Dirección", cotizacion.cliente.direccion);
-        drawCell(gridStartX, startY + rowH * 3, leftColW, rowH, "E-mail", cotizacion.cliente.correo);
-        drawCell(gridStartX, startY + rowH * 4, leftColW, rowH, "Teléfono", cotizacion.cliente.telefono);
+        drawCell(gridStartX, rowY1, leftColW, h1, "Cliente", cotizacion.cliente.nombre);
+        drawCell(gridStartX, rowY2, leftColW, h2, "C.C / NIT", cotizacion.cliente.documento);
+        drawCell(gridStartX, rowY3, leftColW, h3, "Dirección", cotizacion.cliente.direccion);
+        drawCell(gridStartX, rowY4, leftColW, h4, "E-mail", cotizacion.cliente.correo);
+        drawCell(gridStartX, rowY5, leftColW, h5, "Teléfono", cotizacion.cliente.telefono);
 
         // --- RIGHT SIDE: META INFO (3 Rows + Offer Number) ---
-
-        // Row 1: Elaborado por
         const rightX = gridStartX + leftColW;
-        drawCell(rightX, startY, rightColW, rowH, "Elaborado por", preparedBy || "José Gabriel Ramirez Bernal", 'italic', 8, [0, 0, 0], 30);
+        // Row 1: Elaborado por
+        drawCell(rightX, rowY1, rightColW, h1, "Elaborado por", preparedBy || "José Gabriel Ramirez Bernal", 'italic', 8, [0, 0, 0], 30);
 
         // Row 2: Fecha de cotización
-        drawCell(rightX, startY + rowH, rightColW, rowH, "Fecha Cotización", format(new Date(cotizacion.fecha), "dd/MM/yyyy"));
+        drawCell(rightX, rowY2, rightColW, h2, "Fecha Cotización", format(new Date(cotizacion.fecha), "dd/MM/yyyy"));
 
         // Row 3: Fecha de vencimiento
-        drawCell(rightX, startY + rowH * 2, rightColW, rowH, "Fecha Vencimiento", format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy"));
+        drawCell(rightX, rowY3, rightColW, h3, "Fecha Vencimiento", format(cotizacion.fechaValidez ? new Date(cotizacion.fechaValidez) : new Date(new Date(cotizacion.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy"));
 
         // Row 4-5: NÚMERO DE OFERTA (Large Box)
-        doc.rect(rightX, startY + rowH * 3, rightColW, rowH * 2);
+        const offerBoxH = h4 + h5;
+        doc.rect(rightX, rowY4, rightColW, offerBoxH);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(0, 0, 0);
-        doc.text("NÚMERO DE OFERTA", rightX + rightColW / 2, startY + rowH * 3 + 4, { align: 'center' });
+        doc.text("NÚMERO DE OFERTA", rightX + rightColW / 2, rowY4 + offerBoxH/2 - 2, { align: 'center' });
 
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bolditalic');
         doc.setTextColor(200, 40, 40); // Red
-        doc.text(cotizacion.numero, rightX + rightColW / 2, startY + rowH * 3 + 10, { align: 'center' });
+        doc.text(cotizacion.numero, rightX + rightColW / 2, rowY4 + offerBoxH/2 + 4, { align: 'center' });
 
         // --- BOTTOM: TRABAJO A REALIZAR (Spanning Full Width) ---
-        const bottomY = startY + rowH * 5;
-        doc.rect(gridStartX, bottomY, 25, rowH * 2); // Label box
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(0, 0, 0);
-        doc.text("Trabajo a", gridStartX + 12.5, bottomY + 5, { align: 'center' });
-        doc.text("realizar", gridStartX + 12.5, bottomY + 9, { align: 'center' });
-
-        doc.rect(gridStartX + 25, bottomY, gridWidth - 25, rowH * 2); // Value box
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         const workLines = doc.splitTextToSize((cotizacion.descripcionTrabajo || "").toUpperCase(), gridWidth - 30);
-        doc.text(workLines, gridStartX + 27, bottomY + 6);
+        const trabajoH = Math.max(12, workLines.length * 3.5 + 4); // standard 2 rows or dynamic
+        
+        doc.rect(gridStartX, bottomY, 25, trabajoH); // Label box
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text("Trabajo a", gridStartX + 12.5, bottomY + trabajoH/2 - 2, { align: 'center' });
+        doc.text("realizar", gridStartX + 12.5, bottomY + trabajoH/2 + 2, { align: 'center' });
 
-        currentY = bottomY + rowH * 2 + 10;
+        doc.rect(gridStartX + 25, bottomY, gridWidth - 25, trabajoH); // Value box
+        doc.setFont('helvetica', 'normal');
+        const workY = bottomY + (trabajoH - (workLines.length * 3.5)) / 2 + 2.8;
+        doc.text(workLines, gridStartX + 27, workY);
+
+        currentY = bottomY + trabajoH + 10;
     }
 
 

@@ -108,53 +108,61 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                             </div>
 
                             {/* Technical Grid inside header or below */}
-                            <div className="mt-4 border-t-2 border-black">
+                            <div className="mt-4 border-t-2 border-black border-b-2 flex flex-col">
                                 <div className="grid grid-cols-12">
-                                    {/* Left: Client Info (7/12) */}
-                                    <div className="col-span-7 border-r-2 border-black">
-                                        {[
-                                            { label: 'Cliente', value: typeof quote.cliente === 'string' ? quote.cliente : quote.cliente?.nombre },
-                                            { label: 'C.C / NIT', value: typeof quote.cliente === 'string' ? '' : quote.cliente?.documento },
-                                            { label: 'Dirección', value: typeof quote.cliente === 'string' ? '' : quote.cliente?.direccion },
-                                            { label: 'E-mail', value: typeof quote.cliente === 'string' ? '' : quote.cliente?.correo || '' },
-                                            { label: 'Teléfono', value: typeof quote.cliente === 'string' ? '' : quote.cliente?.telefono || '' }
-                                        ].map((row, i) => (
-                                            <div key={i} className={`flex border-b-2 border-black last:border-0 h-6 items-center px-1`}>
-                                                <div className="w-28 text-[9px] font-bold flex items-center gap-1">
-                                                    {row.label}
-                                                </div>
-                                                <div className="flex-1 text-[9px] border-l-2 border-black pl-2 truncate">{row.value}</div>
-                                            </div>
-                                        ))}
+                                    {/* Row 1 */}
+                                    <div className="col-span-7 flex border-b-2 border-black border-r-2 min-h-[24px]">
+                                        <div className="w-28 text-[9px] font-bold flex items-center px-1 shrink-0">Cliente</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center">{typeof quote.cliente === 'string' ? quote.cliente : quote.cliente?.nombre}</div>
                                     </div>
-                                    {/* Right: Meta Info (5/12) */}
-                                    <div className="col-span-5 flex flex-col">
-                                        <div className="flex border-b-2 border-black h-6 items-center px-1">
-                                            <div className="w-32 text-[9px] font-bold">Elaborado por</div>
-                                            <div className="flex-1 text-[9px] border-l-2 border-black pl-2 flex items-center">
-                                                <span className="italic">{quote.elaboradoPor || preparedByFallback || "José Gabriel Ramirez Bernal"}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex border-b-2 border-black h-6 items-center px-1">
-                                            <div className="w-32 text-[9px] font-bold">Fecha Cotización</div>
-                                            <div className="flex-1 text-[9px] border-l-2 border-black pl-2">{format(new Date(quote.fecha), "dd/MM/yyyy")}</div>
-                                        </div>
-                                        <div className="flex border-b-2 border-black h-6 items-center px-1">
-                                            <div className="w-32 text-[9px] font-bold">Fecha Vencimiento</div>
-                                            <div className="flex-1 text-[9px] border-l-2 border-black pl-2">{format(quote.fechaValidez ? new Date(quote.fechaValidez) : new Date(new Date(quote.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy")}</div>
-                                        </div>
-                                        <div className="flex-1 flex flex-col items-center justify-center p-1 bg-gray-100/50">
-                                            <p className="text-[9px] font-bold uppercase text-black">NÚMERO DE OFERTA</p>
-                                            <p className="text-xl font-bold italic" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>{quote.numero}</p>
-                                        </div>
+                                    <div className="col-span-5 flex border-b-2 border-black min-h-[24px]">
+                                        <div className="w-32 text-[9px] font-bold flex items-center px-1 shrink-0">Elaborado por</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center italic">{quote.elaboradoPor || preparedByFallback || "José Gabriel Ramirez Bernal"}</div>
+                                    </div>
+
+                                    {/* Row 2 */}
+                                    <div className="col-span-7 flex border-b-2 border-black border-r-2 min-h-[24px]">
+                                        <div className="w-28 text-[9px] font-bold flex items-center px-1 shrink-0">C.C / NIT</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center">{typeof quote.cliente === 'string' ? '' : quote.cliente?.documento}</div>
+                                    </div>
+                                    <div className="col-span-5 flex border-b-2 border-black min-h-[24px]">
+                                        <div className="w-32 text-[9px] font-bold flex items-center px-1 shrink-0">Fecha Cotización</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center">{format(new Date(quote.fecha), "dd/MM/yyyy")}</div>
+                                    </div>
+
+                                    {/* Row 3 */}
+                                    <div className="col-span-7 flex border-b-2 border-black border-r-2 min-h-[24px]">
+                                        <div className="w-28 text-[9px] font-bold flex items-center px-1 shrink-0">Dirección</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center leading-tight">{typeof quote.cliente === 'string' ? '' : quote.cliente?.direccion}</div>
+                                    </div>
+                                    <div className="col-span-5 flex border-b-2 border-black min-h-[24px]">
+                                        <div className="w-32 text-[9px] font-bold flex items-center px-1 shrink-0">Fecha Vencimiento</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center">{format(quote.fechaValidez ? new Date(quote.fechaValidez) : new Date(new Date(quote.fecha).getTime() + 15 * 24 * 60 * 60 * 1000), "dd/MM/yyyy")}</div>
+                                    </div>
+
+                                    {/* Row 4 */}
+                                    <div className="col-span-7 flex border-b-2 border-black border-r-2 min-h-[24px]">
+                                        <div className="w-28 text-[9px] font-bold flex items-center px-1 shrink-0">E-mail</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center break-all">{typeof quote.cliente === 'string' ? '' : quote.cliente?.correo}</div>
+                                    </div>
+                                    <div className="col-span-5 row-span-2 flex flex-col items-center justify-center p-1 bg-gray-100/50">
+                                        <p className="text-[9px] font-bold uppercase text-black">NÚMERO DE OFERTA</p>
+                                        <p className="text-xl font-bold italic" style={{ color: rgbToHex(currentStyle.colors.secondary) }}>{quote.numero}</p>
+                                    </div>
+
+                                    {/* Row 5 */}
+                                    <div className="col-span-7 flex border-r-2 border-black min-h-[24px]">
+                                        <div className="w-28 text-[9px] font-bold flex items-center px-1 shrink-0">Teléfono</div>
+                                        <div className="flex-1 text-[9px] border-l-2 border-black pl-2 py-1 flex items-center">{typeof quote.cliente === 'string' ? '' : quote.cliente?.telefono}</div>
                                     </div>
                                 </div>
+                                
                                 {/* Full width "Trabajo a realizar" row */}
-                                <div className="grid grid-cols-12 border-t-2 border-black h-12">
+                                <div className="grid grid-cols-12 border-t-2 border-black min-h-[48px]">
                                     <div className="col-span-2 text-[9px] font-bold flex flex-col items-center justify-center text-center px-1 border-r-2 border-black">
                                         Trabajo a realizar
                                     </div>
-                                    <div className="col-span-10 text-[9px] p-2 flex items-center uppercase">
+                                    <div className="col-span-10 text-[9px] p-2 flex items-center uppercase leading-tight">
                                         {quote.descripcionTrabajo}
                                     </div>
                                 </div>
