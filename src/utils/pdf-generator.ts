@@ -241,14 +241,17 @@ export const generateQuotePDF = (
         doc.setTextColor(...primaryColor);
         doc.setFontSize(18);
         doc.setFont('times', 'bold');
-        doc.text("DISEÑO Y MONTAJE DE REDES", pageWidth / 2 + 5, 20, { align: 'center' });
-        doc.text("ELÉCTRICAS D.M.R.E", pageWidth / 2 + 5, 27, { align: 'center' });
+        doc.text("DISEÑO Y MONTAJE DE REDES", pageWidth / 2 + 5, 18.5, { align: 'center' });
+        doc.text("ELÉCTRICAS D.M.R.E", pageWidth / 2 + 5, 24.5, { align: 'center' });
+
+        doc.setFontSize(9);
+        doc.text("NIT: 1075652753", pageWidth / 2 + 5, 28.5, { align: 'center' });
 
         doc.setFontSize(7.5);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(0, 0, 0);
-        doc.text("gramirez.dmre@gmail.com", pageWidth / 2 + 5, 30.5, { align: 'center' });
-        doc.text("Tel: (1)8816064  Cel: 311 536 8577", pageWidth / 2 + 5, 34, { align: 'center' });
+        doc.text("gramirez.dmre@gmail.com", pageWidth / 2 + 5, 31.5, { align: 'center' });
+        doc.text("Tel: (1)8816064  Cel: 311 536 8577", pageWidth / 2 + 5, 34.5, { align: 'center' });
         doc.text("www.dmreingenieria.com", pageWidth / 2 + 5, 37.5, { align: 'center' });
 
         // 3. Metadata Right

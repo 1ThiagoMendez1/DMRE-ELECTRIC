@@ -91,9 +91,12 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                     <img src="/logo.png" alt="Logo" className="max-w-full max-h-full object-contain" />
                                 </div>
                                 <div className="flex-1 text-center px-4">
-                                    <h3 className="text-xl font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif', color: rgbToHex(currentStyle.colors.primary) }}>
-                                        DISEÑO Y MONTAJE DE REDES ELÉCTRICAS D.M.R.E
+                                    <h3 className="text-xl font-bold uppercase leading-tight" style={{ fontFamily: 'Times New Roman, serif', color: rgbToHex(currentStyle.colors.primary) }}>
+                                        DISEÑO Y MONTAJE DE REDES<br />ELÉCTRICAS D.M.R.E
                                     </h3>
+                                    <p className="font-bold text-[10px] mt-1" style={{ fontFamily: 'Times New Roman, serif' }}>
+                                        NIT: 1075652753
+                                    </p>
                                     <div className="text-[9px] mt-1 space-y-0.5">
                                         <p>{companyInfo.email}</p>
                                         <p>{companyInfo.telefono}</p>
