@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Loader2, FileText, Upload, X } from "lucide-react";
+import { Plus, Loader2, FileText, Upload, X, Check, ChevronsUpDown } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,20 @@ import {
 } from "@/components/ui/select";
 import { Factura, Cliente, Cotizacion } from "@/types/sistema";
 import { useErp } from "@/components/providers/erp-provider";
-import { formatCurrency } from "@/lib/utils";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { formatCurrency, cn } from "@/lib/utils";
 
 interface CreateFacturaDialogProps {
     onFacturaCreated: (factura: Factura) => void;
@@ -37,6 +50,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
     const [open, setOpen] = useState(false);
     const { facturas, clientes } = useErp();
     const [clienteId, setClienteId] = useState("");
+    const [openClienteBox, setOpenClienteBox] = useState(false);
     const [selectedCotizacionId, setSelectedCotizacionId] = useState("MANUAL");
     const [numero, setNumero] = useState("");
     const [fechaEmision, setFechaEmision] = useState("");
@@ -179,16 +193,51 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
 
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="cliente" className="text-right">Cliente</Label>
-                        <Select value={clienteId} onValueChange={setClienteId}>
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Seleccione cliente" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {clientes.length > 0 ? clientes.map(c => (
-                                    <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                                )) : <SelectItem value="dev" disabled>No hay clientes registrados</SelectItem>}
-                            </SelectContent>
-                        </Select>
+                        <Popover open={openClienteBox} onOpenChange={setOpenClienteBox}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openClienteBox}
+                                    className="col-span-3 justify-between"
+                                >
+                                    <span className="truncate">
+                                        {clienteId
+                                            ? clientes.find((c) => c.id === clienteId)?.nombre
+                                            : "Seleccione cliente..."}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[350px] p-0" align="start">
+                                <Command>
+                                    <CommandInput placeholder="Buscar cliente..." />
+                                    <CommandList>
+                                        <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+                                        <CommandGroup>
+                                            {clientes.map((c) => (
+                                                <CommandItem
+                                                    key={c.id}
+                                                    value={c.nombre}
+                                                    onSelect={() => {
+                                                        setClienteId(c.id === clienteId ? "" : c.id);
+                                                        setOpenClienteBox(false);
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            clienteId === c.id ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                    {c.nombre}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </div>
 
                     {clienteId && cotizaciones && cotizaciones.filter(c => c.clienteId === clienteId).length > 0 && (

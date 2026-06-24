@@ -126,6 +126,7 @@ export default function CommercialPage() {
     // --- DASHBOARD STATE ---
     const [activeTab, setActiveTab] = useState("resumen");
     const [ofertasFilter, setOfertasFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("TODAS");
+    const [resumenFilter, setResumenFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("NORMAL");
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: startOfYear(new Date()),
         to: endOfYear(new Date()),
@@ -154,8 +155,11 @@ export default function CommercialPage() {
     };
 
     const dashboardFilteredQuotes = useMemo(() => {
-        return cotizaciones.filter(q => q.tipo !== 'SIMPLIFICADA' && filterData(q.fecha, q.cliente.id));
-    }, [dateRange, selectedClientFilter, cotizaciones]);
+        return cotizaciones.filter(q => {
+            const matchesType = resumenFilter === 'TODAS' || q.tipo === resumenFilter;
+            return matchesType && filterData(q.fecha, q.cliente.id);
+        });
+    }, [dateRange, selectedClientFilter, cotizaciones, resumenFilter]);
 
     // 1. Revenue Over Time (Approved Quotes)
     const revenueData = useMemo(() => {
@@ -317,8 +321,19 @@ export default function CommercialPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="flex flex-col gap-1 w-[200px]">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase">Tipo de Oferta</span>
+                            <Select value={resumenFilter} onValueChange={(val: any) => setResumenFilter(val)}>
+                                <SelectTrigger><SelectValue placeholder="Seleccione Tipo" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NORMAL">Normal / Corporativo</SelectItem>
+                                    <SelectItem value="SIMPLIFICADA">Simplificada</SelectItem>
+                                    <SelectItem value="TODAS">Consolidado (Todas)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="flex-1 text-right pt-4">
-                            <Button variant="outline" onClick={() => { setDateRange(undefined); setSelectedClientFilter('all'); }}>Limpiar Filtros</Button>
+                            <Button variant="outline" onClick={() => { setDateRange(undefined); setSelectedClientFilter('all'); setResumenFilter('NORMAL'); }}>Limpiar Filtros</Button>
                         </div>
                     </div>
 
