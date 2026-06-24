@@ -177,6 +177,65 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
         }
     }, [initialData?.id, currentUser?.name]);
 
+    // LocalStorage caching logic
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+        if (!initialData) {
+            const saved = localStorage.getItem("cotizador_draft_new");
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    console.log("Cotizador: Borrador cargado desde localStorage", parsed);
+                    if (parsed.selectedCliente) setSelectedCliente(parsed.selectedCliente);
+                    if (parsed.items) setItems(parsed.items);
+                    if (parsed.descripcionTrabajo) setDescripcionTrabajo(parsed.descripcionTrabajo);
+                    if (parsed.visibilityMode) setVisibilityMode(parsed.visibilityMode);
+                    if (parsed.privadoSuministros) setPrivadoSuministros(parsed.privadoSuministros);
+                    if (parsed.privadoInstalacion) setPrivadoInstalacion(parsed.privadoInstalacion);
+                    if (parsed.privadoServicios) setPrivadoServicios(parsed.privadoServicios);
+                    if (parsed.fechaCotizacion) setFechaCotizacion(parsed.fechaCotizacion);
+                    if (parsed.fechaValidez) setFechaValidez(parsed.fechaValidez);
+                    if (parsed.tipoOferta) setTipoOferta(parsed.tipoOferta);
+                    if (parsed.alcance) setAlcance(parsed.alcance);
+                    if (parsed.formaPago) setFormaPago(parsed.formaPago);
+                    if (parsed.notaFinal) setNotaFinal(parsed.notaFinal);
+                    if (parsed.globalDiscountPct !== undefined) setGlobalDiscountPct(parsed.globalDiscountPct);
+                    if (parsed.globalIvaPct !== undefined) setGlobalIvaPct(parsed.globalIvaPct);
+                    if (parsed.esAiu !== undefined) setEsAiu(parsed.esAiu);
+                    if (parsed.aiuAdminPct !== undefined) setAiuAdminPct(parsed.aiuAdminPct);
+                    if (parsed.aiuImprevistoPct !== undefined) setAiuImprevistoPct(parsed.aiuImprevistoPct);
+                    if (parsed.aiuUtilidadPct !== undefined) setAiuUtilidadPct(parsed.aiuUtilidadPct);
+                    if (parsed.ivaUtilidadPct !== undefined) setIvaUtilidadPct(parsed.ivaUtilidadPct);
+                } catch (e) {
+                    console.error("Failed to parse cotizador draft", e);
+                }
+            } else {
+                console.log("Cotizador: No hay borrador previo");
+            }
+        }
+    }, [initialData]);
+
+    useEffect(() => {
+        if (isMounted && !initialData) {
+            const draft = {
+                selectedCliente, items, descripcionTrabajo, visibilityMode,
+                privadoSuministros, privadoInstalacion, privadoServicios,
+                fechaCotizacion, fechaValidez, tipoOferta, alcance, formaPago, notaFinal,
+                globalDiscountPct, globalIvaPct, esAiu, aiuAdminPct, aiuImprevistoPct, 
+                aiuUtilidadPct, ivaUtilidadPct
+            };
+            localStorage.setItem("cotizador_draft_new", JSON.stringify(draft));
+            console.log("Cotizador: Borrador guardado automáticamente", draft);
+        }
+    }, [
+        isMounted, initialData, selectedCliente, items, descripcionTrabajo, 
+        visibilityMode, privadoSuministros, privadoInstalacion, privadoServicios,
+        fechaCotizacion, fechaValidez, tipoOferta, alcance, formaPago, notaFinal,
+        globalDiscountPct, globalIvaPct, esAiu, aiuAdminPct, aiuImprevistoPct, 
+        aiuUtilidadPct, ivaUtilidadPct
+    ]);
 
     const { subtotal, descuento, aiuAdminVal, aiuImprevistoVal, aiuUtilidadVal, iva, total } = useMemo(() => {
         const sub = items.reduce((acc, item) => {

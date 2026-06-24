@@ -47,7 +47,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center justify-center w-full px-2 py-4 group-data-[collapsible=icon]:px-0">

@@ -1,3 +1,6 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -5,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { mockClients, mockWorkCodes, mockInventory } from "@/lib/data";
-import { ArrowLeft, FileDown, PlusCircle, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, FileDown, PlusCircle, Save, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -13,23 +16,99 @@ import { Separator } from "@/components/ui/separator";
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
 export default function NewQuotePage() {
+    const [isMounted, setIsMounted] = useState(false);
+    const [draft, setDraft] = useState({
+        cliente: "",
+        fecha: new Date().toISOString().split('T')[0],
+        ofertaNro: "COT-005",
+        iva: 19,
+        discount: 0,
+        showMaterials: false,
+        items: [
+            { id: 1, type: "Mano de Obra", qty: 1, price: 80000, category: "Punto de red certificado" },
+            { id: 2, type: "Cable UTP Cat 6A", qty: 25, price: 3000, category: "Punto de red certificado" },
+            { id: 3, type: "Mano de Obra", qty: 1, price: 250000, category: "Instalación de tablero de distribución" },
+        ]
+    });
 
-    const subtotal = 395000;
-    const iva = subtotal * 0.19;
-    const total = subtotal + iva;
+    useEffect(() => {
+        setIsMounted(true);
+        const saved = localStorage.getItem("quote_draft");
+        if (saved) {
+            try {
+                setDraft(JSON.parse(saved));
+            } catch (e) {
+                console.error("Failed to parse quote draft");
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isMounted) {
+            localStorage.setItem("quote_draft", JSON.stringify(draft));
+        }
+    }, [draft, isMounted]);
+
+    const updateDraft = (key: string, value: any) => {
+        setDraft(prev => ({ ...prev, [key]: value }));
+    };
+
+    const updateItemQty = (id: number, qty: number) => {
+        setDraft(prev => ({
+            ...prev,
+            items: prev.items.map(item => item.id === id ? { ...item, qty } : item)
+        }));
+    };
+
+    const deleteItem = (id: number) => {
+        setDraft(prev => ({
+            ...prev,
+            items: prev.items.filter(item => item.id !== id)
+        }));
+    };
+
+    if (!isMounted) {
+        return (
+            <div className="flex items-center justify-center min-h-[50vh]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    const subtotal = draft.items.reduce((acc, item) => acc + (item.qty * item.price), 0);
+    const ivaValue = subtotal * (draft.iva / 100);
+    const total = subtotal + ivaValue - draft.discount;
+
+    // Group items by category for display
+    const itemsByCategory = draft.items.reduce((acc, item) => {
+        if (!acc[item.category]) acc[item.category] = [];
+        acc[item.category].push(item);
+        return acc;
+    }, {} as Record<string, typeof draft.items>);
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center gap-4">
-                 <Button variant="outline" size="icon" asChild>
-                    <Link href="/dashboard">
-                        <ArrowLeft />
-                    </Link>
-                </Button>
-                <div>
-                    <h1 className="text-3xl font-bold text-primary font-headline tracking-tight">Crear Nueva Cotización</h1>
-                    <p className="text-muted-foreground">Completa los detalles para generar una nueva oferta.</p>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Button variant="outline" size="icon" asChild>
+                        <Link href="/dashboard">
+                            <ArrowLeft />
+                        </Link>
+                    </Button>
+                    <div>
+                        <h1 className="text-3xl font-bold text-primary font-headline tracking-tight">Crear Nueva Cotización</h1>
+                        <p className="text-muted-foreground">Completa los detalles para generar una nueva oferta.</p>
+                    </div>
                 </div>
+                <Button variant="ghost" onClick={() => {
+                    if (confirm("¿Estás seguro de que deseas limpiar el borrador?")) {
+                        localStorage.removeItem("quote_draft");
+                        window.location.reload();
+                    }
+                }} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Limpiar Borrador
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -42,7 +121,7 @@ export default function NewQuotePage() {
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <Label htmlFor="cliente">Cliente</Label>
-                                <Select>
+                                <Select value={draft.cliente} onValueChange={(val) => updateDraft('cliente', val)}>
                                     <SelectTrigger id="cliente">
                                         <SelectValue placeholder="Selecciona un cliente" />
                                     </SelectTrigger>
@@ -55,11 +134,11 @@ export default function NewQuotePage() {
                             </div>
                              <div className="space-y-2">
                                 <Label htmlFor="fecha">Fecha</Label>
-                                <Input id="fecha" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                                <Input id="fecha" type="date" value={draft.fecha} onChange={(e) => updateDraft('fecha', e.target.value)} />
                             </div>
                              <div className="space-y-2">
                                 <Label htmlFor="oferta-nro">N° Oferta</Label>
-                                <Input id="oferta-nro" defaultValue="COT-005" />
+                                <Input id="oferta-nro" value={draft.ofertaNro} onChange={(e) => updateDraft('ofertaNro', e.target.value)} />
                             </div>
                         </CardContent>
                     </Card>
@@ -96,33 +175,35 @@ export default function NewQuotePage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        <TableRow className="font-bold bg-secondary/20">
-                                            <TableCell colSpan={5}>Punto de red certificado</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell>Mano de Obra</TableCell>
-                                            <TableCell><Input type="number" defaultValue="1" className="w-full text-center" /></TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(80000)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(80000)}</TableCell>
-                                            <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button></TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell>Cable UTP Cat 6A</TableCell>
-                                            <TableCell><Input type="number" defaultValue="25" className="w-full text-center" /></TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(3000)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(75000)}</TableCell>
-                                             <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button></TableCell>
-                                        </TableRow>
-                                        <TableRow className="font-bold bg-secondary/20">
-                                            <TableCell colSpan={5}>Instalación de tablero de distribución</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell>Mano de Obra</TableCell>
-                                            <TableCell><Input type="number" defaultValue="1" className="w-full text-center" /></TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(250000)}</TableCell>
-                                            <TableCell className="text-right font-mono">{formatCurrency(250000)}</TableCell>
-                                             <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button></TableCell>
-                                        </TableRow>
+                                        {Object.entries(itemsByCategory).map(([category, items]) => (
+                                            <React.Fragment key={category}>
+                                                <TableRow className="font-bold bg-secondary/20">
+                                                    <TableCell colSpan={5}>{category}</TableCell>
+                                                </TableRow>
+                                                {items.map(item => (
+                                                    <TableRow key={item.id}>
+                                                        <TableCell>{item.type}</TableCell>
+                                                        <TableCell>
+                                                            <Input 
+                                                                type="number" 
+                                                                value={item.qty} 
+                                                                onChange={(e) => updateItemQty(item.id, parseFloat(e.target.value) || 0)}
+                                                                className="w-full text-center" 
+                                                                min="0"
+                                                                step="0.01"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono">{formatCurrency(item.price)}</TableCell>
+                                                        <TableCell className="text-right font-mono">{formatCurrency(item.qty * item.price)}</TableCell>
+                                                        <TableCell>
+                                                            <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id)} className="h-8 w-8 text-destructive">
+                                                                <Trash2 className="h-4 w-4"/>
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </React.Fragment>
+                                        ))}
                                     </TableBody>
                                 </Table>
                                  <Button variant="outline" className="w-full">
@@ -143,7 +224,11 @@ export default function NewQuotePage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center space-x-2">
-                                <Checkbox id="show-materials" />
+                                <Checkbox 
+                                    id="show-materials" 
+                                    checked={draft.showMaterials}
+                                    onCheckedChange={(checked) => updateDraft('showMaterials', checked === true)}
+                                />
                                 <label
                                     htmlFor="show-materials"
                                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -157,20 +242,32 @@ export default function NewQuotePage() {
                                     <span>Subtotal</span>
                                     <span className="font-mono">{formatCurrency(subtotal)}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-2">
                                         <Label htmlFor="iva">IVA</Label>
-                                        <Input id="iva" type="number" defaultValue="19" className="w-16 h-8 text-center" />
+                                        <Input 
+                                            id="iva" 
+                                            type="number" 
+                                            value={draft.iva} 
+                                            onChange={(e) => updateDraft('iva', parseFloat(e.target.value) || 0)}
+                                            className="w-20 h-8 text-center" 
+                                        />
                                         <span>%</span>
                                     </div>
-                                    <span className="font-mono">{formatCurrency(iva)}</span>
+                                    <span className="font-mono">{formatCurrency(ivaValue)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-2">
-                                        <Label htmlFor="discount">Descuento</Label>
-                                        <Input id="discount" type="number" defaultValue="0" className="w-24 h-8 text-center" />
+                                        <Label htmlFor="discount">Descuento ($)</Label>
+                                        <Input 
+                                            id="discount" 
+                                            type="number" 
+                                            value={draft.discount} 
+                                            onChange={(e) => updateDraft('discount', parseFloat(e.target.value) || 0)}
+                                            className="w-28 h-8 text-center" 
+                                        />
                                     </div>
-                                    <span className="font-mono text-red-400">- {formatCurrency(0)}</span>
+                                    <span className="font-mono text-red-400">- {formatCurrency(draft.discount)}</span>
                                 </div>
                                 <Separator />
                                 <div className="flex justify-between text-lg font-bold text-primary">
@@ -181,11 +278,11 @@ export default function NewQuotePage() {
                         </CardContent>
                         <CardFooter className="flex flex-col gap-2">
                             <Button size="lg" className="w-full electric-button">
-                                <Save />
+                                <Save className="mr-2 h-5 w-5" />
                                 Guardar Cotización
                             </Button>
                             <Button size="lg" variant="outline" className="w-full electric-button">
-                                <FileDown />
+                                <FileDown className="mr-2 h-5 w-5" />
                                 Exportar a PDF
                             </Button>
                         </CardFooter>
@@ -193,5 +290,5 @@ export default function NewQuotePage() {
                 </div>
             </div>
         </div>
-    )
+    );
 }
