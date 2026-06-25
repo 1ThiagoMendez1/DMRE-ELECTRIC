@@ -130,17 +130,7 @@ export default function FinancieraPage() {
         return true;
     });
 
-    // Filtro aplicado para Movimientos Simples
-    const movimientosSimplesFiltrados = movimientos.filter(mov => {
-        if (!mov.esSimple) return false;
-        const d = new Date(mov.fecha);
-        const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
-        if (filterFecha && format(localD, "yyyy-MM-dd") !== filterFecha) return false;
-        if (filterTipo !== "TODOS" && mov.tipo !== filterTipo) return false;
-        if (filterCategoria !== "TODOS" && mov.categoria !== filterCategoria) return false;
-        if (filterCuenta !== "TODOS" && mov.cuentaId !== filterCuenta) return false;
-        return true;
-    });
+
 
 
     // --- LOGIC MOVED TO BILLING MODULE ---
@@ -191,12 +181,7 @@ export default function FinancieraPage() {
         .filter(m => m.tipo === 'EGRESO' && !m.esSimple)
         .reduce((acc, m) => acc + m.valor, 0);
 
-    const totalIngresosSimples = movimientos
-        .filter(m => m.tipo === 'INGRESO' && m.esSimple)
-        .reduce((acc, m) => acc + m.valor, 0);
-    const totalEgresosSimples = movimientos
-        .filter(m => m.tipo === 'EGRESO' && m.esSimple)
-        .reduce((acc, m) => acc + m.valor, 0);
+
 
     const handleCreateAccount = (newAccount: CuentaBancaria) => {
         addCuentaBancaria(newAccount);
@@ -251,7 +236,7 @@ export default function FinancieraPage() {
                     <TabsTrigger value="obligaciones">Obligaciones</TabsTrigger>
                     <TabsTrigger value="compras">Compras</TabsTrigger>
                     <TabsTrigger value="rentabilidad">Análisis de Proyectos</TabsTrigger>
-                    <TabsTrigger value="simples">Caja Ofertas Simples</TabsTrigger>
+
                 </TabsList>
 
                 {/* --- CUENTAS TAB --- */}
@@ -615,96 +600,7 @@ export default function FinancieraPage() {
                     <ProjectProfitabilityModule />
                 </TabsContent>
 
-                {/* --- SIMPLES TAB --- */}
-                <TabsContent value="simples" className="space-y-4">
-                    <div className="flex justify-between items-center bg-card p-4 rounded-lg shadow-sm border">
-                        <div className="space-y-1">
-                            <h3 className="font-semibold text-lg">Caja Ofertas Simplificadas</h3>
-                            <p className="text-sm text-muted-foreground">Contabilidad aislada exclusiva para ofertas tipo simplificada.</p>
-                        </div>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <Card className="border-l-4 border-l-green-500">
-                            <CardContent className="p-4">
-                                <div className="text-sm text-muted-foreground">Ingresos Totales (Simples)</div>
-                                <div className="text-2xl font-bold text-green-600">{formatCurrency(totalIngresosSimples)}</div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-l-4 border-l-red-500">
-                            <CardContent className="p-4">
-                                <div className="text-sm text-muted-foreground">Egresos / Costos (Simples)</div>
-                                <div className="text-2xl font-bold text-red-600">{formatCurrency(totalEgresosSimples)}</div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-l-4 border-l-primary">
-                            <CardContent className="p-4">
-                                <div className="text-sm text-muted-foreground">Utilidad Neta (Simples)</div>
-                                <div className="text-2xl font-bold text-primary">{formatCurrency(totalIngresosSimples - totalEgresosSimples)}</div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Historial de Transacciones Simplificadas</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Fecha</TableHead>
-                                        <TableHead>Tipo</TableHead>
-                                        <TableHead>Categoría</TableHead>
-                                        <TableHead>Concepto / Tercero</TableHead>
-                                        <TableHead>Cuenta</TableHead>
-                                        <TableHead className="text-right">Valor</TableHead>
-                                        <TableHead className="text-center">Detalle</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {movimientosSimplesFiltrados.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="h-24 text-center">
-                                                No se encontraron movimientos de ofertas simples.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                    {movimientosSimplesFiltrados.map((mov) => {
-                                        const d = new Date(mov.fecha);
-                                        const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
-                                        return (
-                                        <TableRow key={mov.id}>
-                                            <TableCell>{format(localD, "dd MMM yyyy", { locale: es })}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={mov.tipo === 'INGRESO' ? 'default' : 'secondary'} className={mov.tipo === 'EGRESO' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
-                                                    {mov.tipo}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="capitalize">{mov.categoria?.toLowerCase() || 'N/A'}</TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">{mov.concepto}</span>
-                                                    <span className="text-xs text-muted-foreground">{mov.tercero}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{mov.cuenta?.nombre || 'N/A'}</TableCell>
-                                            <TableCell className={cn("text-right font-medium", mov.tipo === 'INGRESO' ? "text-green-600" : "text-red-600")}>
-                                                {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.valor)}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <MovimientoDetailDialog
-                                                    movimiento={mov}
-                                                    onMovimientoUpdated={handleUpdateTransaction}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    )})}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
             </Tabs>
         </div>
     );

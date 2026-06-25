@@ -216,13 +216,13 @@ export default function CommercialPage() {
         }
     };
 
-    const getProgressValue = (status: EstadoCotizacion) => {
-        switch (status) {
+    const getProgressValue = (quote: Cotizacion) => {
+        if (quote.estado === 'APROBADA') return quote.progreso || 0;
+        switch (quote.estado) {
             case 'BORRADOR': return 10;
             case 'ENVIADA': return 30;
             case 'EN_REVISION': return 50;
             case 'MODIFICACION': return 75;
-            case 'APROBADA': return 100;
             case 'RECHAZADA': return 100; // Finished but failed
             default: return 0;
         }
@@ -557,8 +557,8 @@ export default function CommercialPage() {
                                                 </TableCell>
                                                 <TableCell className="w-[100px] sm:w-[120px] whitespace-nowrap hidden sm:table-cell">
                                                     <div className="flex flex-col gap-1">
-                                                        <Progress value={quote.progreso || getProgressValue(quote.estado)} className="h-2" />
-                                                        <span className="text-[10px] text-muted-foreground text-right">{quote.progreso || getProgressValue(quote.estado)}%</span>
+                                                        <Progress value={getProgressValue(quote)} className="h-2" />
+                                                        <span className="text-[10px] text-muted-foreground text-right">{getProgressValue(quote)}%</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="font-mono text-xs sm:text-sm whitespace-nowrap px-4 sm:px-2">{formatCurrency(quote.total)}</TableCell>
@@ -684,8 +684,8 @@ export default function CommercialPage() {
                                                 </TableCell>
                                                 <TableCell className="w-[100px] sm:w-[120px] whitespace-nowrap hidden sm:table-cell">
                                                     <div className="flex flex-col gap-1">
-                                                        <Progress value={quote.progreso || getProgressValue(quote.estado)} className="h-2" />
-                                                        <span className="text-[10px] text-muted-foreground text-right">{quote.progreso || getProgressValue(quote.estado)}%</span>
+                                                        <Progress value={getProgressValue(quote)} className="h-2" />
+                                                        <span className="text-[10px] text-muted-foreground text-right">{getProgressValue(quote)}%</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="font-mono text-xs sm:text-sm whitespace-nowrap px-4 sm:px-2">{formatCurrency(quote.total)}</TableCell>
@@ -810,8 +810,8 @@ export default function CommercialPage() {
                                                 </TableCell>
                                                 <TableCell className="w-[100px] sm:w-[120px] whitespace-nowrap hidden sm:table-cell">
                                                     <div className="flex flex-col gap-1">
-                                                        <Progress value={quote.progreso || getProgressValue(quote.estado)} className="h-2" />
-                                                        <span className="text-[10px] text-muted-foreground text-right">{quote.progreso || getProgressValue(quote.estado)}%</span>
+                                                        <Progress value={getProgressValue(quote)} className="h-2" />
+                                                        <span className="text-[10px] text-muted-foreground text-right">{getProgressValue(quote)}%</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="font-mono text-xs sm:text-sm whitespace-nowrap px-4 sm:px-2">{formatCurrency(quote.total)}</TableCell>
