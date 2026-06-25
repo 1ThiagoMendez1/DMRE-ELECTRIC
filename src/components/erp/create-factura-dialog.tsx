@@ -218,7 +218,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                             {clientes.map((c) => (
                                                 <CommandItem
                                                     key={c.id}
-                                                    value={c.nombre}
+                                                    value={`${c.nombre} ${c.documento || ''}`}
                                                     onSelect={() => {
                                                         setClienteId(c.id === clienteId ? "" : c.id);
                                                         setOpenClienteBox(false);
@@ -226,11 +226,14 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                                 >
                                                     <Check
                                                         className={cn(
-                                                            "mr-2 h-4 w-4",
+                                                            "mr-2 h-4 w-4 shrink-0",
                                                             clienteId === c.id ? "opacity-100" : "opacity-0"
                                                         )}
                                                     />
-                                                    {c.nombre}
+                                                    <div className="flex flex-col">
+                                                        <span>{c.nombre}</span>
+                                                        {c.documento && <span className="text-[10px] text-muted-foreground">NIT/Doc: {c.documento}</span>}
+                                                    </div>
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>
