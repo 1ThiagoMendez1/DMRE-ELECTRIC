@@ -28,7 +28,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Button } from './ui/button';
-import { LogOut, LayoutDashboard as LayoutDashboardIcon, Users as UsersIcon, Package as PackageIcon, FileText as FileTextIcon, ClipboardList as ClipboardListIcon, ChevronDown, DollarSign, Truck, Car, Briefcase } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { dashboardNavItems, systemNavItems } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -36,10 +36,11 @@ import Image from 'next/image';
 import { ThemeToggle } from './theme-toggle';
 import { NotificationCenter } from './notification-center';
 import { useErp } from "@/components/providers/erp-provider";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentUser, logout } = useErp();
+  const { currentUser, logout, isLoading } = useErp();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -65,32 +66,43 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {systemNavItems.map((item) => {
-                  // Check permissions
-                  const hasAccess = currentUser?.role === 'ADMIN' || currentUser?.sidebarAccess?.includes(item.id);
-                  if (!hasAccess) return null;
-
-                  return (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)}
-                        tooltip={item.label}
-                        className={cn(
-                          "transition-all duration-300",
-                          (item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)) 
-                            ? "bg-primary/20 text-primary font-bold border-l-4 border-primary rounded-none" 
-                            : "hover:bg-primary/10 hover:text-primary hover:translate-x-1"
-                        )}
-                      >
-                        <Link href={item.href}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
+                {isLoading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <SidebarMenuItem key={`skeleton-${i}`}>
+                      <div className="flex w-full items-center gap-2 overflow-hidden rounded-md p-2">
+                        <Skeleton className="h-4 w-4 shrink-0" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
                     </SidebarMenuItem>
-                  );
-                })}
+                  ))
+                ) : (
+                  systemNavItems.map((item) => {
+                    // Check permissions
+                    const hasAccess = currentUser?.role === 'ADMIN' || currentUser?.sidebarAccess?.includes(item.id);
+                    if (!hasAccess) return null;
+
+                    return (
+                      <SidebarMenuItem key={item.id}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)}
+                          tooltip={item.label}
+                          className={cn(
+                            "transition-all duration-300",
+                            (item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)) 
+                              ? "bg-primary/20 text-primary font-bold border-l-4 border-primary rounded-none" 
+                              : "hover:bg-primary/10 hover:text-primary hover:translate-x-1"
+                          )}
+                        >
+                          <Link href={item.href}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
