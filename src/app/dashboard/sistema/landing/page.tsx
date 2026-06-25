@@ -43,6 +43,16 @@ export default function LandingPageManagement() {
     const [isLoadingProjects, setIsLoadingProjects] = useState(true);
     const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
     const [editingProject, setEditingProject] = useState<any | null>(null);
+    const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+
+    const toggleMessage = (id: string) => {
+        setExpandedMessages(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     useEffect(() => {
         fetchProjects();
@@ -182,7 +192,11 @@ export default function LandingPageManagement() {
                                                 <div className="text-xs text-muted-foreground">{proposal.email}</div>
                                             </TableCell>
                                             <TableCell>{proposal.phone}</TableCell>
-                                            <TableCell className="max-w-[300px] truncate" title={proposal.message}>
+                                            <TableCell 
+                                                className={`max-w-[300px] cursor-pointer hover:bg-muted/50 transition-colors ${expandedMessages.has(proposal.id) ? '' : 'truncate'}`} 
+                                                onClick={() => toggleMessage(proposal.id)}
+                                                title={expandedMessages.has(proposal.id) ? "Click para contraer" : "Click para expandir"}
+                                            >
                                                 {proposal.message}
                                             </TableCell>
                                             <TableCell>{getStatusBadge(proposal.status)}</TableCell>
