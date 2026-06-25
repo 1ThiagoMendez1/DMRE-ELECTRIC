@@ -455,6 +455,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         try {
             const saved = await updateClientAction(updated.id, updated);
             setClientes(prev => prev.map(c => c.id === saved.id ? saved : c));
+            // Sync embedded cliente inside cotizaciones
+            setCotizaciones(prev => prev.map(cot => cot.clienteId === saved.id ? { ...cot, cliente: saved } : cot));
         } catch (error) { console.error("Failed to update client:", error); }
     };
     const deleteCliente = async (id: string) => {

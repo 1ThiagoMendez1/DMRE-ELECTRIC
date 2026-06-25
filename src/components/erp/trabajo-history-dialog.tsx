@@ -967,6 +967,7 @@ export function TrabajoHistoryDialog({
 
         const updated: Cotizacion = {
             ...trabajo,
+            descripcionTrabajo: editDescripcion,
             items: items.map(({ visibleEnPdf, ...item }) => item), // Strip UI-only field
             subtotal,
             iva,
