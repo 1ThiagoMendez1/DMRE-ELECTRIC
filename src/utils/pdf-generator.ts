@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale';
 import { Cotizacion } from '@/types/sistema';
 import { MaterialVisibilityMode } from '@/components/erp/trabajo-history-dialog';
 import { PDFStyleConfig, PDF_STYLES } from './pdf-styles';
+import { LOGO_BASE64 } from './logo-base64';
 
 export interface CompanyInfo {
     nombre: string;
@@ -85,12 +86,9 @@ export const generateQuotePDF = (
         contentStartX = 75; // Shift content right
         contentWidth = pageWidth - 75 - 14;
 
-        // Valid for "Creativo" / "Lateral"
         // Logo in sidebar
         try {
-            const logoImg = new Image();
-            logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 10, 8, 55, 55);
+            doc.addImage(LOGO_BASE64, 'PNG', 10, 8, 55, 55);
         } catch (e) { }
 
         // Company Details in sidebar (White text)
@@ -98,19 +96,25 @@ export const generateQuotePDF = (
         doc.setFontSize(14);
         doc.setFont(style.fonts.header, 'bold');
 
+        let nextY = 65;
         // Split name if long
         const nameLines = doc.splitTextToSize(company.nombre, 55);
-        doc.text(nameLines, 32, 65, { align: 'center' });
+        doc.text(nameLines, 32, nextY, { align: 'center' });
+        nextY += nameLines.length * 5 + 10;
 
         doc.setFontSize(9);
         doc.setFont(style.fonts.body, 'normal');
-        doc.text(`NIT: ${company.nit}`, 32, 80, { align: 'center' });
+        doc.text(`NIT: ${company.nit}`, 32, nextY, { align: 'center' });
+        nextY += 10;
 
         doc.setFontSize(8);
         const addressLines = doc.splitTextToSize(company.direccion, 50);
-        doc.text(addressLines, 32, 90, { align: 'center' });
-        doc.text(company.telefono, 32, 105, { align: 'center' });
-        doc.text(company.email, 32, 110, { align: 'center' });
+        doc.text(addressLines, 32, nextY, { align: 'center' });
+        nextY += addressLines.length * 4 + 10;
+        
+        doc.text(company.telefono, 32, nextY, { align: 'center' });
+        nextY += 5;
+        doc.text(company.email, 32, nextY, { align: 'center' });
 
         currentY = 20; // Top of main content area
     }
@@ -123,26 +127,36 @@ export const generateQuotePDF = (
 
         // Logo Left
         try {
-            const logoImg = new Image();
-            logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 12, 5, 50, 50);
+            doc.addImage(LOGO_BASE64, 'PNG', 12, 5, 50, 50);
         } catch (e) { }
 
         // Company Text White
         doc.setTextColor(255, 255, 255);
         doc.setFont(style.fonts.header, 'bold');
         doc.setFontSize(24);
-        doc.text(company.nombre, 50, 25);
+        doc.text(company.nombre, 65, 25);
 
         doc.setFontSize(10);
         doc.setFont(style.fonts.body, 'normal');
-        doc.text(company.descripcion, 50, 32);
+        // Prevent description from overlapping right info by forcing it to wrap at 50mm
+        const descLines = doc.splitTextToSize(company.descripcion, 50);
+        doc.text(descLines, 65, 33);
 
         // Right Side Info (White)
         doc.setFontSize(9);
-        doc.text(`NIT: ${company.nit}`, pageWidth - 14, 20, { align: 'right' });
-        doc.text(company.direccion, pageWidth - 14, 25, { align: 'right' });
-        doc.text(`${company.telefono} | ${company.email}`, pageWidth - 14, 30, { align: 'right' });
+        doc.text(`NIT: ${company.nit}`, pageWidth - 14, 17, { align: 'right' });
+        
+        const addrSplit = doc.splitTextToSize(company.direccion, 70);
+        let rightY = 21;
+        doc.text(addrSplit, pageWidth - 14, rightY, { align: 'right' });
+        rightY += addrSplit.length * 4;
+        
+        const telLines = doc.splitTextToSize(`Tel: ${company.telefono}`, 70);
+        doc.text(telLines, pageWidth - 14, rightY, { align: 'right' });
+        rightY += telLines.length * 4;
+        
+        const emailLines = doc.splitTextToSize(company.email, 70);
+        doc.text(emailLines, pageWidth - 14, rightY, { align: 'right' });
 
         currentY = 70;
     }
@@ -151,24 +165,30 @@ export const generateQuotePDF = (
     else if (style.layout === 'centered') {
         // Logo Center
         try {
-            const logoImg = new Image();
-            logoImg.src = '/logo.png';
             const logoX = (pageWidth - 55) / 2;
-            doc.addImage(logoImg, 'PNG', logoX, 5, 55, 55);
+            doc.addImage(LOGO_BASE64, 'PNG', logoX, 5, 55, 55);
         } catch (e) { }
 
         doc.setTextColor(...primary);
         doc.setFont(style.fonts.header, 'bold');
         doc.setFontSize(22);
-        doc.text(company.nombre, pageWidth / 2, 55, { align: 'center' });
+        
+        const centerNameLines = doc.splitTextToSize(company.nombre, pageWidth - 20);
+        let centerNextY = 65;
+        doc.text(centerNameLines, pageWidth / 2, centerNextY, { align: 'center' });
+        centerNextY += centerNameLines.length * 7;
 
         doc.setFontSize(10);
         doc.setFont(style.fonts.body, 'normal');
         doc.setTextColor(...text);
-        doc.text(company.nit, pageWidth / 2, 62, { align: 'center' });
-        doc.text(`${company.direccion} • ${company.telefono}`, pageWidth / 2, 67, { align: 'center' }); // Bullet separator
+        doc.text(`NIT: ${company.nit}`, pageWidth / 2, centerNextY, { align: 'center' });
+        centerNextY += 5;
+        
+        const centerAddressLines = doc.splitTextToSize(`${company.direccion} • ${company.telefono}`, pageWidth - 20);
+        doc.text(centerAddressLines, pageWidth / 2, centerNextY, { align: 'center' }); 
+        centerNextY += centerAddressLines.length * 4;
 
-        currentY = 80;
+        currentY = centerNextY + 10;
     }
     // E. MINIMAL (Structured Order of Purchase Style)
     else if (style.layout === 'minimal') {
@@ -198,27 +218,35 @@ export const generateQuotePDF = (
 
         // 2. Top Center (Company Info)
         doc.setFontSize(10);
-        doc.text(company.nombre, pageWidth / 2, 18, { align: 'center' });
+        const minNameLines = doc.splitTextToSize(company.nombre, 80);
+        doc.text(minNameLines, pageWidth / 2, 18, { align: 'center' });
+        
+        let minY = 18 + minNameLines.length * 5;
+        
         doc.setFontSize(8);
         doc.setFont(style.fonts.body, 'normal');
-        doc.text(`NIT: ${company.nit}`, pageWidth / 2, 23, { align: 'center' });
-        doc.text(company.direccion, pageWidth / 2, 28, { align: 'center' });
-        doc.text(`Tel: ${company.telefono}`, pageWidth / 2, 33, { align: 'center' });
-        doc.text(company.email, pageWidth / 2, 38, { align: 'center' });
+        doc.text(`NIT: ${company.nit}`, pageWidth / 2, minY, { align: 'center' });
+        minY += 5;
+        
+        const minAddrSplit = doc.splitTextToSize(company.direccion, 65);
+        doc.text(minAddrSplit, pageWidth / 2, minY, { align: 'center' });
+        minY += minAddrSplit.length * 3.5 + 1.5;
+        
+        doc.text(`Tel: ${company.telefono}`, pageWidth / 2, minY, { align: 'center' });
+        doc.text(company.email, pageWidth / 2, minY + 5, { align: 'center' });
 
         // 3. Top Right (Logo)
         try {
-            const logoImg = new Image();
-            logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', pageWidth - 50, 8, 40, 40);
+            doc.addImage(LOGO_BASE64, 'PNG', pageWidth - 50, 8, 40, 40);
         } catch (e) { }
 
         // Below the logo text
         doc.setFontSize(8);
         doc.setFont(style.fonts.header, 'bold');
-        doc.text(company.descripcion, pageWidth - 35, 34, { align: 'center' });
+        const descLines = doc.splitTextToSize(company.descripcion, 40);
+        doc.text(descLines, pageWidth - 30, 52, { align: 'center' });
 
-        currentY = 48; // Ready for boxes
+        currentY = 52 + descLines.length * 4; // Ready for boxes
     }
 
     // F. OFFICIAL GRID LAYOUT (Technical Header with Metadata)
@@ -232,9 +260,7 @@ export const generateQuotePDF = (
 
         // 1. Logo Left
         try {
-            const logoImg = new Image();
-            logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 13, 10, 32, 32);
+            doc.addImage(LOGO_BASE64, 'PNG', 13, 10, 32, 32);
         } catch (e) { }
 
         // 2. Company Name Center
@@ -278,29 +304,39 @@ export const generateQuotePDF = (
 
         // Logo
         try {
-            const logoImg = new Image();
-            logoImg.src = '/logo.png';
-            doc.addImage(logoImg, 'PNG', 10, 8, 45, 45);
+            doc.addImage(LOGO_BASE64, 'PNG', 10, 8, 45, 45);
         } catch (e) { }
 
         doc.setTextColor(...primary);
         doc.setFont(style.fonts.header, 'bold');
         doc.setFontSize(20);
-        doc.text(company.nombre, 45, 22);
+        
+        let stdNextY = 22;
+        const stdNameLines = doc.splitTextToSize(company.nombre, pageWidth - 140);
+        doc.text(stdNameLines, 60, stdNextY);
+        stdNextY += stdNameLines.length * 6;
 
         doc.setFontSize(10);
         doc.setFont(style.fonts.body, 'normal');
         doc.setTextColor(...text);
-        doc.text(company.descripcion, 45, 28);
+        
+        const stdDescLines = doc.splitTextToSize(company.descripcion, pageWidth - 140);
+        doc.text(stdDescLines, 60, stdNextY);
+        stdNextY += stdDescLines.length * 4 + 2;
 
         // Contact Block
         doc.setFontSize(9);
         doc.setTextColor(...text); // Use black text
-        doc.text(`NIT: ${company.nit}`, 45, 34);
-        doc.text(`${company.direccion}`, 45, 39);
-        doc.text(`${company.telefono} | ${company.email}`, 45, 44);
+        doc.text(`NIT: ${company.nit}`, 60, stdNextY);
+        stdNextY += 5;
+        
+        const stdAddrLines = doc.splitTextToSize(company.direccion, pageWidth - 140);
+        doc.text(stdAddrLines, 60, stdNextY);
+        stdNextY += stdAddrLines.length * 4 + 1;
+        
+        doc.text(`${company.telefono} | ${company.email}`, 60, stdNextY);
 
-        currentY = 55;
+        currentY = Math.max(55, stdNextY + 10);
     }
 
 
@@ -447,12 +483,15 @@ export const generateQuotePDF = (
         doc.roundedRect(rightBoxX, currentY, rightBoxWidth, boxHeight, 2, 2);
 
         // Overlapping Title
-        doc.setFillColor(255, 255, 255);
-        doc.rect(rightBoxX + 10, currentY - 2, 35, 4, 'F'); // Mask line
         doc.setFont(style.fonts.header, 'bold');
         doc.setFontSize(10);
+        const titleText = "COTIZACIÓN DE SERVICIO";
+        const titleWidth = doc.getTextWidth(titleText) + 4;
+        doc.setFillColor(255, 255, 255);
+        doc.rect(rightBoxX + 10, currentY - 2, titleWidth, 4, 'F'); // Mask line
+        
         doc.setTextColor(0, 50, 100); // Brand color for title
-        doc.text("COTIZACIÓN DE SERVICIO", rightBoxX + 12, currentY + 1);
+        doc.text(titleText, rightBoxX + 12, currentY + 1);
 
         doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
@@ -489,7 +528,7 @@ export const generateQuotePDF = (
         doc.setFont(style.fonts.body, 'normal');
         doc.text(cotizacion.cliente.correo || "", rightBoxX + 20, currentY + 27);
 
-        currentY += boxHeight;
+        currentY += boxHeight + 8;
     }
     // Existing Client Box Styles for other layouts
     else if (style.components.clientBoxStyle === 'filled') {
@@ -845,7 +884,7 @@ export const generateQuotePDF = (
         styles: {
             font: style.fonts.body,
             fontSize: isMinimal ? 7 : 9,
-            cellPadding: 4,
+            cellPadding: 1.5,
             textColor: [40, 40, 40],
             lineColor: [40, 40, 40],
             lineWidth: isMinimal ? 0.3 : 0.1
@@ -867,9 +906,9 @@ export const generateQuotePDF = (
             5: { halign: 'right' },
             6: { halign: 'right', fontStyle: 'bold' }
         } : {
-            0: { cellWidth: 22, halign: 'center' },
-            2: { cellWidth: 15, halign: 'center' },
-            3: { cellWidth: 15, halign: 'center' },
+            0: { halign: 'center' },
+            2: { halign: 'center' },
+            3: { halign: 'center' },
             4: { halign: 'right' },
             5: { halign: 'right', fontStyle: 'bold' }
         },
@@ -1019,13 +1058,14 @@ export const generateQuotePDF = (
         doc.setFontSize(12);
         doc.setFont(style.fonts.header, 'bold');
 
-        currentTotalsY += lineSpacing + 2;
+        currentTotalsY += lineSpacing + 4;
 
         // Colored Box for Total if Bold style
         if (style.layout === 'bold') {
             doc.setFillColor(...secondary);
             doc.rect(totalsX - 5, currentTotalsY - 8, contentStartX + contentWidth - (totalsX - 5), 11, 'F');
-            doc.setTextColor(255, 255, 255);
+            const isLight = (secondary[0] > 200 && secondary[1] > 200 && secondary[2] > 200);
+            doc.setTextColor(isLight ? 0 : 255, isLight ? 0 : 255, isLight ? 0 : 255);
             doc.text("TOTAL:", totalsX, currentTotalsY);
             doc.text(currencyFmt.format(cotizacion.total), contentStartX + contentWidth, currentTotalsY, { align: "right" });
         } else {
@@ -1129,8 +1169,9 @@ export const generateQuotePDF = (
     doc.text(alcanceLines, contentStartX + titleWidth + 2, currentTotalsY + 6);
 
     // 'FORMA DE PAGO' Label
-    doc.setFont(style.fonts.header, 'bold');
-    doc.text("FORMA DE PAGO PARA ESTA OFERTA:", contentStartX + termsLeftWidth + (termsRightWidth / 2), currentTotalsY + 5.5, { align: 'center' });
+        doc.setFont(style.fonts.header, 'bold');
+        const titleText = termsRightWidth < 50 ? "FORMA DE PAGO:" : "FORMA DE PAGO PARA ESTA OFERTA:";
+        doc.text(titleText, contentStartX + termsLeftWidth + (termsRightWidth / 2), currentTotalsY + 5.5, { align: 'center' });
 
     // Forma de Pago Content
     doc.setFont(style.fonts.body, 'normal');
