@@ -885,7 +885,14 @@ export const generateQuotePDF = (
 
     // --- 6. TOTALS & FOOTER ---
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    let finalY = (doc as any).lastAutoTable.finalY + 10;
+    
+    // Validate if there's enough space for totals block before rendering
+    if (finalY > pageHeight - 65) {
+        doc.addPage();
+        finalY = 20;
+    }
+
     const totalsX = contentStartX + contentWidth - 60; // Right aligned in content area
 
     // Divider
