@@ -153,7 +153,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex-1 p-4 sm:p-6 lg:p-8 pt-6">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 pt-6 w-full max-w-full min-w-0">
           {children}
         </div>
       </SidebarInset>

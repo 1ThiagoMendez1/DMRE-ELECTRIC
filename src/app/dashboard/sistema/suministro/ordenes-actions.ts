@@ -127,15 +127,35 @@ export async function updateOrdenCompraAction(id: string, oc: Partial<OrdenCompr
     if (oc.estado) dbData.estado = oc.estado;
     if (oc.observaciones !== undefined) dbData.observaciones = oc.observaciones;
     if (oc.fechaEntregaEstimada) dbData.fecha_entrega_estimada = oc.fechaEntregaEstimada;
+    if (oc.subtotal !== undefined) dbData.subtotal = oc.subtotal;
+    if (oc.impuestos !== undefined) dbData.impuestos = oc.impuestos;
+    if (oc.total !== undefined) dbData.total = oc.total;
 
-    const { error } = await supabase
-        .from("ordenes_compra")
-        .update(dbData)
-        .eq("id", id);
+    if (Object.keys(dbData).length > 0) {
+        const { error } = await supabase
+            .from("ordenes_compra")
+            .update(dbData)
+            .eq("id", id);
 
-    if (error) {
-        console.error("Error updating order:", error);
-        throw new Error("Failed to update order");
+        if (error) {
+            console.error("Error updating order:", error);
+            throw new Error("Failed to update order");
+        }
+    }
+
+    if (oc.items && oc.items.length > 0) {
+        for (const item of oc.items) {
+            if (item.id) {
+                await supabase
+                    .from("detalle_compra")
+                    .update({
+                        cantidad: item.cantidad,
+                        valor_unitario: item.valorUnitario,
+                        subtotal: item.subtotal
+                    })
+                    .eq("id", item.id);
+            }
+        }
     }
 
     revalidatePath("/dashboard/sistema/suministro");

@@ -27,9 +27,9 @@ export function InteractiveHero() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
-                    className="text-5xl md:text-7xl lg:text-8xl font-black font-headline tracking-tighter mb-8 leading-[0.9] text-foreground uppercase"
+                    className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black font-headline tracking-tighter mb-6 md:mb-8 leading-[1.1] md:leading-[0.9] text-foreground uppercase"
                 >
-                    Diseño y Montaje <br />
+                    Diseño y Montaje <br className="hidden sm:block" />
                     de <span className="text-primary italic">Redes</span> Eléctricas
                 </motion.h1>
 
@@ -37,7 +37,7 @@ export function InteractiveHero() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.4 }}
-                    className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed"
+                    className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto px-2 mb-10 md:mb-12 leading-relaxed"
                 >
                     En D.M.R.E. diseñamos, construimos y operamos infraestructuras eléctricas inteligentes para los sectores más exigentes del país.
                 </motion.p>
@@ -46,14 +46,14 @@ export function InteractiveHero() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.6 }}
-                    className="flex flex-col sm:flex-row gap-6 justify-center items-center"
+                    className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center w-full px-4 sm:px-0"
                 >
-                    <Button size="lg" asChild className="h-16 px-10 rounded-full text-xl font-bold shadow-neon hover:shadow-premium transition-all duration-300">
+                    <Button size="lg" asChild className="h-14 sm:h-16 px-8 sm:px-10 rounded-full text-lg sm:text-xl font-bold shadow-neon hover:shadow-premium transition-all duration-300 w-full sm:w-auto">
                         <Link href="/solutions">
-                            Nuestras Soluciones <MoveRight className="ml-2 h-6 w-6" />
+                            Nuestras Soluciones <MoveRight className="ml-2 h-5 w-5 sm:h-6 sm:w-6" />
                         </Link>
                     </Button>
-                    <Button size="lg" variant="outline" asChild className="h-16 px-10 rounded-full text-xl font-bold border-2 hover:bg-primary/5 transition-all duration-300">
+                    <Button size="lg" variant="outline" asChild className="h-14 sm:h-16 px-8 sm:px-10 rounded-full text-lg sm:text-xl font-bold border-2 hover:bg-primary/5 transition-all duration-300 w-full sm:w-auto">
                         <Link href="/portfolio">
                             Ver Portafolio
                         </Link>

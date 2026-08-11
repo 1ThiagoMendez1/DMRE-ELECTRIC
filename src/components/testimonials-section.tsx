@@ -27,16 +27,16 @@ const testimonials = [
 
 export function TestimonialsSection() {
     return (
-        <section className="py-24 lg:py-32 bg-background relative overflow-hidden">
+        <section className="py-16 md:py-24 lg:py-32 bg-background relative overflow-hidden">
             <div className="container mx-auto px-4 relative z-10">
-                <div className="text-center mb-16">
-                    <h2 className="text-4xl lg:text-5xl font-bold font-headline text-foreground mb-6">Voces de <span className="text-primary italic">Confianza</span></h2>
-                    <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                <div className="text-center mb-12 md:mb-16">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-headline text-foreground mb-4 md:mb-6">Voces de <span className="text-primary italic">Confianza</span></h2>
+                    <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
                         El testimonio de nuestros aliados corporativos es el mejor aval de nuestra excelencia técnica.
                     </p>
                 </div>
 
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
                     {testimonials.map((t, index) => (
                         <motion.div
                             key={index}

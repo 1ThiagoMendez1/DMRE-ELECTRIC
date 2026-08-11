@@ -33,6 +33,7 @@ export function CrearCotizacionMaterialDialog({ cotizacion, onClose }: Props) {
     const [observaciones, setObservaciones] = useState("");
     const [proveedorId, setProveedorId] = useState<string>("none");
     const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
+    const [customQuantities, setCustomQuantities] = useState<Record<string, number>>({});
 
     // Extraer todos los materiales posibles de la oferta (items directos + subItems)
     const availableMaterials: any[] = [];
@@ -77,7 +78,13 @@ export function CrearCotizacionMaterialDialog({ cotizacion, onClose }: Props) {
     };
 
     const handleSubmit = async () => {
-        const selectedToInclude = availableMaterials.filter(m => selectedItems[m.id]);
+        const selectedToInclude = availableMaterials
+            .filter(m => selectedItems[m.id])
+            .map(m => ({
+                ...m,
+                cantidad: customQuantities[m.id] ?? m.cantidad
+            }));
+            
         if (selectedToInclude.length === 0) return;
 
         setIsSubmitting(true);
@@ -154,9 +161,18 @@ export function CrearCotizacionMaterialDialog({ cotizacion, onClose }: Props) {
                                             <Label htmlFor={`mat-${mat.id}`} className="text-sm font-medium leading-none cursor-pointer">
                                                 {mat.descripcion}
                                             </Label>
-                                            <p className="text-xs text-muted-foreground">
-                                                Cant: {mat.cantidad} {mat.unidad} | Origen: {mat.source}
-                                            </p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-xs text-muted-foreground">Cant:</span>
+                                                <Input 
+                                                    type="number"
+                                                    className="h-6 w-16 text-xs px-2 py-0"
+                                                    value={customQuantities[mat.id] ?? mat.cantidad}
+                                                    onChange={(e) => setCustomQuantities({...customQuantities, [mat.id]: Number(e.target.value)})}
+                                                    disabled={!selectedItems[mat.id]}
+                                                    min={1}
+                                                />
+                                                <span className="text-xs text-muted-foreground">{mat.unidad} | Origen: {mat.source}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

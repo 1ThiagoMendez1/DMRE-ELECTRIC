@@ -42,9 +42,9 @@ export default async function Home() {
         <ClientMarquee />
 
         {/* Sección Sobre Nosotros (Refinada) */}
-        <section id="about" className="py-24 lg:py-32 bg-background">
+        <section id="about" className="py-16 md:py-24 lg:py-32 bg-background">
           <div className="container mx-auto px-4">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
               <div className="relative group">
                 <div className="absolute -inset-4 bg-primary/10 rounded-2xl blur-2xl group-hover:bg-primary/20 transition-all duration-500"></div>
                 <div className="relative rounded-2xl overflow-hidden shadow-premium">
@@ -62,7 +62,7 @@ export default async function Home() {
                 </div>
               </div>
               <div>
-                <h2 className="text-4xl lg:text-5xl font-bold font-headline text-foreground mb-8 leading-tight">
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-headline text-foreground mb-6 md:mb-8 leading-tight">
                   Más que Ingeniería Eléctrica: <br />
                   <span className="text-primary">Arquitectura Energética</span>
                 </h2>
@@ -80,15 +80,15 @@ export default async function Home() {
         </section>
 
         {/* Sección de Servicios / Soluciones */}
-        <section id="services" className="py-24 lg:py-32 bg-secondary/20">
+        <section id="services" className="py-16 md:py-24 lg:py-32 bg-secondary/20">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl lg:text-5xl font-bold font-headline text-foreground mb-6">Expertos en Alta Complejidad</h2>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+            <div className="text-center mb-12 md:mb-16">
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-headline text-foreground mb-4 md:mb-6">Expertos en Alta Complejidad</h2>
+              <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
                 Ofrecemos soluciones integrales diseñadas para máxima confiabilidad y rendimiento energético.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
               {services.slice(0, 6).map((service, index) => (
                 <Card key={index} className="bg-card hover:bg-card/80 border-border group transition-all duration-500 hover:shadow-premium hover:-translate-y-2">
                   <CardHeader className="p-8">
@@ -114,13 +114,13 @@ export default async function Home() {
         <TestimonialsSection />
 
         {/* Sección Galería */}
-        <section id="gallery" className="py-24 lg:py-32 bg-background overflow-hidden relative">
+        <section id="gallery" className="py-16 md:py-24 lg:py-32 bg-background overflow-hidden relative">
           <div className="container mx-auto px-4 text-center relative">
-            <h2 className="text-4xl lg:text-5xl font-bold font-headline text-foreground mb-6">Proyectos Emblemáticos</h2>
-            <p className="text-xl text-muted-foreground mb-16 max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-headline text-foreground mb-4 md:mb-6">Proyectos Emblemáticos</h2>
+            <p className="text-lg md:text-xl text-muted-foreground mb-10 md:mb-16 max-w-2xl mx-auto">
               Testimonio visual de nuestra capacidad de ejecución y compromiso con la calidad superior.
             </p>
-            <div className="h-[600px] relative">
+            <div className="h-[400px] md:h-[600px] relative">
               {galleryItems.length > 0 ? (
                 <CircularGallery items={galleryItems} />
               ) : (
@@ -133,13 +133,13 @@ export default async function Home() {
         </section>
 
         {/* Sección de Contacto */}
-        <section id="contact" className="py-24 lg:py-32 bg-secondary/30 relative">
+        <section id="contact" className="py-16 md:py-24 lg:py-32 bg-secondary/30 relative">
           <div className="container mx-auto px-4">
             <div className="bg-card rounded-3xl overflow-hidden shadow-premium border border-border">
-              <div className="grid lg:grid-cols-2">
-                <div className="p-12 lg:p-20">
-                  <h2 className="text-4xl lg:text-5xl font-bold font-headline text-foreground mb-6">Inicie su <span className="text-primary italic">Transformación</span></h2>
-                  <p className="text-xl text-muted-foreground mb-10">
+              <div className="grid grid-cols-1 lg:grid-cols-2 flex-col-reverse">
+                <div className="p-8 md:p-12 lg:p-20 order-2 lg:order-1">
+                  <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-headline text-foreground mb-4 md:mb-6">Inicie su <span className="text-primary italic">Transformación</span></h2>
+                  <p className="text-lg md:text-xl text-muted-foreground mb-8 md:mb-10">
                     Nuestros especialistas comerciales y técnicos están listos para asesorarle en su próximo gran reto de infraestructura.
                   </p>
                   <form action={async (formData) => {
@@ -174,12 +174,12 @@ export default async function Home() {
                       required
                       className="min-h-[150px] bg-background border-border focus:ring-primary text-lg"
                     />
-                    <Button type="submit" size="lg" className="w-full h-16 text-xl font-bold shadow-neon">
+                    <Button type="submit" size="lg" className="w-full h-14 md:h-16 text-lg md:text-xl font-bold shadow-neon">
                       Enviar Solicitud de Consulta
                     </Button>
                   </form>
                 </div>
-                <div className="relative min-h-[400px] lg:min-h-full">
+                <div className="relative min-h-[300px] md:min-h-[400px] lg:min-h-full order-1 lg:order-2">
                   <Image
                     src={getPlaceholderImage('contact-map')?.imageUrl || ''}
                     alt="Ubicación estratégica"

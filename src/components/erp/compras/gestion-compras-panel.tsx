@@ -1,13 +1,14 @@
 "use client";
 
 import { useErp } from "@/components/providers/erp-provider";
-import { Cotizacion, CotizacionProveedor } from "@/types/sistema";
+import { useToast } from "@/hooks/use-toast";
+import { Cotizacion, CotizacionProveedor, OrdenCompra } from "@/types/sistema";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, CheckCircle2, ShoppingCart, Download, User, Eye } from "lucide-react";
+import { FileText, CheckCircle2, ShoppingCart, Download, User, Eye, Pencil, Save, X } from "lucide-react";
 import { CrearCotizacionMaterialDialog } from "./crear-cotizacion-material-dialog";
 import { generateMaterialQuotePDF } from "@/utils/pdf-cotizacion-material";
 import { generateOrdenCompraPDF } from "@/utils/pdf-orden-compra";
@@ -25,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Props {
     cotizacion: Cotizacion;
@@ -75,33 +77,7 @@ export function GestionComprasPanel({ cotizacion }: Props) {
                     </h4>
                     <div className="grid gap-3">
                         {ocs.map(oc => (
-                            <Card key={oc.id} className="bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
-                                <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 border-green-300">
-                                                {oc.numero}
-                                            </Badge>
-                                            <span className="text-sm font-medium">{oc.proveedor?.nombre}</span>
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {format(oc.fechaEmision, "dd MMM yyyy", { locale: es })} • {oc.items.length} items
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <Badge variant="secondary">{oc.estado}</Badge>
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            onClick={() => generateOrdenCompraPDF(oc, cotizacion)}
-                                            className="h-8 gap-1 bg-white dark:bg-slate-900"
-                                        >
-                                            <Download className="h-3 w-3" />
-                                            PDF
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <OrdenCompraCard key={oc.id} oc={oc} cotizacion={cotizacion} />
                         ))}
                     </div>
                 </div>
@@ -123,6 +99,20 @@ function CotizacionProveedorCard({ cotizacionProveedor, ofertaOriginal }: { coti
         return initial;
     });
 
+    // Estado para guardar la cantidad aprobada para cada ítem
+    const [itemQuantities, setItemQuantities] = useState<Record<string, number>>(() => {
+        const initial: Record<string, number> = {};
+        cotizacionProveedor.items.forEach(i => initial[i.id] = i.cantidad);
+        return initial;
+    });
+
+    // Estado para ítems seleccionados para aprobar
+    const [selectedApproveItems, setSelectedApproveItems] = useState<Record<string, boolean>>(() => {
+        const initial: Record<string, boolean> = {};
+        cotizacionProveedor.items.forEach(i => initial[i.id] = true);
+        return initial;
+    });
+
     const isApproved = cotizacionProveedor.estado === 'APROBADA';
     const hasOC = ordenesCompra.some(oc => oc.cotizacionProveedorId === cotizacionProveedor.id);
 
@@ -131,19 +121,27 @@ function CotizacionProveedorCard({ cotizacionProveedor, ofertaOriginal }: { coti
         
         setIsApproving(true);
         try {
-            // 1. Calcular totales en base a los precios ingresados
-            const itemsWithPrices = cotizacionProveedor.items.map(i => {
-                const unitPrice = itemPrices[i.id] || 0;
-                return {
-                    id: i.id,
-                    inventarioId: i.inventarioId,
-                    descripcion: i.descripcion,
-                    cantidad: i.cantidad,
-                    valorUnitario: unitPrice,
-                    subtotal: unitPrice * i.cantidad,
-                    recibido: 0
-                };
-            });
+            // 1. Calcular totales en base a los precios ingresados y filtrar seleccionados
+            const itemsWithPrices = cotizacionProveedor.items
+                .filter(i => selectedApproveItems[i.id])
+                .map(i => {
+                    const unitPrice = itemPrices[i.id] || 0;
+                    const approvedQty = itemQuantities[i.id] || i.cantidad;
+                    return {
+                        id: i.id,
+                        inventarioId: i.inventarioId,
+                        descripcion: i.descripcion,
+                        cantidad: approvedQty,
+                        valorUnitario: unitPrice,
+                        subtotal: unitPrice * approvedQty,
+                        recibido: 0
+                    };
+                });
+
+            if (itemsWithPrices.length === 0) {
+                setIsApproving(false);
+                return;
+            }
 
             const ocSubtotal = itemsWithPrices.reduce((acc, item) => acc + item.subtotal, 0);
             const ocImpuestos = ocSubtotal * 0.19;
@@ -288,10 +286,32 @@ function CotizacionProveedorCard({ cotizacionProveedor, ofertaOriginal }: { coti
                                         <ScrollArea className="border rounded-md p-4 flex-1">
                                             <div className="space-y-3">
                                                 {cotizacionProveedor.items.map(item => (
-                                                    <div key={item.id} className="grid grid-cols-[1fr,120px] gap-4 items-center pb-3 border-b last:border-0 last:pb-0">
+                                                    <div key={item.id} className="grid grid-cols-[auto,1fr,120px] gap-4 items-center pb-3 border-b last:border-0 last:pb-0">
+                                                        <Checkbox 
+                                                            id={`approve-${item.id}`}
+                                                            checked={!!selectedApproveItems[item.id]}
+                                                            onCheckedChange={(checked) => setSelectedApproveItems({...selectedApproveItems, [item.id]: !!checked})}
+                                                        />
                                                         <div>
-                                                            <p className="text-sm font-medium line-clamp-2">{item.descripcion}</p>
-                                                            <p className="text-xs text-muted-foreground">Cantidad: {item.cantidad}</p>
+                                                            <Label htmlFor={`approve-${item.id}`} className="text-sm font-medium line-clamp-2 cursor-pointer">{item.descripcion}</Label>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className="text-xs text-muted-foreground">Cant:</span>
+                                                                <Input 
+                                                                    type="number"
+                                                                    className="h-6 w-16 text-xs px-2 py-0"
+                                                                    value={itemQuantities[item.id] ?? item.cantidad}
+                                                                    onChange={(e) => {
+                                                                        let val = e.target.value;
+                                                                        if (val.length > 1 && val.startsWith('0')) {
+                                                                            val = val.replace(/^0+(?=\d)/, '');
+                                                                            e.target.value = val;
+                                                                        }
+                                                                        setItemQuantities({...itemQuantities, [item.id]: Number(val)});
+                                                                    }}
+                                                                    disabled={!selectedApproveItems[item.id]}
+                                                                    min={1}
+                                                                />
+                                                            </div>
                                                         </div>
                                                         <div className="relative">
                                                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
@@ -300,7 +320,15 @@ function CotizacionProveedorCard({ cotizacionProveedor, ofertaOriginal }: { coti
                                                                 className="h-8 pl-6 text-sm"
                                                                 placeholder="V. Unit"
                                                                 value={itemPrices[item.id] || ''}
-                                                                onChange={(e) => setItemPrices({...itemPrices, [item.id]: Number(e.target.value)})}
+                                                                onChange={(e) => {
+                                                                    let val = e.target.value;
+                                                                    if (val.length > 1 && val.startsWith('0')) {
+                                                                        val = val.replace(/^0+(?=\d)/, '');
+                                                                        e.target.value = val;
+                                                                    }
+                                                                    setItemPrices({...itemPrices, [item.id]: Number(val)});
+                                                                }}
+                                                                disabled={!selectedApproveItems[item.id]}
                                                             />
                                                         </div>
                                                     </div>
@@ -318,6 +346,237 @@ function CotizacionProveedorCard({ cotizacionProveedor, ofertaOriginal }: { coti
                         </Dialog>
                     )}
                 </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function OrdenCompraCard({ oc, cotizacion }: { oc: OrdenCompra, cotizacion: Cotizacion }) {
+    const { updateOrdenCompra } = useErp();
+    const { toast } = useToast();
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editItems, setEditItems] = useState<Record<string, { cantidad: number, valorUnitario: number }>>({});
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleEditStart = () => {
+        const initial: Record<string, { cantidad: number, valorUnitario: number }> = {};
+        oc.items.forEach(i => {
+            initial[i.id] = { cantidad: i.cantidad, valorUnitario: i.valorUnitario };
+        });
+        setEditItems(initial);
+        setIsEditing(true);
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const updatedItems = oc.items.map(i => {
+                const editData = editItems[i.id];
+                if (editData) {
+                    return {
+                        ...i,
+                        cantidad: editData.cantidad,
+                        valorUnitario: editData.valorUnitario,
+                        subtotal: editData.cantidad * editData.valorUnitario
+                    };
+                }
+                return i;
+            });
+
+            const subtotal = updatedItems.reduce((acc, item) => acc + item.subtotal, 0);
+            const impuestos = subtotal * 0.19;
+            const total = subtotal + impuestos;
+
+            const updatedOC = {
+                ...oc,
+                items: updatedItems,
+                subtotal,
+                impuestos,
+                total
+            };
+
+            await updateOrdenCompra(oc.id, updatedOC);
+            setIsEditing(false);
+            toast({
+                title: "Orden de Compra actualizada",
+                description: "Los ítems y totales se han guardado correctamente.",
+            });
+        } catch (error) {
+            console.error("Error updating OC:", error);
+            toast({
+                title: "Error al guardar",
+                description: "Hubo un problema intentando actualizar la orden.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Card className="bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
+            <CardContent className="p-4 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 border-green-300">
+                                {oc.numero}
+                            </Badge>
+                            <span className="text-sm font-medium">{oc.proveedor?.nombre}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {format(oc.fechaEmision, "dd MMM yyyy", { locale: es })} • {oc.items.length} items
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className="bg-white/50">{oc.estado}</Badge>
+                        
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 gap-1 bg-white dark:bg-slate-900"
+                                    onClick={() => {
+                                        const pdfDataUrl = generateOrdenCompraPDF(oc, cotizacion, 'bloburl');
+                                        setPreviewUrl(pdfDataUrl as string);
+                                    }}
+                                >
+                                    <Eye className="h-3 w-3" />
+                                    Vista Previa
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                                <DialogHeader>
+                                    <DialogTitle>Vista Previa Orden de Compra</DialogTitle>
+                                </DialogHeader>
+                                <div className="flex-1 w-full mt-4 bg-muted/50 rounded-md overflow-hidden">
+                                    {previewUrl ? (
+                                        <iframe src={previewUrl} className="w-full h-full border-0" title="PDF Preview" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                            Generando vista previa...
+                                        </div>
+                                    )}
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => generateOrdenCompraPDF(oc, cotizacion, 'save')}
+                            className="h-8 gap-1 bg-white dark:bg-slate-900"
+                        >
+                            <Download className="h-3 w-3" />
+                            PDF
+                        </Button>
+
+                        {!isEditing ? (
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleEditStart}
+                                className="h-8 gap-1 bg-white dark:bg-slate-900"
+                            >
+                                <Pencil className="h-3 w-3" />
+                                Editar
+                            </Button>
+                        ) : (
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setIsEditing(false)}
+                                    className="h-8 gap-1"
+                                    disabled={isSaving}
+                                >
+                                    <X className="h-3 w-3" />
+                                    Cancelar
+                                </Button>
+                                <Button 
+                                    variant="default" 
+                                    size="sm" 
+                                    onClick={handleSave}
+                                    className="h-8 gap-1 bg-green-600 hover:bg-green-700 text-white"
+                                    disabled={isSaving}
+                                >
+                                    <Save className="h-3 w-3" />
+                                    Guardar
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {isEditing && (
+                    <div className="mt-4 border rounded-md p-4 bg-white dark:bg-slate-950">
+                        <h5 className="text-sm font-medium mb-3">Editar Ítems de la Orden de Compra</h5>
+                        <ScrollArea className="max-h-[300px]">
+                            <div className="space-y-3">
+                                {oc.items.map(item => (
+                                    <div key={item.id} className="grid grid-cols-1 sm:grid-cols-[1fr,auto,auto] gap-4 items-end pb-3 border-b last:border-0 last:pb-0">
+                                        <div>
+                                            <Label className="text-xs text-muted-foreground line-clamp-1">{item.descripcion}</Label>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-4">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Cantidad</Label>
+                                                <Input 
+                                                    type="number"
+                                                    className="h-8 w-24 text-sm"
+                                                    value={editItems[item.id]?.cantidad ?? item.cantidad}
+                                                    onChange={(e) => {
+                                                        let val = e.target.value;
+                                                        if (val.length > 1 && val.startsWith('0')) {
+                                                            val = val.replace(/^0+(?=\d)/, '');
+                                                            e.target.value = val;
+                                                        }
+                                                        setEditItems({
+                                                            ...editItems, 
+                                                            [item.id]: { ...editItems[item.id], cantidad: Number(val) }
+                                                        });
+                                                    }}
+                                                    min={1}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Valor Unitario</Label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
+                                                    <Input 
+                                                        type="number"
+                                                        className="h-8 w-32 pl-6 text-sm"
+                                                        value={editItems[item.id]?.valorUnitario ?? item.valorUnitario}
+                                                        onChange={(e) => {
+                                                            let val = e.target.value;
+                                                            if (val.length > 1 && val.startsWith('0')) {
+                                                                val = val.replace(/^0+(?=\d)/, '');
+                                                                e.target.value = val;
+                                                            }
+                                                            setEditItems({
+                                                                ...editItems, 
+                                                                [item.id]: { ...editItems[item.id], valorUnitario: Number(val) }
+                                                            });
+                                                        }}
+                                                        min={0}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1 w-24 text-right">
+                                                <Label className="text-xs text-muted-foreground">Subtotal</Label>
+                                                <div className="text-sm font-medium">
+                                                    ${((editItems[item.id]?.cantidad || 0) * (editItems[item.id]?.valorUnitario || 0)).toLocaleString('es-CO')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

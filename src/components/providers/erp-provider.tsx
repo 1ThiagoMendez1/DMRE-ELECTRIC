@@ -891,7 +891,10 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         try {
             const saved = await updateOrdenCompraAction(id, oc);
             setOrdenesCompra(prev => prev.map(o => o.id === saved.id ? saved : o));
-        } catch (error) { console.error("Error updating OC:", error); }
+        } catch (error) { 
+            console.error("Error updating OC:", error); 
+            throw error;
+        }
     };
 
     const addCotizacionProveedor = async (cot: Omit<CotizacionProveedor, "id" | "fechaAprobacion" | "items">, items: any[]) => {

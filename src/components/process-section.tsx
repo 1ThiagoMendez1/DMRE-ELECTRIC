@@ -38,18 +38,18 @@ const steps = [
 
 export function ProcessSection() {
     return (
-        <section className="py-24 lg:py-32 bg-background relative overflow-hidden">
+        <section className="py-16 md:py-24 lg:py-32 bg-background relative overflow-hidden">
             <div className="container mx-auto px-4 relative z-10">
                 <div className="max-w-3xl mb-16">
-                    <h2 className="text-4xl lg:text-5xl font-bold font-headline text-foreground mb-6">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-headline text-foreground mb-4 md:mb-6">
                         Nuestra Metodología de Éxito
                     </h2>
-                    <p className="text-xl text-muted-foreground">
+                    <p className="text-lg md:text-xl text-muted-foreground">
                         Desde la concepción hasta la operación, aplicamos un proceso riguroso para asegurar la excelencia en cada kilovatio.
                     </p>
                 </div>
 
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-12 relative">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12 relative">
                     {/* Decorative lines for "process" flow could be added here */}
                     {steps.map((step, index) => (
                         <motion.div

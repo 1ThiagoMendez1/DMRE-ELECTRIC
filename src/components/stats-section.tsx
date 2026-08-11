@@ -18,12 +18,12 @@ const stats: Stat[] = [
 
 export function StatsSection() {
     return (
-        <section className="py-24 bg-primary text-primary-foreground relative overflow-hidden">
+        <section className="py-16 md:py-24 bg-primary text-primary-foreground relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 pointer-events-none">
                 <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
             </div>
             <div className="container mx-auto px-4 relative z-10">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-12 text-center">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 text-center">
                     {stats.map((stat, index) => (
                         <StatItem key={index} stat={stat} index={index} />
                     ))}
@@ -66,10 +66,10 @@ function StatItem({ stat, index }: { stat: Stat; index: number }) {
             transition={{ duration: 0.6, delay: index * 0.1 }}
             className="flex flex-col gap-2"
         >
-            <span className="text-5xl lg:text-7xl font-bold font-headline tracking-tighter">
+            <span className="text-4xl sm:text-5xl lg:text-7xl font-bold font-headline tracking-tighter">
                 {count}{stat.suffix}
             </span>
-            <span className="text-primary-foreground/70 uppercase tracking-widest text-sm font-semibold">
+            <span className="text-primary-foreground/70 uppercase tracking-widest text-xs sm:text-sm font-semibold">
                 {stat.label}
             </span>
         </motion.div>
