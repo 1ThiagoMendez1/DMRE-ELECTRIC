@@ -84,7 +84,7 @@ export function DotacionMetricsDashboard({ dotacionItems, entregas }: DotacionMe
             </Button>
 
             {isExpanded && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                     {/* Inventario Total */}
                     <Card className="shadow-sm">
                         <CardHeader className="pb-2">

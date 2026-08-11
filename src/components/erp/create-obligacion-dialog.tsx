@@ -95,17 +95,17 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="entidad" className="text-right">Entidad</Label>
                         <Input
                             id="entidad"
                             placeholder="Ej: Banco Agrario"
                             value={entidad}
                             onChange={(e) => setEntidad(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="monto" className="text-right">Monto</Label>
                         <Input
                             id="monto"
@@ -113,10 +113,10 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
                             placeholder="0"
                             value={monto}
                             onChange={(e) => setMonto(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="tasa" className="text-right">Tasa (E.A %)</Label>
                         <Input
                             id="tasa"
@@ -124,10 +124,10 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
                             placeholder="Ej: 14.5"
                             value={tasa}
                             onChange={(e) => setTasa(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="plazo" className="text-right">Plazo (Meses)</Label>
                         <Input
                             id="plazo"
@@ -135,23 +135,23 @@ export function CreateObligacionDialog({ onObligacionCreated }: CreateObligacion
                             placeholder="Ej: 36"
                             value={plazo}
                             onChange={(e) => setPlazo(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="fecha" className="text-right">Fecha Inicio</Label>
                         <Input
                             id="fecha"
                             type="date"
                             value={fecha}
                             onChange={(e) => setFecha(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label className="text-right">Cuenta Receptora (Opcional)</Label>
                         <Select onValueChange={setCuentaId} value={cuentaId}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="col-span-1 md:col-span-3">
                                 <SelectValue placeholder="Seleccione una cuenta" />
                             </SelectTrigger>
                             <SelectContent>

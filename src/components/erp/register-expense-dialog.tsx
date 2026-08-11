@@ -231,7 +231,7 @@ export function RegisterExpenseDialog({ vehiculos, cuentas, onExpenseCreated, ga
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="fecha"
@@ -300,7 +300,7 @@ export function RegisterExpenseDialog({ vehiculos, cuentas, onExpenseCreated, ga
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="tipo"
@@ -343,7 +343,7 @@ export function RegisterExpenseDialog({ vehiculos, cuentas, onExpenseCreated, ga
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="proveedor"

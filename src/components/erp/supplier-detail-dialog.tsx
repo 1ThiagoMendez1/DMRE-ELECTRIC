@@ -197,7 +197,7 @@ export function SupplierDetailDialog({ open, onOpenChange, proveedor }: Supplier
                 </DialogHeader>
 
                 <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-3">
                         <TabsTrigger value="overview">Resumen y Finanzas</TabsTrigger>
                         <TabsTrigger value="history">Historial de Pedidos</TabsTrigger>
                         <TabsTrigger value="analytics">Análisis de Precios</TabsTrigger>
@@ -208,7 +208,7 @@ export function SupplierDetailDialog({ open, onOpenChange, proveedor }: Supplier
                         <TabsContent value="overview" className="space-y-4">
                             {isEditing ? (
                                 <Form {...form}>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField control={form.control} name="nombre" render={({ field }) => (
                                             <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                                         )} />
@@ -222,16 +222,16 @@ export function SupplierDetailDialog({ open, onOpenChange, proveedor }: Supplier
                                             <FormItem><FormLabel>Categoría</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={form.control} name="datosBancarios" render={({ field }) => (
-                                            <FormItem className="col-span-2"><FormLabel>Datos Bancarios</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                            <FormItem className="col-span-1 md:col-span-2"><FormLabel>Datos Bancarios</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={form.control} name="notas" render={({ field }) => (
-                                            <FormItem className="col-span-2"><FormLabel>Notas / Proyecto</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                            <FormItem className="col-span-1 md:col-span-2"><FormLabel>Notas / Proyecto</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                                         )} />
                                     </div>
                                 </Form>
                             ) : (
                                 <>
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <Card>
                                             <CardHeader className="pb-2">
                                                 <CardTitle className="text-sm font-medium">Pedidos Totales</CardTitle>

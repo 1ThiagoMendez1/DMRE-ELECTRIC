@@ -175,7 +175,7 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                 </DialogHeader>
 
                 <Tabs defaultValue="info" className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-2">
                         <TabsTrigger value="info">Información General</TabsTrigger>
                         <TabsTrigger value="metrics">Métricas e Histórico</TabsTrigger>
                     </TabsList>
@@ -228,7 +228,7 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                         </TabsContent>
 
                         <TabsContent value="metrics" className="space-y-6">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-4">
                                 <Card>
                                     <CardContent className="p-4 flex flex-col items-center text-center">
                                         <FileText className="h-8 w-8 text-blue-500 mb-2" />

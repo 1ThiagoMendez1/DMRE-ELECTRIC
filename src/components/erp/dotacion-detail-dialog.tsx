@@ -65,7 +65,7 @@ export function DotacionDetailDialog({
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-2">
                         <TabsTrigger value="variantes">Variantes y Stock</TabsTrigger>
                         <TabsTrigger value="historial">Historial Entregas</TabsTrigger>
                     </TabsList>
@@ -155,17 +155,17 @@ export function DotacionDetailDialog({
                                             <p className="text-sm text-muted-foreground">Defina talla, color y stock inicial.</p>
                                         </div>
                                         <div className="grid gap-2">
-                                            <div className="grid grid-cols-3 items-center gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-4">
                                                 <Label htmlFor="talla">Talla</Label>
-                                                <Input id="talla" value={newVariant.talla} onChange={(e) => setNewVariant({ ...newVariant, talla: e.target.value })} className="col-span-2 h-8" />
+                                                <Input id="talla" value={newVariant.talla} onChange={(e) => setNewVariant({ ...newVariant, talla: e.target.value })} className="col-span-1 md:col-span-2 h-8" />
                                             </div>
-                                            <div className="grid grid-cols-3 items-center gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-4">
                                                 <Label htmlFor="color">Color</Label>
-                                                <Input id="color" value={newVariant.color} onChange={(e) => setNewVariant({ ...newVariant, color: e.target.value })} className="col-span-2 h-8" />
+                                                <Input id="color" value={newVariant.color} onChange={(e) => setNewVariant({ ...newVariant, color: e.target.value })} className="col-span-1 md:col-span-2 h-8" />
                                             </div>
-                                            <div className="grid grid-cols-3 items-center gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-4">
                                                 <Label htmlFor="stock">Stock</Label>
-                                                <Input id="stock" type="number" value={newVariant.stock} onChange={(e) => setNewVariant({ ...newVariant, stock: parseInt(e.target.value) || 0 })} className="col-span-2 h-8" />
+                                                <Input id="stock" type="number" value={newVariant.stock} onChange={(e) => setNewVariant({ ...newVariant, stock: parseInt(e.target.value) || 0 })} className="col-span-1 md:col-span-2 h-8" />
                                             </div>
                                         </div>
                                         <Button onClick={handleAddVariant} className="electric-button">Agregar</Button>

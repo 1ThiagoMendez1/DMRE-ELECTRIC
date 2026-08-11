@@ -221,7 +221,7 @@ export function ActivosDashboard({ vehiculos, gastos }: ActivosDashboardProps) {
 
             {/* Charts */}
             <div className="grid gap-4 md:grid-cols-7">
-                <Card className="col-span-4 shadow-sm">
+                <Card className="col-span-1 md:col-span-4 shadow-sm">
                     <CardHeader>
                         <CardTitle>Tendencia de Costos Operativos</CardTitle>
                         <CardDescription>Últimos 6 meses por categoría</CardDescription>
@@ -242,7 +242,7 @@ export function ActivosDashboard({ vehiculos, gastos }: ActivosDashboardProps) {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-3 shadow-sm">
+                <Card className="col-span-1 md:col-span-3 shadow-sm">
                     <CardHeader>
                         <CardTitle>Estado de la Flota</CardTitle>
                         <CardDescription>Distribución actual</CardDescription>

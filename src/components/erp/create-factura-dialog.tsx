@@ -179,19 +179,19 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="numero" className="text-right">No. Factura</Label>
                         <Input
                             id="numero"
                             value={numero}
                             onChange={(e) => setNumero(e.target.value)}
                             placeholder="Ej. FAC-1001"
-                            className="col-span-3 font-mono"
+                            className="col-span-1 md:col-span-3 font-mono"
                         />
 
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="cliente" className="text-right">Cliente</Label>
                         <Popover open={openClienteBox} onOpenChange={setOpenClienteBox}>
                             <PopoverTrigger asChild>
@@ -199,7 +199,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                     variant="outline"
                                     role="combobox"
                                     aria-expanded={openClienteBox}
-                                    className="col-span-3 justify-between"
+                                    className="col-span-1 md:col-span-3 justify-between"
                                 >
                                     <span className="truncate">
                                         {clienteId
@@ -244,10 +244,10 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                     </div>
 
                     {clienteId && cotizaciones && cotizaciones.filter(c => c.clienteId === clienteId).length > 0 && (
-                        <div className="grid grid-cols-4 items-center gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                             <Label htmlFor="cotizacion" className="text-right">Cotización</Label>
                             <Select value={selectedCotizacionId} onValueChange={setSelectedCotizacionId}>
-                                <SelectTrigger className="col-span-3 h-auto min-h-[40px] py-2 px-3 text-left">
+                                <SelectTrigger className="col-span-1 md:col-span-3 h-auto min-h-[40px] py-2 px-3 text-left">
                                     <div className="flex-1 text-left line-clamp-2">
                                         <SelectValue placeholder="Vincular a Oferta..." />
                                     </div>
@@ -276,29 +276,29 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                         </div>
                     )}
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="emision" className="text-right">Emisión</Label>
                         <Input
                             id="emision"
                             type="date"
                             value={fechaEmision}
                             onChange={(e) => setFechaEmision(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="vencimiento" className="text-right">Vencimiento</Label>
                         <Input
                             id="vencimiento"
                             type="date"
                             value={fechaVencimiento}
                             onChange={(e) => setFechaVencimiento(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="valor" className="text-right">Valor Total</Label>
                         <Input
                             id="valor"
@@ -306,14 +306,14 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                             value={valor}
                             onChange={(e) => setValor(e.target.value)}
                             placeholder="0"
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="estado" className="text-right">Estado</Label>
                         <Select value={estado} onValueChange={(v) => setEstado(v as any)}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="col-span-1 md:col-span-3">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -324,9 +324,9 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-4 items-start gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-start gap-4">
                         <Label className="text-right mt-2">Soporte (PDF)</Label>
-                        <div className="col-span-3 flex flex-col gap-2">
+                        <div className="col-span-1 md:col-span-3 flex flex-col gap-2">
                             {archivoUrl ? (
                                 <div className="flex items-center justify-between p-2 border rounded-md bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
                                     <div className="flex items-center gap-2 overflow-hidden">

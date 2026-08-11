@@ -240,7 +240,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                 </DialogHeader>
 
                 <Tabs defaultValue="pagos" className="flex-1 overflow-hidden flex flex-col mt-4">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-3">
                         <TabsTrigger value="pagos">Registrar & Historial</TabsTrigger>
                         <TabsTrigger value="amortizacion">Proyección Dinámica</TabsTrigger>
                         <TabsTrigger value="detalle">Info. General</TabsTrigger>
@@ -249,18 +249,18 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                     {/* --- DETAILS TAB --- */}
                     <TabsContent value="detalle" className="flex-1 overflow-auto p-4 border rounded-md mt-2">
                         <div className="grid gap-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label className="text-right font-bold">Entidad</Label>
                                 <Input
                                     value={entidad}
                                     onChange={(e) => setEntidad(e.target.value)}
                                     disabled={!isEditing}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label className="text-right font-bold">Monto Original</Label>
-                                <div className="col-span-3 p-2 bg-muted rounded-md">{formatCurrency(localObligacion.montoPrestado)}</div>
+                                <div className="col-span-1 md:col-span-3 p-2 bg-muted rounded-md">{formatCurrency(localObligacion.montoPrestado)}</div>
                             </div>
                         </div>
                         <div className="flex justify-end mt-6">
@@ -276,7 +276,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
 
                     {/* --- AMORTIZATION TAB --- */}
                     <TabsContent value="amortizacion" className="flex-1 overflow-auto rounded-md border mt-2">
-                        <div className="p-2 text-sm text-center sticky top-0 bg-background border-b z-10 grid grid-cols-2 gap-4">
+                        <div className="p-2 text-sm text-center sticky top-0 bg-background border-b z-10 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex items-center justify-center gap-2 text-green-600">
                                 <span className="w-3 h-3 rounded-full bg-green-100 border border-green-600"></span>
                                 Historico Real
@@ -341,7 +341,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                             </div>
                                         </RadioGroup>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <Label>Fecha</Label>
                                             <Input type="date" value={pagoFecha} onChange={e => setPagoFecha(e.target.value)} />

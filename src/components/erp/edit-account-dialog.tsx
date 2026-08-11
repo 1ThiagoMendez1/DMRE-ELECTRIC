@@ -94,12 +94,12 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="tipo-edit" className="text-right">
                             Tipo
                         </Label>
                         <Select value={tipo} onValueChange={(v) => setTipo(v as TipoCuenta)}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="col-span-1 md:col-span-3">
                                 <SelectValue placeholder="Seleccione tipo" />
                             </SelectTrigger>
                             <SelectContent>
@@ -109,7 +109,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="nombre-edit" className="text-right">
                             Nombre
                         </Label>
@@ -117,13 +117,13 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                             id="nombre-edit"
                             value={nombre}
                             onChange={(e) => setNombre(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
                     {(tipo === 'BANCO' || tipo === 'CREDITO') && (
                         <>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="banco-edit" className="text-right">
                                     Banco
                                 </Label>
@@ -131,10 +131,10 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                                     id="banco-edit"
                                     value={banco}
                                     onChange={(e) => setBanco(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="numero-edit" className="text-right">
                                     Número
                                 </Label>
@@ -142,7 +142,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                                     id="numero-edit"
                                     value={numero}
                                     onChange={(e) => setNumero(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
                         </>
@@ -150,7 +150,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
 
                     {tipo === 'CREDITO' && (
                         <>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="cupo-edit" className="text-right">
                                     Cupo Total
                                 </Label>
@@ -160,10 +160,10 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                                     placeholder="0"
                                     value={cupoTotal}
                                     onChange={(e) => setCupoTotal(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="corte-edit" className="text-right text-xs">
                                     Día Corte
                                 </Label>
@@ -191,7 +191,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                                     className="col-span-1"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="interes-edit" className="text-right text-xs">
                                     Tasa (%)
                                 </Label>
@@ -202,13 +202,13 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                                     placeholder="2.5"
                                     value={tasaInteres}
                                     onChange={(e) => setTasaInteres(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
                         </>
                     )}
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="saldo-edit" className="text-right">
                             {tipo === 'CREDITO' ? 'Deuda Actual' : 'Saldo Actual'}
                         </Label>
@@ -217,7 +217,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
                             type="number"
                             value={saldo}
                             onChange={(e) => setSaldo(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
                 </div>

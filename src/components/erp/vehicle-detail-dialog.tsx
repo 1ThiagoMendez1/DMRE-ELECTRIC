@@ -273,7 +273,7 @@ export function VehicleDetailDialog({ open, onOpenChange, vehiculo, gastos }: Ve
 
                             {/* Tab: General */}
                             <TabsContent value="general" className="space-y-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <p className="text-sm text-muted-foreground">Placa</p>
                                         {isEditing ? (
@@ -505,7 +505,7 @@ export function VehicleDetailDialog({ open, onOpenChange, vehiculo, gastos }: Ve
 
                             {/* Tab: Métricas */}
                             <TabsContent value="metricas" className="space-y-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <Card>
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-xs text-muted-foreground flex items-center gap-2">
@@ -576,7 +576,7 @@ export function VehicleDetailDialog({ open, onOpenChange, vehiculo, gastos }: Ve
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {(vehiculo.archivos || []).map((archivo, idx) => (
                                         <Card key={idx} className="overflow-hidden group relative">
                                             <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
@@ -627,7 +627,7 @@ export function VehicleDetailDialog({ open, onOpenChange, vehiculo, gastos }: Ve
                                     ))}
 
                                     {!(vehiculo.archivos?.length) && !vehicleGastos.some(g => g.soporteUrl) && (
-                                        <div className="col-span-3 py-10 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+                                        <div className="col-span-1 md:col-span-3 py-10 text-center text-muted-foreground border-2 border-dashed rounded-lg">
                                             No hay archivos cargados para este vehículo
                                         </div>
                                     )}

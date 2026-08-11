@@ -64,7 +64,7 @@ export function CodigoDetailDialog({ open, onOpenChange, codigo, onUpdate }: Cod
                         <Textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
                             <Label>Costo Mano de Obra</Label>
                             <Input type="number" value={manoDeObra} onChange={(e) => setManoDeObra(e.target.value)} />

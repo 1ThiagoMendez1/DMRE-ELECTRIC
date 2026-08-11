@@ -129,7 +129,7 @@ export function MaterialDetailConsumoDialog({
                 </DialogHeader>
 
                 {/* Material Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-3 mt-2">
                     <div className="rounded-lg border p-3 text-center">
                         <p className="text-xs text-muted-foreground">SKU</p>
                         <p className="font-semibold text-sm">{material.sku || "—"}</p>

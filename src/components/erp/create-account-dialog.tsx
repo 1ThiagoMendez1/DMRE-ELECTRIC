@@ -86,12 +86,12 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="tipo" className="text-right">
                             Tipo
                         </Label>
                         <Select value={tipo} onValueChange={(v) => setTipo(v as any)}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="col-span-1 md:col-span-3">
                                 <SelectValue placeholder="Seleccione tipo" />
                             </SelectTrigger>
                             <SelectContent>
@@ -101,7 +101,7 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="nombre" className="text-right">
                             Nombre
                         </Label>
@@ -110,13 +110,13 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                             placeholder="Ej: Bancolombia Principal"
                             value={nombre}
                             onChange={(e) => setNombre(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
                     {(tipo === 'BANCO' || tipo === 'CREDITO') && (
                         <>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="banco" className="text-right">
                                     Banco
                                 </Label>
@@ -125,10 +125,10 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                                     placeholder="Ej: Bancolombia"
                                     value={banco}
                                     onChange={(e) => setBanco(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="numero" className="text-right">
                                     Número
                                 </Label>
@@ -137,7 +137,7 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                                     placeholder="000-000-000-00"
                                     value={numero}
                                     onChange={(e) => setNumero(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
                         </>
@@ -145,7 +145,7 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
 
                     {tipo === 'CREDITO' && (
                         <>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="cupo" className="text-right">
                                     Cupo Total
                                 </Label>
@@ -155,10 +155,10 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                                     placeholder="0"
                                     value={cupoTotal}
                                     onChange={(e) => setCupoTotal(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="corte" className="text-right text-xs">
                                     Día Corte
                                 </Label>
@@ -186,7 +186,7 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                                     className="col-span-1"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label htmlFor="interes" className="text-right text-xs">
                                     Tasa (%)
                                 </Label>
@@ -197,13 +197,13 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                                     placeholder="2.5"
                                     value={tasaInteres}
                                     onChange={(e) => setTasaInteres(e.target.value)}
-                                    className="col-span-3"
+                                    className="col-span-1 md:col-span-3"
                                 />
                             </div>
                         </>
                     )}
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="saldo" className="text-right">
                             {tipo === 'CREDITO' ? 'Deuda Actual' : 'Saldo Inicial'}
                         </Label>
@@ -213,7 +213,7 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
                             placeholder="0"
                             value={saldo}
                             onChange={(e) => setSaldo(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
                 </div>

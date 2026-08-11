@@ -60,7 +60,7 @@ export function ClientProfileDialog({ cliente, trigger }: ClientProfileDialogPro
                     </div>
 
                     {/* Contact Details and Location */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-3">
                             <h4 className="text-sm font-semibold text-muted-foreground uppercase">Contacto</h4>
                             {cliente.codigo && (
@@ -104,7 +104,7 @@ export function ClientProfileDialog({ cliente, trigger }: ClientProfileDialogPro
                     )}
 
                     {/* Stats Placeholder */}
-                    <div className="bg-muted/50 p-4 rounded-lg grid grid-cols-3 gap-4 text-center">
+                    <div className="bg-muted/50 p-4 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                         <div>
                             <p className="text-xs text-muted-foreground">Proyectos</p>
                             <p className="text-lg font-bold">Activos</p>

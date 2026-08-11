@@ -171,7 +171,7 @@ export function NovedadDialog({ empleados, onNovedadSaved, novedadToEdit, open, 
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="fecha"
@@ -240,7 +240,7 @@ export function NovedadDialog({ empleados, onNovedadSaved, novedadToEdit, open, 
                             />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="tipo"
@@ -299,12 +299,12 @@ export function NovedadDialog({ empleados, onNovedadSaved, novedadToEdit, open, 
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="descripcion"
                                 render={({ field }) => (
-                                    <FormItem className="col-span-2">
+                                    <FormItem className="col-span-1 md:col-span-2">
                                         <FormLabel>Descripción / Concepto</FormLabel>
                                         <FormControl>
                                             <Input placeholder="Ej: Trabajo extra proyecto X" {...field} />
@@ -318,7 +318,7 @@ export function NovedadDialog({ empleados, onNovedadSaved, novedadToEdit, open, 
                                 control={form.control}
                                 name="observaciones"
                                 render={({ field }) => (
-                                    <FormItem className="col-span-2">
+                                    <FormItem className="col-span-1 md:col-span-2">
                                         <FormLabel>Observaciones Detalladas</FormLabel>
                                         <FormControl>
                                             <Textarea placeholder="Detalles adicionales..." {...field} />

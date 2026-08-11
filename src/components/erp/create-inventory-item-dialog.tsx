@@ -223,7 +223,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="sku"
@@ -252,7 +252,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="marca"
@@ -347,7 +347,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             )}
                         />
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="categoria"
@@ -394,7 +394,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="cantidad"
@@ -423,7 +423,7 @@ export function CreateInventoryItemDialog({ onItemCreated }: CreateInventoryItem
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="precioProveedor"

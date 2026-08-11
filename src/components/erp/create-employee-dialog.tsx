@@ -222,7 +222,7 @@ export function CreateEmployeeDialog({ onEmployeeCreated }: CreateEmployeeDialog
                 </DialogHeader>
 
                 <Tabs value={tab} onValueChange={setTab} className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-2">
                         <TabsTrigger value="info">Información Personal</TabsTrigger>
                         <TabsTrigger value="docs" className="relative">
                             Documentos
@@ -251,7 +251,7 @@ export function CreateEmployeeDialog({ onEmployeeCreated }: CreateEmployeeDialog
                                 />
 
                                 {/* Cédula + Teléfono */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={form.control} name="cedula"
                                         render={({ field }) => (
                                             <FormItem>
@@ -284,7 +284,7 @@ export function CreateEmployeeDialog({ onEmployeeCreated }: CreateEmployeeDialog
                                 />
 
                                 {/* Cargo + Tipo Vinculación */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={form.control} name="cargo"
                                         render={({ field }) => (
                                             <FormItem>
@@ -339,7 +339,7 @@ export function CreateEmployeeDialog({ onEmployeeCreated }: CreateEmployeeDialog
                                 </div>
 
                                 {/* Salario + Fecha Ingreso */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={form.control} name="salarioBase"
                                         render={({ field }) => (
                                             <FormItem>

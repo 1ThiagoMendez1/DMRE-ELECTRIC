@@ -219,12 +219,12 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="cotizacionId"
                                 render={({ field }) => (
-                                    <FormItem className="col-span-2">
+                                    <FormItem className="col-span-1 md:col-span-2">
                                         <FormLabel>Oferta Vinculada (Cliente)</FormLabel>
                                         <Select 
                                             onValueChange={(val) => {
@@ -262,7 +262,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                     );
 
                                     return (
-                                        <FormItem className="col-span-2">
+                                        <FormItem className="col-span-1 md:col-span-2">
                                             <FormLabel>Compra Aprobada (Solicitud CM-XXXX)</FormLabel>
                                             <Select 
                                                 onValueChange={field.onChange} 
@@ -350,7 +350,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="valorFactura"
@@ -380,7 +380,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="valorPago"
@@ -438,7 +438,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="diasCredito"

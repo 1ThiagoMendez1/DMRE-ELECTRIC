@@ -162,7 +162,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                 
                                 {/* Full width "Trabajo a realizar" row */}
                                 <div className="grid grid-cols-12 border-t-2 border-black min-h-[48px]">
-                                    <div className="col-span-2 text-[9px] font-bold flex flex-col items-center justify-center text-center px-1 border-r-2 border-black">
+                                    <div className="col-span-1 md:col-span-2 text-[9px] font-bold flex flex-col items-center justify-center text-center px-1 border-r-2 border-black">
                                         Trabajo a realizar
                                     </div>
                                     <div className="col-span-10 text-[9px] p-2 flex items-center uppercase leading-tight">
@@ -204,10 +204,10 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                             <div className="mb-8 p-4 rounded bg-gray-50 text-black">
                                 <h3 className="font-bold mb-2 uppercase text-sm" style={{ color: rgbToHex(currentStyle.colors.primary) }}>CLIENTE:</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                                    <p className="font-bold col-span-2 text-base text-black">{typeof quote.cliente === 'string' ? quote.cliente : quote.cliente?.nombre}</p>
+                                    <p className="font-bold col-span-1 md:col-span-2 text-base text-black">{typeof quote.cliente === 'string' ? quote.cliente : quote.cliente?.nombre}</p>
                                     <p><span className="opacity-70">NIT/CC:</span> {typeof quote.cliente === 'string' ? '' : quote.cliente?.documento}</p>
                                     <p><span className="opacity-70">Contacto:</span> {typeof quote.cliente === 'string' ? '' : quote.cliente?.contactoPrincipal}</p>
-                                    <p className="col-span-2"><span className="opacity-70">Dirección:</span> {typeof quote.cliente === 'string' ? '' : quote.cliente?.direccion}</p>
+                                    <p className="col-span-1 md:col-span-2"><span className="opacity-70">Dirección:</span> {typeof quote.cliente === 'string' ? '' : quote.cliente?.direccion}</p>
                                 </div>
                             </div>
 

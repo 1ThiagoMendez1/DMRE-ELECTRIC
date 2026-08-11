@@ -91,7 +91,7 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                 </DialogHeader>
 
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="fecha" className="text-right">Fecha</Label>
                         <Input
                             id="fecha"
@@ -99,14 +99,14 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                             value={fecha}
                             onChange={(e) => setFecha(e.target.value)}
                             disabled={!isEditing}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="tipo" className="text-right">Tipo</Label>
                         <Select value={tipo} onValueChange={(v) => setTipo(v as TipoMovimiento)} disabled={!isEditing}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="col-span-1 md:col-span-3">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -116,10 +116,10 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="categoria" className="text-right">Categoría</Label>
                         <Select value={categoria} onValueChange={(v) => setCategoria(v as CategoriaMovimiento)} disabled={!isEditing}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="col-span-1 md:col-span-3">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -135,29 +135,29 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="concepto" className="text-right">Concepto</Label>
                         <Input
                             id="concepto"
                             value={concepto}
                             onChange={(e) => setConcepto(e.target.value)}
                             disabled={!isEditing}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="tercero" className="text-right">Tercero</Label>
                         <Input
                             id="tercero"
                             value={tercero}
                             onChange={(e) => setTercero(e.target.value)}
                             disabled={!isEditing}
-                            className="col-span-3"
+                            className="col-span-1 md:col-span-3"
                         />
                     </div>
 
-                    <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="valor" className="text-right">Valor</Label>
                         <Input
                             id="valor"
@@ -165,23 +165,23 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                             value={valor}
                             onChange={(e) => setValor(e.target.value)}
                             disabled={!isEditing}
-                            className="col-span-3 font-mono font-bold"
+                            className="col-span-1 md:col-span-3 font-mono font-bold"
                         />
                     </div>
 
                     {!isEditing && (
-                        <div className="grid grid-cols-4 items-center gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                             <Label className="text-right">Cuenta</Label>
-                            <div className="col-span-3 text-sm font-medium border p-2 rounded-md bg-muted/50">
+                            <div className="col-span-1 md:col-span-3 text-sm font-medium border p-2 rounded-md bg-muted/50">
                                 {movimiento.cuenta.nombre} ({movimiento.cuenta.tipo})
                             </div>
                         </div>
                     )}
 
                     {movimiento.comprobanteUrl && (
-                        <div className="grid grid-cols-4 items-center gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                             <Label className="text-right">Soporte</Label>
-                            <div className="col-span-3">
+                            <div className="col-span-1 md:col-span-3">
                                 <Button 
                                     variant="outline" 
                                     className="w-full flex items-center justify-between gap-2 border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"

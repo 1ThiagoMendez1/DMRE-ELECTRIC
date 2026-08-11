@@ -96,14 +96,14 @@ export function ObraDetailDialog({ open, onOpenChange, registro, onUpdate }: Obr
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden mt-4">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-3">
                         <TabsTrigger value="info">Información General</TabsTrigger>
                         <TabsTrigger value="historial">Historial de Cambios</TabsTrigger>
                         <TabsTrigger value="pagos">Pagos y Anticipos</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="info" className="flex-1 overflow-auto py-4 space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-4">
                                 <div className="space-y-2">
                                     <Label>Nombre de la Obra</Label>
@@ -186,7 +186,7 @@ export function ObraDetailDialog({ open, onOpenChange, registro, onUpdate }: Obr
                     </TabsContent>
 
                     <TabsContent value="pagos" className="flex-1 overflow-auto py-4 space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm font-medium">Total Recibido</CardTitle>
@@ -222,7 +222,7 @@ export function ObraDetailDialog({ open, onOpenChange, registro, onUpdate }: Obr
                             <Card className="border-primary bg-primary/5">
                                 <CardContent className="p-4 space-y-4">
                                     <h4 className="font-medium text-sm">Nuevo Abono</h4>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label>Monto a Abonar</Label>
                                             <Input

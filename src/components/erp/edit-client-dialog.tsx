@@ -119,7 +119,7 @@ export function EditClientDialog({ cliente, onClientUpdated }: EditClientDialogP
                                 </FormItem>
                             )}
                         />
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="documento"
@@ -147,7 +147,7 @@ export function EditClientDialog({ cliente, onClientUpdated }: EditClientDialogP
                                 )}
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="correo"

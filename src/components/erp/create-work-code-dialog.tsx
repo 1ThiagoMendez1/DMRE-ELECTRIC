@@ -254,7 +254,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                 <div className="flex-1 overflow-y-auto px-1">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
                                     name="codigo"
@@ -357,8 +357,8 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                                 <div className="border rounded-md">
                                     <div className="grid grid-cols-12 gap-2 p-2 bg-muted/50 text-xs font-medium text-muted-foreground">
                                         <div className="col-span-6">Descripción</div>
-                                        <div className="col-span-2 text-right">Cant.</div>
-                                        <div className="col-span-3 text-right">Subtotal</div>
+                                        <div className="col-span-1 md:col-span-2 text-right">Cant.</div>
+                                        <div className="col-span-1 md:col-span-3 text-right">Subtotal</div>
                                         <div className="col-span-1"></div>
                                     </div>
                                     <div className="max-h-[200px] overflow-y-auto">
@@ -372,7 +372,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                                                     {mat.type === 'APU' && <span className="font-bold mr-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">APU</span>}
                                                     {mat.itemRef.descripcion || mat.itemRef.nombre}
                                                 </div>
-                                                <div className="col-span-2">
+                                                <div className="col-span-1 md:col-span-2">
                                                     <Input
                                                         type="number"
                                                         className="h-7 text-right px-2"
@@ -382,7 +382,7 @@ export function CreateWorkCodeDialog({ open, onOpenChange, codigosExistentes, on
                                                         onChange={(e) => handleUpdateQuantity(mat.inventarioId || mat.subCodigoId, Number(e.target.value))}
                                                     />
                                                 </div>
-                                                <div className="col-span-3 text-right">
+                                                <div className="col-span-1 md:col-span-3 text-right">
                                                     {formatCurrency(mat.itemRef.valorUnitario * mat.cantidad)}
                                                 </div>
                                                 <div className="col-span-1 text-right">

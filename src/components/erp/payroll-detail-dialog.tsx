@@ -69,7 +69,7 @@ export function PayrollDetailDialog({ open, onOpenChange, nomina }: PayrollDetai
 
                 <div className="space-y-4 py-4 text-sm">
                     {/* Employee Info */}
-                    <div className="grid grid-cols-2 gap-4 p-3 bg-muted/30 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-muted/30 rounded-lg">
                         <div>
                             <p className="text-muted-foreground text-xs">EMPLEADO</p>
                             <p className="font-bold">{nomina.empleado.nombreCompleto}</p>
@@ -88,24 +88,24 @@ export function PayrollDetailDialog({ open, onOpenChange, nomina }: PayrollDetai
                             DEVENGADOS
                         </div>
                         <div className="p-3 space-y-2">
-                            <div className="grid grid-cols-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2">
                                 <span>Salario Básico Mensual</span>
                                 <span className="text-right">{formatCurrency(baseSalary)}</span>
                             </div>
                             {novedadesAdicion > 0 && (
-                                <div className="grid grid-cols-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2">
                                     <span>Horas Extras / Bonificaciones</span>
                                     <span className="text-right">{formatCurrency(novedadesAdicion)}</span>
                                 </div>
                             )}
                             {detalles.novedades?.filter((n: any) => n.efecto === 'SUMA').map((nov: any, idx: number) => (
-                                <div key={idx} className="grid grid-cols-2 text-xs text-muted-foreground pl-4">
+                                <div key={idx} className="grid grid-cols-1 md:grid-cols-2 text-xs text-muted-foreground pl-4">
                                     <span>• {nov.tipo.replace(/_/g, " ")}</span>
                                     <span className="text-right">{formatCurrency(nov.valor)}</span>
                                 </div>
                             ))}
                             <Separator />
-                            <div className="grid grid-cols-2 font-semibold">
+                            <div className="grid grid-cols-1 md:grid-cols-2 font-semibold">
                                 <span>TOTAL DEVENGADO</span>
                                 <span className="text-right text-green-600">{formatCurrency(totalDevengado)}</span>
                             </div>
@@ -118,28 +118,28 @@ export function PayrollDetailDialog({ open, onOpenChange, nomina }: PayrollDetai
                             DEDUCCIONES
                         </div>
                         <div className="p-3 space-y-2">
-                            <div className="grid grid-cols-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2">
                                 <span>Aporte Salud (4%)</span>
                                 <span className="text-right text-red-600">-{formatCurrency(deduccionSalud)}</span>
                             </div>
-                            <div className="grid grid-cols-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2">
                                 <span>Aporte Pensión (4%)</span>
                                 <span className="text-right text-red-600">-{formatCurrency(deduccionPension)}</span>
                             </div>
                             {deduccionFSP > 0 && (
-                                <div className="grid grid-cols-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2">
                                     <span>Fondo Solidaridad Pensional (1%)</span>
                                     <span className="text-right text-red-600">-{formatCurrency(deduccionFSP)}</span>
                                 </div>
                             )}
                             {novedadesDeduccion > 0 && (
                                 <>
-                                    <div className="grid grid-cols-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2">
                                         <span>Otras Deducciones</span>
                                         <span className="text-right text-red-600">-{formatCurrency(novedadesDeduccion)}</span>
                                     </div>
                                     {detalles.novedades?.filter((n: any) => n.efecto === 'RESTA').map((nov: any, idx: number) => (
-                                        <div key={idx} className="grid grid-cols-2 text-xs text-muted-foreground pl-4">
+                                        <div key={idx} className="grid grid-cols-1 md:grid-cols-2 text-xs text-muted-foreground pl-4">
                                             <span>• {nov.tipo.replace(/_/g, " ")}</span>
                                             <span className="text-right">-{formatCurrency(nov.valor)}</span>
                                         </div>
@@ -147,7 +147,7 @@ export function PayrollDetailDialog({ open, onOpenChange, nomina }: PayrollDetai
                                 </>
                             )}
                             <Separator />
-                            <div className="grid grid-cols-2 font-semibold">
+                            <div className="grid grid-cols-1 md:grid-cols-2 font-semibold">
                                 <span>TOTAL DEDUCCIONES</span>
                                 <span className="text-right text-red-600">-{formatCurrency(totalDeducciones)}</span>
                             </div>
@@ -156,14 +156,14 @@ export function PayrollDetailDialog({ open, onOpenChange, nomina }: PayrollDetai
 
                     {/* NETO A PAGAR */}
                     <div className="border-2 border-primary rounded-md p-4 bg-primary/5">
-                        <div className="grid grid-cols-2 text-xl font-bold">
+                        <div className="grid grid-cols-1 md:grid-cols-2 text-xl font-bold">
                             <span>NETO A PAGAR</span>
                             <span className="text-right text-primary">{formatCurrency(netoPagar)}</span>
                         </div>
                     </div>
 
                     {/* Footer */}
-                    <div className="grid grid-cols-2 gap-8 pt-6 border-t text-xs text-muted-foreground">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t text-xs text-muted-foreground">
                         <div className="text-center">
                             <div className="border-t border-foreground/30 pt-2 mt-8">
                                 Firma Empleador

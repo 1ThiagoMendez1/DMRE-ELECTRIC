@@ -369,7 +369,7 @@ export function SuministroDashboard({ proveedores, cuentasPorPagar, ordenesCompr
                 </Card>
 
                 {/* Debt Composition */}
-                <Card className="col-span-2 shadow-sm border-0">
+                <Card className="col-span-1 md:col-span-2 shadow-sm border-0">
                     <CardHeader>
                         <CardTitle>Composición Deuda</CardTitle>
                         <CardDescription>Por antigüedad</CardDescription>
@@ -400,7 +400,7 @@ export function SuministroDashboard({ proveedores, cuentasPorPagar, ordenesCompr
 
             {/* Charts Section Lower */}
             <div className="grid gap-6 md:grid-cols-7">
-                <Card className="col-span-4 shadow-sm">
+                <Card className="col-span-1 md:col-span-4 shadow-sm">
                     <CardHeader>
                         <CardTitle>Tendencia de Compras</CardTitle>
                         <CardDescription>Evolución mensual del gasto</CardDescription>
@@ -429,7 +429,7 @@ export function SuministroDashboard({ proveedores, cuentasPorPagar, ordenesCompr
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-3 shadow-sm border-0">
+                <Card className="col-span-1 md:col-span-3 shadow-sm border-0">
                     <CardHeader>
                         <CardTitle>Top Proveedores</CardTitle>
                         <CardDescription>Mayores compras históricas</CardDescription>

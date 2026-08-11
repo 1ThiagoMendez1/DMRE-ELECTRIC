@@ -316,7 +316,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-3">
                         <TabsTrigger value="acciones">Acciones</TabsTrigger>
                         <TabsTrigger value="detalles">Detalles Completos</TabsTrigger>
                         <TabsTrigger value="historial">Historial</TabsTrigger>
@@ -324,7 +324,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
 
                     {/* DETALLES TAB */}
                     <TabsContent value="detalles" className="flex-1 overflow-auto space-y-4 mt-4">
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Client Info */}
                             <Card>
                                 <CardHeader className="pb-2">
@@ -343,11 +343,11 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                             </Card>
 
                             {/* Values */}
-                            <Card className="col-span-2">
+                            <Card className="col-span-1 md:col-span-2">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm">Desglose de Valores</CardTitle>
                                 </CardHeader>
-                                <CardContent className="grid grid-cols-2 gap-4">
+                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-1 text-sm">
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Subtotal:</span>
@@ -379,7 +379,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
 
                     {/* ACCIONES TAB */}
                     <TabsContent value="acciones" className="flex-1 overflow-auto space-y-4 mt-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Registrar Abono */}
                             <Card className="border-l-4 border-l-green-500">
                                 <CardHeader className="pb-2">
@@ -405,7 +405,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                         <p className="text-[10px] text-muted-foreground mt-1">El dinero ingresará a esta cuenta.</p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                         <div>
                                             <label className="text-xs text-muted-foreground">Monto</label>
                                             <Input

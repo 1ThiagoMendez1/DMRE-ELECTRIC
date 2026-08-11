@@ -132,7 +132,7 @@ export function CreateTareaDialog({ open, onOpenChange }: CreateTareaDialogProps
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="fechaVencimiento"
@@ -190,7 +190,7 @@ export function CreateTareaDialog({ open, onOpenChange }: CreateTareaDialogProps
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="prioridad"

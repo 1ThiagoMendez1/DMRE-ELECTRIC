@@ -470,7 +470,9 @@ export default function FinancieraPage() {
                                         <TableHead>Fecha</TableHead>
                                         <TableHead>Tipo</TableHead>
                                         <TableHead>Categoría</TableHead>
-                                        <TableHead>Concepto / Tercero</TableHead>
+                                        <TableHead>Concepto</TableHead>
+                                        <TableHead>Tercero</TableHead>
+                                        <TableHead>NIT</TableHead>
                                         <TableHead>Cuenta</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                         <TableHead className="text-center">Detalle</TableHead>
@@ -479,7 +481,7 @@ export default function FinancieraPage() {
                                 <TableBody>
                                     {movimientosFiltrados.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="h-24 text-center">
+                                            <TableCell colSpan={9} className="h-24 text-center">
                                                 No se encontraron movimientos con los filtros seleccionados.
                                             </TableCell>
                                         </TableRow>
@@ -496,10 +498,19 @@ export default function FinancieraPage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="capitalize">{mov.categoria?.toLowerCase() || 'N/A'}</TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">{mov.concepto}</span>
-                                                    <span className="text-xs text-muted-foreground">{mov.tercero}</span>
+                                            <TableCell className="max-w-[150px] md:max-w-[200px]">
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="font-medium truncate" title={mov.concepto}>{mov.concepto}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="max-w-[150px] md:max-w-[200px]">
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="text-sm truncate" title={mov.tercero || 'N/A'}>{mov.tercero || 'Sin tercero'}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="max-w-[120px] md:max-w-[150px]">
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="text-sm text-muted-foreground truncate" title={mov.identificacion || 'N/A'}>{mov.identificacion || 'N/A'}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>{mov.cuenta?.nombre || 'N/A'}</TableCell>

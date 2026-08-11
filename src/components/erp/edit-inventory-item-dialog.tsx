@@ -232,7 +232,7 @@ export function EditInventoryItemDialog({ open, onOpenChange, initialData, onSav
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="sku"
@@ -261,7 +261,7 @@ export function EditInventoryItemDialog({ open, onOpenChange, initialData, onSav
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="marca"
@@ -356,7 +356,7 @@ export function EditInventoryItemDialog({ open, onOpenChange, initialData, onSav
                             )}
                         />
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="categoria"
@@ -403,7 +403,7 @@ export function EditInventoryItemDialog({ open, onOpenChange, initialData, onSav
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="cantidad"
@@ -432,7 +432,7 @@ export function EditInventoryItemDialog({ open, onOpenChange, initialData, onSav
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="precioProveedor"

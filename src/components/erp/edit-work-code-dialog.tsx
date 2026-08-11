@@ -243,7 +243,7 @@ export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogPr
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             {/* Same fields as Create... reused */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
                                     name="codigo"
@@ -298,7 +298,7 @@ export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogPr
                                     control={form.control}
                                     name="descripcion"
                                     render={({ field }) => (
-                                        <FormItem className="col-span-2">
+                                        <FormItem className="col-span-1 md:col-span-2">
                                             <FormLabel>Descripción</FormLabel>
                                             <FormControl>
                                                 <Input {...field} />
@@ -347,9 +347,9 @@ export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogPr
                                 <div className="border rounded-md">
                                     <div className="grid grid-cols-12 gap-2 p-2 bg-muted/50 text-xs font-medium text-muted-foreground">
                                         <div className="col-span-5">Descripción</div>
-                                        <div className="col-span-2 text-right">Cant.</div>
-                                        <div className="col-span-2 text-right">Unitario</div>
-                                        <div className="col-span-2 text-right">Subtotal</div>
+                                        <div className="col-span-1 md:col-span-2 text-right">Cant.</div>
+                                        <div className="col-span-1 md:col-span-2 text-right">Unitario</div>
+                                        <div className="col-span-1 md:col-span-2 text-right">Subtotal</div>
                                         <div className="col-span-1"></div>
                                     </div>
                                     <div className="max-h-[200px] overflow-y-auto">
@@ -360,7 +360,7 @@ export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogPr
                                         ) : selectedMaterials.map((mat) => (
                                             <div key={mat.inventarioId} className="grid grid-cols-12 gap-2 p-2 items-center border-t text-sm">
                                                 <div className="col-span-5 truncate" title={mat.itemRef.descripcion}>{mat.itemRef.descripcion}</div>
-                                                <div className="col-span-2">
+                                                <div className="col-span-1 md:col-span-2">
                                                     <Input
                                                         type="number"
                                                         className="h-7 text-right px-2"
@@ -370,10 +370,10 @@ export function EditWorkCodeDialog({ code, open, onClose }: EditWorkCodeDialogPr
                                                         onChange={(e) => handleUpdateQuantity(mat.inventarioId, Number(e.target.value))}
                                                     />
                                                 </div>
-                                                <div className="col-span-2 text-right text-muted-foreground">
+                                                <div className="col-span-1 md:col-span-2 text-right text-muted-foreground">
                                                     {formatCurrency(mat.itemRef.valorUnitario || 0)}
                                                 </div>
-                                                <div className="col-span-2 text-right font-medium">
+                                                <div className="col-span-1 md:col-span-2 text-right font-medium">
                                                     {formatCurrency((mat.itemRef.valorUnitario || 0) * mat.cantidad)}
                                                 </div>
                                                 <div className="col-span-1 text-right">

@@ -56,7 +56,7 @@ export function RolesView() {
 
             <div className="grid grid-cols-12 gap-6 h-full min-h-0">
                 {/* Left: Roles List */}
-                <Card className="col-span-3 h-full flex flex-col">
+                <Card className="col-span-1 md:col-span-3 h-full flex flex-col">
                     <CardHeader>
                         <CardTitle className="text-lg">Roles</CardTitle>
                     </CardHeader>

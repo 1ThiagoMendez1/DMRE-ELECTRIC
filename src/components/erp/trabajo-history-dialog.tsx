@@ -123,7 +123,7 @@ function FinancialTabContent({ trabajoId, totalTrabajo }: { trabajoId: string, t
 
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-4">
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Total Trabajo</CardTitle></CardHeader>
                     <CardContent><div className="text-2xl font-bold">{formatCurrency(totalTrabajo)}</div></CardContent>
@@ -1519,7 +1519,7 @@ export function TrabajoHistoryDialog({
 
                                 return (
                                     <div className="flex flex-col gap-4 mb-4">
-                                        <div className="grid grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <Card className="bg-muted/10 border-dashed">
                                                 <CardContent className="p-4 flex flex-col justify-center items-center">
                                                     <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">
@@ -2158,7 +2158,7 @@ export function TrabajoHistoryDialog({
                                         </div>
 
                                         {/* Main two-column block */}
-                                        <div className="grid grid-cols-2 divide-x">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 divide-x">
                                             {/* Client info */}
                                             <div className="p-4 space-y-1">
                                                 <p className="text-[10px] text-primary font-bold uppercase tracking-wider mb-2">Datos del Cliente</p>
@@ -2649,7 +2649,7 @@ export function TrabajoHistoryDialog({
 
                                         <div className="space-y-2">
                                             <p className="text-[10px] font-semibold text-muted-foreground uppercase">Desglose AIU</p>
-                                            <div className="grid grid-cols-3 gap-2">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                                 <div className="space-y-1">
                                                     <Label className="text-[9px]">Admin %</Label>
                                                     <Input type="number" className="h-6 text-[10px] p-1" value={aiuAdminPct === 0 ? '' : aiuAdminPct} onFocus={(e) => e.target.select()} onChange={e => {
@@ -2729,7 +2729,7 @@ export function TrabajoHistoryDialog({
                                             <Package className="w-4 h-4" /> Estilo PDF
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="grid grid-cols-2 gap-2">
+                                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                         {PDF_STYLES.map(style => (
                                             <div
                                                 key={style.id}

@@ -239,7 +239,7 @@ export function FacturarTrabajosDialog({ onFacturaCreated, nextId }: FacturarTra
                                 </div>
 
                                 {/* Date Inputs */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
                                         <Label htmlFor="ft-emision" className="text-xs flex items-center gap-1">
                                             <Calendar className="h-3 w-3" />

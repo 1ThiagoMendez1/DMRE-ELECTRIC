@@ -213,15 +213,15 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
                 </div>
             </div>
 
-            <div className="flex flex-col-reverse lg:grid lg:grid-cols-3 gap-6 flex-1 lg:overflow-hidden mt-2">
+            <div className="flex flex-col-reverse lg:grid lg:grid-cols-1 md:grid-cols-3 gap-6 flex-1 lg:overflow-hidden mt-2">
                 {/* Main Content: Details */}
-                <div className="lg:col-span-2 space-y-6 lg:overflow-y-auto pr-1 pb-4">
+                <div className="lg:col-span-1 md:col-span-2 space-y-6 lg:overflow-y-auto pr-1 pb-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Detalles de la Oferta</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <span className="text-muted-foreground block">Cliente</span>
                                     <span className="font-medium">{typeof quote.cliente === 'string' ? quote.cliente : quote.cliente?.nombre}</span>

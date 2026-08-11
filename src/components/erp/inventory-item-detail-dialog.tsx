@@ -62,7 +62,7 @@ export function InventoryItemDetailDialog({ open, onOpenChange, item, onItemUpda
                     )}
 
                     {/* Info Grid */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <p className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Layers className="h-3 w-3" /> Categoría
@@ -80,7 +80,7 @@ export function InventoryItemDetailDialog({ open, onOpenChange, item, onItemUpda
                     <Separator />
 
                     {/* Stock Info */}
-                    <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                         <div className="p-3 bg-muted/30 rounded-lg">
                             <p className="text-2xl font-bold text-primary">{item.cantidad}</p>
                             <p className="text-xs text-muted-foreground">{item.unidad} disponibles</p>
@@ -102,7 +102,7 @@ export function InventoryItemDetailDialog({ open, onOpenChange, item, onItemUpda
                         <p className="text-sm font-medium flex items-center gap-1">
                             <DollarSign className="h-4 w-4" /> Información de Precios
                         </p>
-                        <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                             <div className="p-2 border rounded-lg text-center">
                                 <p className="text-muted-foreground text-xs">Precio Proveedor</p>
                                 <p className="font-medium">{formatCurrency(precioProveedor)}</p>

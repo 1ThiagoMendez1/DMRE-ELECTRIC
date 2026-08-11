@@ -210,7 +210,7 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                 </DialogHeader>
 
                 <Tabs defaultValue="movimientos" className="flex-1 flex flex-col overflow-hidden mt-4">
-                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 mb-4">
                         <TabsTrigger value="movimientos">Movimientos Detallados</TabsTrigger>
                         <TabsTrigger value="analisis">Análisis y Gráficos</TabsTrigger>
                     </TabsList>

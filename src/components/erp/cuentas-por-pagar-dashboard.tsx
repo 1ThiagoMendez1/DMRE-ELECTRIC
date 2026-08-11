@@ -283,7 +283,7 @@ export function CuentasPorPagarDashboard({ cuentas, proveedores, onRegisterPayme
                     </DialogHeader>
                     {selectedInvoice && (
                         <div className="space-y-6">
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <Card>
                                     <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Total Facturado</CardTitle></CardHeader>
                                     <CardContent className="p-4 pt-0 text-xl font-bold">{formatCurrency(selectedInvoice.valorTotal)}</CardContent>

@@ -65,7 +65,7 @@ export function SupplierProfileDialog({ proveedor }: SupplierProfileDialogProps)
                     </div>
 
                     {/* Stats Placeholder */}
-                    <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
                         <div className="border rounded p-2">
                             <p className="text-xs text-muted-foreground">Compras Totales</p>
                             <p className="font-bold text-lg">$ 45.2M</p>

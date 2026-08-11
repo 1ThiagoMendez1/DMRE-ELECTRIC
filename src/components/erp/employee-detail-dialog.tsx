@@ -147,7 +147,7 @@ export function EmployeeDetailDialog({
                 </DialogHeader>
 
                 <Tabs defaultValue="perfil" className="flex-1 flex flex-col overflow-hidden">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-4">
                         <TabsTrigger value="perfil"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
                         <TabsTrigger value="pagos"><Banknote className="h-4 w-4 mr-1" /> Pagos</TabsTrigger>
                         <TabsTrigger value="novedades"><History className="h-4 w-4 mr-1" /> Novedades</TabsTrigger>
@@ -173,7 +173,7 @@ export function EmployeeDetailDialog({
                             )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Info Card */}
                             <Card>
                                 <CardHeader><CardTitle className="text-sm">Información Personal</CardTitle></CardHeader>
@@ -246,7 +246,7 @@ export function EmployeeDetailDialog({
                         </div>
 
                         {/* Summary Stats */}
-                        <div className="grid grid-cols-3 gap-4 pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
                             <Card className="bg-primary/5">
                                 <CardContent className="pt-4 text-center">
                                     <p className="text-2xl font-bold">{empPagosFinancieros.length}</p>
