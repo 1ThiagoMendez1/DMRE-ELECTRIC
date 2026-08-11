@@ -117,6 +117,7 @@ export function Cotizador({ clientes, inventario, codigosTrabajo, instalaciones:
             };
 
             await onSave(quote);
+            localStorage.removeItem("cotizador_draft_new");
             onClose();
         } catch (error) {
             console.error("Error saving quotation:", error);

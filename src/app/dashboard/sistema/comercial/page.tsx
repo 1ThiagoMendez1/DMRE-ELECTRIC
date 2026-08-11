@@ -547,8 +547,8 @@ export default function CommercialPage() {
                                                 <TableCell className="min-w-[150px] sm:min-w-[200px] px-4 sm:px-2">
                                                     <div className="flex flex-col">
                                                         <span className="text-sm" title={quote.descripcionTrabajo}>
-                                                            {quote.descripcionTrabajo && quote.descripcionTrabajo.length > 45 
-                                                                ? `${quote.descripcionTrabajo.substring(0, 45)}...` 
+                                                            {quote.descripcionTrabajo && quote.descripcionTrabajo.length > 44 
+                                                                ? `${quote.descripcionTrabajo.substring(0, 44)}...` 
                                                                 : quote.descripcionTrabajo}
                                                         </span>
                                                         <div className="flex items-center gap-2 mt-1">
@@ -678,8 +678,8 @@ export default function CommercialPage() {
                                                 <TableCell className="min-w-[150px] sm:min-w-[200px] px-4 sm:px-2">
                                                     <div className="flex flex-col">
                                                         <span className="text-sm" title={quote.descripcionTrabajo}>
-                                                            {quote.descripcionTrabajo && quote.descripcionTrabajo.length > 45 
-                                                                ? `${quote.descripcionTrabajo.substring(0, 45)}...` 
+                                                            {quote.descripcionTrabajo && quote.descripcionTrabajo.length > 44 
+                                                                ? `${quote.descripcionTrabajo.substring(0, 44)}...` 
                                                                 : quote.descripcionTrabajo}
                                                         </span>
                                                         <div className="flex items-center gap-2 mt-1">
@@ -808,8 +808,8 @@ export default function CommercialPage() {
                                                 <TableCell className="min-w-[150px] sm:min-w-[200px] px-4 sm:px-2">
                                                     <div className="flex flex-col">
                                                         <span className="text-sm" title={quote.descripcionTrabajo}>
-                                                            {quote.descripcionTrabajo && quote.descripcionTrabajo.length > 45 
-                                                                ? `${quote.descripcionTrabajo.substring(0, 45)}...` 
+                                                            {quote.descripcionTrabajo && quote.descripcionTrabajo.length > 44 
+                                                                ? `${quote.descripcionTrabajo.substring(0, 44)}...` 
                                                                 : quote.descripcionTrabajo}
                                                         </span>
                                                         <div className="flex items-center gap-2 mt-1">

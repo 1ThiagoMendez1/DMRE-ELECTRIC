@@ -7,7 +7,7 @@ import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, CheckCircle2, ShoppingCart, Download, User } from "lucide-react";
+import { FileText, CheckCircle2, ShoppingCart, Download, User, Eye } from "lucide-react";
 import { CrearCotizacionMaterialDialog } from "./crear-cotizacion-material-dialog";
 import { generateMaterialQuotePDF } from "@/utils/pdf-cotizacion-material";
 import { generateOrdenCompraPDF } from "@/utils/pdf-orden-compra";
@@ -114,6 +114,7 @@ function CotizacionProveedorCard({ cotizacionProveedor, ofertaOriginal }: { coti
     const { updateCotizacionProveedorEstado, updateCotizacionProveedorItemPrices, addOrdenCompra, proveedores, ordenesCompra } = useErp();
     const [isApproving, setIsApproving] = useState(false);
     const [selectedProveedorId, setSelectedProveedorId] = useState<string>("");
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     
     // Estado para guardar el precio unitario ingresado para cada ítem
     const [itemPrices, setItemPrices] = useState<Record<string, number>>(() => {
@@ -211,10 +212,41 @@ function CotizacionProveedorCard({ cotizacionProveedor, ofertaOriginal }: { coti
                 </div>
                 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex-1 sm:flex-none gap-2"
+                                onClick={() => {
+                                    const pdfDataUrl = generateMaterialQuotePDF(cotizacionProveedor, ofertaOriginal, 'bloburl');
+                                    setPreviewUrl(pdfDataUrl as string);
+                                }}
+                            >
+                                <Eye className="h-4 w-4" />
+                                Vista Previa
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                            <DialogHeader>
+                                <DialogTitle>Vista Previa PDF Proveedor</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex-1 w-full mt-4 bg-muted/50 rounded-md overflow-hidden">
+                                {previewUrl ? (
+                                    <iframe src={previewUrl} className="w-full h-full border-0" title="PDF Preview" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                        Generando vista previa...
+                                    </div>
+                                )}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => generateMaterialQuotePDF(cotizacionProveedor, ofertaOriginal)}
+                        onClick={() => generateMaterialQuotePDF(cotizacionProveedor, ofertaOriginal, 'save')}
                         className="flex-1 sm:flex-none gap-2"
                     >
                         <Download className="h-4 w-4" />

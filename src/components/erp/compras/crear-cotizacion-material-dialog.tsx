@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Cotizacion, CotizacionItem, MaterialAsociado } from "@/types/sistema";
 import { FileText, Plus, ShoppingCart } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,10 +27,11 @@ interface Props {
 }
 
 export function CrearCotizacionMaterialDialog({ cotizacion, onClose }: Props) {
-    const { addCotizacionProveedor, cotizacionesProveedor } = useErp();
+    const { addCotizacionProveedor, cotizacionesProveedor, proveedores } = useErp();
     const [open, setOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [observaciones, setObservaciones] = useState("");
+    const [proveedorId, setProveedorId] = useState<string>("none");
     const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
 
     // Extraer todos los materiales posibles de la oferta (items directos + subItems)
@@ -83,13 +85,16 @@ export function CrearCotizacionMaterialDialog({ cotizacion, onClose }: Props) {
             // Generate CM number
             const cmCount = cotizacionesProveedor.length + 1;
             const numero = `CM-${cmCount.toString().padStart(4, '0')}`;
+            const selectedProv = proveedorId !== 'none' ? proveedores.find(p => p.id === proveedorId) : undefined;
 
             await addCotizacionProveedor({
                 numero,
                 cotizacionId: cotizacion.id,
                 estado: 'BORRADOR',
                 fecha: new Date(),
-                observaciones
+                observaciones,
+                proveedorId: selectedProv?.id,
+                proveedor: selectedProv
             }, selectedToInclude);
 
             setOpen(false);
@@ -159,14 +164,30 @@ export function CrearCotizacionMaterialDialog({ cotizacion, onClose }: Props) {
                         )}
                     </ScrollArea>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="observaciones">Observaciones para el proveedor (opcional)</Label>
-                        <Textarea 
-                            id="observaciones" 
-                            placeholder="Ej. Entregar en obra principal, especificar marca, etc." 
-                            value={observaciones}
-                            onChange={(e) => setObservaciones(e.target.value)}
-                        />
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="proveedor">Proveedor (Opcional)</Label>
+                            <Select value={proveedorId} onValueChange={setProveedorId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar proveedor..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">A quien corresponda (Sin asignar)</SelectItem>
+                                    {proveedores.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="observaciones">Observaciones para el proveedor (opcional)</Label>
+                            <Textarea 
+                                id="observaciones" 
+                                placeholder="Ej. Entregar en obra principal, especificar marca, etc." 
+                                value={observaciones}
+                                onChange={(e) => setObservaciones(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
 
