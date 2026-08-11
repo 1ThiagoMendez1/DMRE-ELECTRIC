@@ -465,7 +465,11 @@ export default function CommercialPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="whitespace-nowrap px-4 sm:px-2">{client.telefono}</TableCell>
-                                                <TableCell className="whitespace-nowrap hidden md:table-cell">{client.direccion}</TableCell>
+                                                <TableCell className="hidden md:table-cell" title={client.direccion}>
+                                                    {client.direccion && client.direccion.length > 30 
+                                                        ? `${client.direccion.substring(0, 30)}...` 
+                                                        : client.direccion}
+                                                </TableCell>
                                                 <TableCell className="text-right whitespace-nowrap px-4 sm:px-2">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <ClientProfileDialog cliente={client} />
