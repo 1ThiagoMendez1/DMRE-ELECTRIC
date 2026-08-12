@@ -650,7 +650,10 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const { id, ...rest } = mov;
             const saved = await createMovimientoFinancieroAction(rest as any);
             setMovimientosFinancieros(prev => [saved, ...prev]);
-        } catch (error) { console.error("Error adding movimiento:", error); }
+        } catch (error) { 
+            console.error("Error adding movimiento:", error); 
+            throw error;
+        }
     };
 
     const updateMovimientoFinanciero = async (updated: MovimientoFinanciero) => {

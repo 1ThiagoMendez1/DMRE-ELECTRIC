@@ -71,6 +71,7 @@ import { ObligacionDetailDialog } from "@/components/erp/obligacion-detail-dialo
 import { BillingModule } from "@/components/erp/billing-module";
 import { ComprasModule } from "@/components/erp/compras-module";
 import { ProjectProfitabilityModule } from "@/components/erp/project-profitability-module";
+import { generateExcelReport } from "@/lib/excel-generator";
 
 import { useToast } from "@/hooks/use-toast";
 import { useErp } from "@/components/providers/erp-provider";
@@ -93,7 +94,9 @@ export default function FinancieraPage() {
     } = useErp();
 
     // Filtros para Movimientos
+    const [isExporting, setIsExporting] = useState(false);
     const [filterFecha, setFilterFecha] = useState("");
+    const [fastDateFilter, setFastDateFilter] = useState("todos"); // dia, mes, año, todos, custom
     const [filterTipo, setFilterTipo] = useState("TODOS");
     const [filterCategoria, setFilterCategoria] = useState("TODOS");
     const [filterCuenta, setFilterCuenta] = useState("TODOS");
@@ -123,7 +126,18 @@ export default function FinancieraPage() {
         if (mov.esSimple) return false;
         const d = new Date(mov.fecha);
         const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
-        if (filterFecha && format(localD, "yyyy-MM-dd") !== filterFecha) return false;
+        
+        const today = new Date();
+        if (fastDateFilter === 'dia') {
+            if (localD.getDate() !== today.getDate() || localD.getMonth() !== today.getMonth() || localD.getFullYear() !== today.getFullYear()) return false;
+        } else if (fastDateFilter === 'mes') {
+            if (localD.getMonth() !== today.getMonth() || localD.getFullYear() !== today.getFullYear()) return false;
+        } else if (fastDateFilter === 'año') {
+            if (localD.getFullYear() !== today.getFullYear()) return false;
+        } else {
+            if (filterFecha && format(localD, "yyyy-MM-dd") !== filterFecha) return false;
+        }
+
         if (filterTipo !== "TODOS" && mov.tipo !== filterTipo) return false;
         if (filterCategoria !== "TODOS" && mov.categoria !== filterCategoria) return false;
         if (filterCuenta !== "TODOS" && mov.cuentaId !== filterCuenta) return false;
@@ -132,6 +146,30 @@ export default function FinancieraPage() {
 
 
 
+
+    const handleExportExcel = async () => {
+        setIsExporting(true);
+        try {
+            const filterState = {
+                mes: filterFecha ? format(new Date(filterFecha + "T12:00:00"), 'MMMM', { locale: es }) : undefined,
+                ano: filterFecha ? format(new Date(filterFecha + "T12:00:00"), 'yyyy') : undefined
+            };
+            await generateExcelReport(movimientosFiltrados, filterState);
+            toast({
+                title: "Excel generado",
+                description: "El reporte se ha descargado correctamente.",
+            });
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: "Error al generar Excel",
+                description: "Hubo un problema al generar el archivo.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     // --- LOGIC MOVED TO BILLING MODULE ---
     // nextInvoiceId, filteredFacturas, handlers, useEffect
@@ -399,21 +437,56 @@ export default function FinancieraPage() {
                         <CardHeader>
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                 <CardTitle>Historial de Transacciones</CardTitle>
-                                <CreateTransactionDialog 
-                                    cuentas={cuentas} 
-                                    cotizaciones={cotizaciones}
-                                    onTransactionCreated={handleCreateTransaction} 
-                                />
+                                <div className="flex gap-2 w-full md:w-auto">
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={handleExportExcel}
+                                        disabled={isExporting}
+                                        className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 flex-1 md:flex-none"
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        {isExporting ? "Generando..." : "Exportar Excel"}
+                                    </Button>
+                                    <CreateTransactionDialog 
+                                        cuentas={cuentas} 
+                                        cotizaciones={cotizaciones}
+                                        movimientos={movementsRaw}
+                                        onTransactionCreated={handleCreateTransaction} 
+                                    />
+                                </div>
                             </div>
                             
                             {/* Barra de Filtros */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-muted-foreground">Fecha</label>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t items-end">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-medium text-muted-foreground">Fecha</label>
+                                        <div className="flex bg-muted p-0.5 rounded-md">
+                                            <button 
+                                                onClick={() => { setFastDateFilter('dia'); setFilterFecha(''); }} 
+                                                className={cn("px-2 py-0.5 text-[10px] rounded-sm transition-all", fastDateFilter === 'dia' ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:bg-background/50")}
+                                            >Día</button>
+                                            <button 
+                                                onClick={() => { setFastDateFilter('mes'); setFilterFecha(''); }} 
+                                                className={cn("px-2 py-0.5 text-[10px] rounded-sm transition-all", fastDateFilter === 'mes' ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:bg-background/50")}
+                                            >Mes</button>
+                                            <button 
+                                                onClick={() => { setFastDateFilter('año'); setFilterFecha(''); }} 
+                                                className={cn("px-2 py-0.5 text-[10px] rounded-sm transition-all", fastDateFilter === 'año' ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:bg-background/50")}
+                                            >Año</button>
+                                            <button 
+                                                onClick={() => { setFastDateFilter('todos'); setFilterFecha(''); }} 
+                                                className={cn("px-2 py-0.5 text-[10px] rounded-sm transition-all", fastDateFilter === 'todos' && !filterFecha ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:bg-background/50")}
+                                            >Todos</button>
+                                        </div>
+                                    </div>
                                     <Input 
                                         type="date" 
                                         value={filterFecha} 
-                                        onChange={(e) => setFilterFecha(e.target.value)} 
+                                        onChange={(e) => {
+                                            setFilterFecha(e.target.value);
+                                            setFastDateFilter("custom");
+                                        }} 
                                         className="h-8"
                                     />
                                 </div>
@@ -470,10 +543,11 @@ export default function FinancieraPage() {
                                         <TableHead>Fecha</TableHead>
                                         <TableHead>Tipo</TableHead>
                                         <TableHead>Categoría</TableHead>
-                                        <TableHead>Concepto</TableHead>
                                         <TableHead>Tercero</TableHead>
                                         <TableHead>NIT</TableHead>
+                                        <TableHead>Concepto</TableHead>
                                         <TableHead>Cuenta</TableHead>
+                                        <TableHead className="text-right">IVA</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                         <TableHead className="text-center">Detalle</TableHead>
                                     </TableRow>
@@ -481,7 +555,7 @@ export default function FinancieraPage() {
                                 <TableBody>
                                     {movimientosFiltrados.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={9} className="h-24 text-center">
+                                            <TableCell colSpan={10} className="h-24 text-center">
                                                 No se encontraron movimientos con los filtros seleccionados.
                                             </TableCell>
                                         </TableRow>
@@ -500,11 +574,6 @@ export default function FinancieraPage() {
                                             <TableCell className="capitalize">{mov.categoria?.toLowerCase() || 'N/A'}</TableCell>
                                             <TableCell className="max-w-[150px] md:max-w-[200px]">
                                                 <div className="flex flex-col overflow-hidden">
-                                                    <span className="font-medium truncate" title={mov.concepto}>{mov.concepto}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="max-w-[150px] md:max-w-[200px]">
-                                                <div className="flex flex-col overflow-hidden">
                                                     <span className="text-sm truncate" title={mov.tercero || 'N/A'}>{mov.tercero || 'Sin tercero'}</span>
                                                 </div>
                                             </TableCell>
@@ -513,13 +582,22 @@ export default function FinancieraPage() {
                                                     <span className="text-sm text-muted-foreground truncate" title={mov.identificacion || 'N/A'}>{mov.identificacion || 'N/A'}</span>
                                                 </div>
                                             </TableCell>
+                                            <TableCell className="max-w-[150px] md:max-w-[200px]">
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="font-medium truncate" title={mov.concepto}>{mov.concepto}</span>
+                                                </div>
+                                            </TableCell>
                                             <TableCell>{mov.cuenta?.nombre || 'N/A'}</TableCell>
+                                            <TableCell className="text-right text-muted-foreground">
+                                                {formatCurrency(mov.iva || 0)}
+                                            </TableCell>
                                             <TableCell className={cn("text-right font-medium", mov.tipo === 'INGRESO' ? "text-green-600" : "text-red-600")}>
                                                 {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.valor)}
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 <MovimientoDetailDialog
                                                     movimiento={mov}
+                                                    movimientos={movementsRaw}
                                                     onMovimientoUpdated={handleUpdateTransaction}
                                                 />
                                             </TableCell>

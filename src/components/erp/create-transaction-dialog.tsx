@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, FileText, Upload, Loader2, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { CuentaBancaria, TipoMovimiento, CategoriaMovimiento, Cotizacion, ObligacionFinanciera } from "@/types/sistema";
+import { CuentaBancaria, TipoMovimiento, CategoriaMovimiento, Cotizacion, ObligacionFinanciera, MovimientoFinanciero } from "@/types/sistema";
 import { createClient } from "@/utils/supabase/client";
 
 const formSchema = z.object({
@@ -44,6 +44,7 @@ const formSchema = z.object({
     identificacion: z.string().optional().or(z.literal("")),
     concepto: z.string().min(3, "Concepto requerido"),
     valor: z.coerce.number().min(1, "Valor debe ser mayor a 0"),
+    iva: z.coerce.number().optional().default(0),
     fecha: z.string().optional(),
     cuotas: z.coerce.number().optional(),
     cuotaActual: z.coerce.number().optional(),
@@ -85,10 +86,11 @@ const formSchema = z.object({
 interface CreateTransactionDialogProps {
     cuentas: CuentaBancaria[];
     cotizaciones?: Cotizacion[];
+    movimientos?: MovimientoFinanciero[];
     onTransactionCreated: (tx: any) => void;
 }
 
-export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransactionCreated }: CreateTransactionDialogProps) {
+export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimientos = [], onTransactionCreated }: CreateTransactionDialogProps) {
     const [open, setOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const supabase = createClient();
@@ -100,6 +102,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
             categoria: "OTROS",
             concepto: "",
             valor: 0,
+            iva: 0,
             fecha: new Date().toISOString().split('T')[0],
             tercero: "",
             identificacion: "",
@@ -113,6 +116,10 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
     const [assignedEmployees, setAssignedEmployees] = useState<{id: string, nombre: string, salario: number}[]>([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
 
+    const [providersList, setProvidersList] = useState<{id: string, nombre: string, identificacion: string}[]>([]);
+    const [employeesList, setEmployeesList] = useState<{id: string, nombre: string, salario: number, identificacion: string}[]>([]);
+    const [loadingTerceros, setLoadingTerceros] = useState(false);
+
     const watchCategoria = form.watch("categoria");
     const watchCotizacionId = form.watch("cotizacionId");
 
@@ -123,7 +130,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                 .from("asignaciones_programador")
                 .select(`
                     empleado_id,
-                    empleados ( id, nombre_completo, salario_base )
+                    empleados ( id, nombre_completo, salario_base, numero_documento )
                 `)
                 .eq("cotizacion_id", watchCotizacionId)
                 .then(({ data, error }) => {
@@ -135,7 +142,8 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                 emps.set(row.empleados.id, {
                                     id: row.empleados.id,
                                     nombre: row.empleados.nombre_completo,
-                                    salario: Number(row.empleados.salario_base) || 0
+                                    salario: Number(row.empleados.salario_base) || 0,
+                                    identificacion: row.empleados.numero_documento || ""
                                 });
                             }
                         });
@@ -148,6 +156,22 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
             setAssignedEmployees([]);
         }
     }, [watchCategoria, watchCotizacionId, supabase]);
+
+    useEffect(() => {
+        if (watchCategoria === "PROVEEDORES") {
+            setLoadingTerceros(true);
+            supabase.from("proveedores").select("id, nombre, nit").then(({ data }) => {
+                if (data) setProvidersList(data.map((p: any) => ({ id: p.id, nombre: p.nombre, identificacion: p.nit || "" })));
+                setLoadingTerceros(false);
+            });
+        } else if (watchCategoria === "NOMINA") {
+            setLoadingTerceros(true);
+            supabase.from("empleados").select("id, nombre_completo, salario_base, numero_documento").then(({ data }) => {
+                if (data) setEmployeesList(data.map((e: any) => ({ id: e.id, nombre: e.nombre_completo, salario: Number(e.salario_base) || 0, identificacion: e.numero_documento || "" })));
+                setLoadingTerceros(false);
+            });
+        }
+    }, [watchCategoria, supabase]);
 
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -219,7 +243,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
             onTransactionCreated(egreso);
             setTimeout(() => onTransactionCreated(ingreso), 300);
         } else {
-            const emp = assignedEmployees.find(e => e.nombre === values.tercero);
+            const emp = employeesList.find(e => e.nombre === values.tercero) || assignedEmployees.find(e => e.nombre === values.tercero);
             const newTx = {
                 id: `MOV-${Math.floor(Math.random() * 10000)}`,
                 fecha: txDate,
@@ -231,6 +255,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                 identificacion: values.identificacion,
                 concepto: values.concepto,
                 valor: values.valor,
+                iva: values.iva,
                 cuotas: values.cuotas,
                 cuotaActual: values.cuotaActual,
                 cotizacionId: values.cotizacionId,
@@ -389,7 +414,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                 />
 
 
-                                {form.watch("categoria") === "NOMINA" && form.watch("cotizacionId") && form.watch("cotizacionId") !== "none" ? (
+                                {form.watch("categoria") === "NOMINA" ? (
                                     <FormField
                                         control={form.control}
                                         name="tercero"
@@ -399,9 +424,14 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                                 <Select 
                                                     onValueChange={(val) => {
                                                         field.onChange(val);
-                                                        const emp = assignedEmployees.find(e => e.nombre === val);
+                                                        const emp = employeesList.find(e => e.nombre === val) || assignedEmployees.find(e => e.nombre === val);
                                                         if (emp) {
-                                                            form.setValue("valor", emp.salario);
+                                                            if ('salario' in emp) {
+                                                                form.setValue("valor", emp.salario);
+                                                            }
+                                                            if ('identificacion' in emp && emp.identificacion) {
+                                                                form.setValue("identificacion", emp.identificacion);
+                                                            }
                                                             // Opcionalmente pre-llenar concepto si está vacío
                                                             if (!form.getValues("concepto")) {
                                                                 form.setValue("concepto", `Pago Nómina - ${emp.nombre}`);
@@ -413,15 +443,15 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                                     <FormControl>
                                                         <SelectTrigger>
                                                             <SelectValue placeholder={
-                                                                loadingEmployees ? "Cargando..." : "Seleccione empleado"
+                                                                loadingEmployees || loadingTerceros ? "Cargando..." : "Seleccione empleado"
                                                             } />
                                                         </SelectTrigger>
                                                     </FormControl>
                                                     <SelectContent>
-                                                        {assignedEmployees.length === 0 && !loadingEmployees ? (
-                                                            <SelectItem value="none_disabled" disabled>No hay empleados programados</SelectItem>
+                                                        {employeesList.length === 0 && !loadingTerceros ? (
+                                                            <SelectItem value="none_disabled" disabled>No hay empleados disponibles</SelectItem>
                                                         ) : (
-                                                            assignedEmployees.map(e => (
+                                                            employeesList.map(e => (
                                                                 <SelectItem key={e.id} value={e.nombre}>
                                                                     {e.nombre} - {formatCurrency(e.salario)}
                                                                 </SelectItem>
@@ -433,40 +463,78 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                             </FormItem>
                                         )}
                                     />
+                                ) : form.watch("categoria") === "PROVEEDORES" ? (
+                                    <FormField
+                                        control={form.control}
+                                        name="tercero"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Proveedor (Tercero)</FormLabel>
+                                                <Select 
+                                                    onValueChange={(val) => {
+                                                        field.onChange(val);
+                                                        const prov = providersList.find(p => p.nombre === val);
+                                                        if (prov && prov.identificacion) {
+                                                            form.setValue("identificacion", prov.identificacion);
+                                                        }
+                                                    }} 
+                                                    value={field.value}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder={
+                                                                loadingTerceros ? "Cargando..." : "Seleccione proveedor"
+                                                            } />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {providersList.length === 0 && !loadingTerceros ? (
+                                                            <SelectItem value="none_disabled" disabled>No hay proveedores</SelectItem>
+                                                        ) : (
+                                                            providersList.map(p => (
+                                                                <SelectItem key={p.id} value={p.nombre}>
+                                                                    {p.nombre}
+                                                                </SelectItem>
+                                                            ))
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 ) : (
-                                    <>
-                                        <FormField
-                                            control={form.control}
-                                            name="tercero"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Tercero (Beneficiario/Pagador)</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Nombre del tercero" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="identificacion"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Identificación</FormLabel>
-                                                    <FormControl>
-                                                        <Input 
-                                                            placeholder="CC/NIT del tercero" 
-                                                            {...field} 
-                                                            disabled={form.watch("categoria") !== "OTROS"}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </>
+                                    <FormField
+                                        control={form.control}
+                                        name="tercero"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Tercero (Beneficiario/Pagador)</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="Nombre del tercero" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 )}
+
+                                <FormField
+                                    control={form.control}
+                                    name="identificacion"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Identificación</FormLabel>
+                                            <FormControl>
+                                                <Input 
+                                                    placeholder="CC/NIT del tercero" 
+                                                    {...field} 
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
                             </>
                         )}
@@ -487,7 +555,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                             )}
                         />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="fecha"
@@ -507,6 +575,19 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], onTransact
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Valor</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder="0" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="iva"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>IVA</FormLabel>
                                         <FormControl>
                                             <Input type="number" placeholder="0" {...field} />
                                         </FormControl>

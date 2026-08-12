@@ -593,6 +593,7 @@ export interface MovimientoFinanciero {
     concepto: string
     descripcion: string | null
     valor: number
+    iva: number | null
     factura_id: string | null
     trabajo_id: string | null
     cuenta_por_pagar_id: string | null

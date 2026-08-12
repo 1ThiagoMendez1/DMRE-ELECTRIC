@@ -23,6 +23,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { Factura, Cliente, Cotizacion } from "@/types/sistema";
 import { useErp } from "@/components/providers/erp-provider";
 import {
@@ -59,6 +61,15 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
     const [estado, setEstado] = useState<"PENDIENTE" | "PARCIAL" | "PAGADA">("PENDIENTE");
     const [archivoUrl, setArchivoUrl] = useState("");
     const [isUploading, setIsUploading] = useState(false);
+    
+    // Impuestos States
+    const [tipoImpuesto, setTipoImpuesto] = useState<"NINGUNO" | "IVA" | "AIU">("NINGUNO");
+    const [aiuAdminPct, setAiuAdminPct] = useState(0);
+    const [aiuImprevPct, setAiuImprevPct] = useState(0);
+    const [aiuUtilPct, setAiuUtilPct] = useState(0);
+    const [ivaUtilPct, setIvaUtilPct] = useState(19);
+    const [ivaGeneralPct, setIvaGeneralPct] = useState(19);
+
     const supabase = createClient();
 
 
@@ -122,23 +133,42 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
         const cliente = clientes.find(c => c.id === clienteId);
         const cotizacion = cotizaciones?.find(c => c.id === selectedCotizacionId);
 
+        let calculatedIva = 0;
+        const parsedValor = parseFloat(valor) || 0;
+        let subtotal = parsedValor;
+        let total = parsedValor;
+        
+        if (tipoImpuesto === "AIU") {
+            const admin = parsedValor * (aiuAdminPct / 100);
+            const imprev = parsedValor * (aiuImprevPct / 100);
+            const util = parsedValor * (aiuUtilPct / 100);
+            calculatedIva = util * (ivaUtilPct / 100);
+            subtotal = parsedValor + admin + imprev + util;
+            total = subtotal + calculatedIva;
+        } else if (tipoImpuesto === "IVA") {
+            calculatedIva = parsedValor * (ivaGeneralPct / 100);
+            subtotal = parsedValor;
+            total = subtotal + calculatedIva;
+        }
+
         const newFactura: Factura = {
             id: numero,
             numero: numero,
             fechaEmision: new Date(fechaEmision),
             fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : new Date(fechaEmision),
-            subtotal: parseFloat(valor),
-            iva: 0,
-            valorFacturado: parseFloat(valor),
-            valorPagado: estado === "PAGADA" ? parseFloat(valor) : 0,
-            saldoPendiente: estado === "PAGADA" ? 0 : parseFloat(valor),
+            subtotal: subtotal,
+            iva: calculatedIva,
+            valorFacturado: total,
+            valorPagado: estado === "PAGADA" ? total : 0,
+            saldoPendiente: estado === "PAGADA" ? 0 : total,
             estado: estado,
             cotizacionId: selectedCotizacionId !== "MANUAL" ? selectedCotizacionId : undefined,
             clienteId: clienteId,
+            cliente: cliente as Cliente,
             trabajoId: (selectedCotizacionId !== "MANUAL" && cotizacion?.trabajoId) ? cotizacion.trabajoId : undefined,
             cotizacion: cotizacion ? cotizacion : {
                 id: "MANUAL",
-                numero: "N/A",
+                numero: "SIN-REF",
                 clienteId: clienteId,
                 cliente: cliente as Cliente,
             } as any,
@@ -160,6 +190,12 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
         setValor("");
         setEstado("PENDIENTE");
         setArchivoUrl("");
+        setTipoImpuesto("NINGUNO");
+        setAiuAdminPct(0);
+        setAiuImprevPct(0);
+        setAiuUtilPct(0);
+        setIvaUtilPct(19);
+        setIvaGeneralPct(19);
     };
 
 
@@ -300,14 +336,126 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
 
                     <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="valor" className="text-right">Valor Total</Label>
-                        <Input
-                            id="valor"
-                            type="number"
-                            value={valor}
-                            onChange={(e) => setValor(e.target.value)}
-                            placeholder="0"
-                            className="col-span-1 md:col-span-3"
-                        />
+                        <div className="col-span-1 md:col-span-3 flex flex-col gap-2">
+                            <Input
+                                id="valor"
+                                type="number"
+                                value={valor}
+                                onChange={(e) => setValor(e.target.value)}
+                                placeholder="0"
+                                className=""
+                            />
+                            
+                            {/* Impuestos UI */}
+                            <div className="py-2">
+                                <Select value={tipoImpuesto} onValueChange={(val: any) => setTipoImpuesto(val)}>
+                                    <SelectTrigger className="w-full h-8 text-xs font-medium">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="NINGUNO">Factura Estándar (Sin impuestos extra)</SelectItem>
+                                        <SelectItem value="IVA">Factura con IVA</SelectItem>
+                                        <SelectItem value="AIU">Factura con AIU</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {tipoImpuesto === "IVA" && (
+                                <div className="space-y-2 border rounded-md p-3 bg-muted/10">
+                                    <div className="flex justify-between items-center text-sm pt-1">
+                                        <span className="text-muted-foreground text-xs font-medium">Subtotal</span>
+                                        <span className="font-mono text-xs">
+                                            {formatCurrency(parseFloat(valor) || 0)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm pt-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-muted-foreground text-xs font-medium">IVA %</span>
+                                            <div className="flex items-center">
+                                                <Input
+                                                    type="number"
+                                                    className="h-7 w-14 text-right text-xs"
+                                                    value={ivaGeneralPct === 0 ? '' : ivaGeneralPct}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={e => setIvaGeneralPct(Number(e.target.value) || 0)}
+                                                    placeholder="19"
+                                                />
+                                                <span className="text-xs ml-1 text-muted-foreground">%</span>
+                                            </div>
+                                        </div>
+                                        <span className="font-mono text-xs text-muted-foreground">
+                                            {formatCurrency((parseFloat(valor) || 0) * (ivaGeneralPct/100))}
+                                        </span>
+                                    </div>
+                                    <Separator className="my-2" />
+                                    <div className="flex justify-between items-center pt-1 font-bold">
+                                        <span className="text-sm">Total Factura</span>
+                                        <span className="font-mono text-sm text-primary">
+                                            {formatCurrency((parseFloat(valor) || 0) * (1 + (ivaGeneralPct/100)))}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {tipoImpuesto === "AIU" && (
+                                <div className="space-y-2 border rounded-md p-3 bg-muted/10">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase">Desglose AIU</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Admin %</Label>
+                                            <Input type="number" className="h-7 text-xs" value={aiuAdminPct === 0 ? '' : aiuAdminPct} onFocus={(e) => e.target.select()} onChange={e => setAiuAdminPct(Number(e.target.value) || 0)} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Impr. %</Label>
+                                            <Input type="number" className="h-7 text-xs" value={aiuImprevPct === 0 ? '' : aiuImprevPct} onFocus={(e) => e.target.select()} onChange={e => setAiuImprevPct(Number(e.target.value) || 0)} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px]">Util. %</Label>
+                                            <Input type="number" className="h-7 text-xs" value={aiuUtilPct === 0 ? '' : aiuUtilPct} onFocus={(e) => e.target.select()} onChange={e => setAiuUtilPct(Number(e.target.value) || 0)} />
+                                        </div>
+                                    </div>
+                                    <Separator className="my-2" />
+                                    
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between items-center text-sm pt-1">
+                                            <span className="text-muted-foreground text-xs font-medium">Subtotal</span>
+                                            <span className="font-mono text-xs">
+                                                {formatCurrency((parseFloat(valor) || 0) * (1 + (aiuAdminPct/100) + (aiuImprevPct/100) + (aiuUtilPct/100)))}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm pt-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-muted-foreground text-xs font-medium">IVA s/ Util.</span>
+                                                <div className="flex items-center">
+                                                    <Input
+                                                        type="number"
+                                                        className="h-7 w-14 text-right text-xs"
+                                                        value={ivaUtilPct === 0 ? '' : ivaUtilPct}
+                                                        onFocus={(e) => e.target.select()}
+                                                        onChange={e => setIvaUtilPct(Number(e.target.value) || 0)}
+                                                        placeholder="19"
+                                                    />
+                                                    <span className="text-xs ml-1 text-muted-foreground">%</span>
+                                                </div>
+                                            </div>
+                                            <span className="font-mono text-xs text-muted-foreground">
+                                                {formatCurrency((parseFloat(valor) || 0) * (aiuUtilPct/100) * (ivaUtilPct/100))}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <Separator className="my-2" />
+                                    <div className="flex justify-between items-center pt-1 font-bold">
+                                        <span className="text-sm">Total Factura</span>
+                                        <span className="font-mono text-sm text-primary">
+                                            {formatCurrency(
+                                                ((parseFloat(valor) || 0) * (1 + (aiuAdminPct/100) + (aiuImprevPct/100) + (aiuUtilPct/100))) + 
+                                                ((parseFloat(valor) || 0) * (aiuUtilPct/100) * (ivaUtilPct/100))
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">

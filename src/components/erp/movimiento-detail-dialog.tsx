@@ -22,17 +22,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MovimientoFinanciero, TipoMovimiento, CategoriaMovimiento } from "@/types/sistema";
 import { formatCurrency } from "@/lib/utils";
-import { Pencil, Eye, FileText, ExternalLink } from "lucide-react";
+import { Pencil, Eye, FileText, ExternalLink, Download } from "lucide-react";
+import { generateReceipt } from "@/lib/pdf-generator";
 
 interface MovimientoDetailDialogProps {
     movimiento: MovimientoFinanciero;
+    movimientos?: MovimientoFinanciero[];
     onMovimientoUpdated: (mov: MovimientoFinanciero) => void;
     trigger?: React.ReactNode;
 }
 
-export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigger }: MovimientoDetailDialogProps) {
+export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimientoUpdated, trigger }: MovimientoDetailDialogProps) {
     const [open, setOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
 
@@ -73,6 +76,52 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
         // Don't close, just exit edit mode
     };
 
+    const generateConsecutive = (tipo: string, fechaVal?: string | Date) => {
+        const dateObj = typeof fechaVal === 'string' ? new Date(fechaVal + "T12:00:00") : fechaVal ? new Date(fechaVal) : new Date();
+        const year = dateObj.getFullYear();
+        const yearSuffix = year.toString().slice(-2);
+        
+        const sorted = [...movimientos].filter(m => m.tipo === tipo && new Date(m.fecha).getFullYear() === year).sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+        const index = sorted.findIndex(m => m.id === movimiento.id);
+        const count = index !== -1 ? index + 1 : sorted.length + 1;
+        
+        const prefix = tipo === "INGRESO" ? "ING" : tipo === "EGRESO" ? "EGR" : "TRF";
+        return `${prefix}${yearSuffix}-${count.toString().padStart(3, '0')}`;
+    };
+
+    const handlePreviewReceipt = async () => {
+        const receiptData = {
+            id: generateConsecutive(movimiento.tipo, movimiento.fecha),
+            tipo: movimiento.tipo,
+            fecha: new Date(movimiento.fecha).toLocaleDateString(),
+            tercero: movimiento.tercero,
+            identificacion: movimiento.identificacion,
+            categoria: movimiento.categoria,
+            cuentaNombre: movimiento.cuenta?.nombre,
+            concepto: movimiento.concepto,
+            valor: movimiento.valor
+        };
+        const url = await generateReceipt(receiptData, true);
+        if (typeof url === 'string') {
+            window.open(url, '_blank');
+        }
+    };
+
+    const handleDownloadReceipt = async () => {
+        const receiptData = {
+            id: generateConsecutive(movimiento.tipo, movimiento.fecha),
+            tipo: movimiento.tipo,
+            fecha: new Date(movimiento.fecha).toLocaleDateString(),
+            tercero: movimiento.tercero,
+            identificacion: movimiento.identificacion,
+            categoria: movimiento.categoria,
+            cuentaNombre: movimiento.cuenta?.nombre,
+            concepto: movimiento.concepto,
+            valor: movimiento.valor
+        };
+        await generateReceipt(receiptData, false);
+    };
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -82,7 +131,7 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Detalle de Movimiento</DialogTitle>
                     <DialogDescription>
@@ -179,22 +228,32 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                     )}
 
                     {movimiento.comprobanteUrl && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Soporte</Label>
-                            <div className="col-span-1 md:col-span-3">
-                                <Button 
-                                    variant="outline" 
-                                    className="w-full flex items-center justify-between gap-2 border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
-                                    onClick={() => window.open(movimiento.comprobanteUrl, '_blank')}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4" />
-                                        <span>Ver Documento PDF</span>
+                        <Card className="col-span-1 md:col-span-4 mt-2">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <FileText className="h-4 w-4" /> Soporte Adjunto
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex justify-between items-center bg-muted/30 p-2 rounded-md border">
+                                        <span className="text-sm font-medium truncate">
+                                            Soporte en formato PDF
+                                        </span>
+                                        <Button variant="outline" size="sm" asChild>
+                                            <a href={movimiento.comprobanteUrl} target="_blank" rel="noopener noreferrer">
+                                                Abrir PDF
+                                            </a>
+                                        </Button>
                                     </div>
-                                    <ExternalLink className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        </div>
+                                    <iframe 
+                                        src={movimiento.comprobanteUrl} 
+                                        className="w-full h-64 border rounded-md" 
+                                        title="Vista previa del soporte"
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
                     )}
                 </div>
 
@@ -206,6 +265,16 @@ export function MovimientoDetailDialog({ movimiento, onMovimientoUpdated, trigge
                         </>
                     ) : (
                         <div className="flex justify-end w-full gap-2">
+                            {movimiento.tipo === 'INGRESO' && (
+                                <div className="flex gap-2 mr-auto">
+                                    <Button variant="outline" onClick={handlePreviewReceipt} className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                        <Eye className="mr-2 h-4 w-4" /> Vista Previa
+                                    </Button>
+                                    <Button variant="secondary" onClick={handleDownloadReceipt} className="border-green-200 bg-green-50 text-green-700 hover:bg-green-100">
+                                        <Download className="mr-2 h-4 w-4" /> Descargar
+                                    </Button>
+                                </div>
+                            )}
                             <Button variant="outline" onClick={() => setOpen(false)}>Cerrar</Button>
                             <Button onClick={() => setIsEditing(true)}>
                                 <Pencil className="mr-2 h-4 w-4" /> Editar

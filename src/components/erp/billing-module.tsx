@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateFacturaDialog } from "@/components/erp/create-factura-dialog";
 import { FacturarTrabajosDialog } from "@/components/erp/facturar-trabajos-dialog";
 import { FacturaHistoryDialog } from "@/components/erp/factura-history-dialog";
+import { EditInvoiceDialog } from "@/components/erp/edit-invoice-dialog";
 import { useErp } from "@/components/providers/erp-provider";
 import { useToast } from "@/hooks/use-toast";
 import { Factura, CuentaBancaria } from "@/types/sistema";
@@ -251,8 +252,10 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                 <TableRow>
                     <TableHead>N° Factura</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Oferta Vinculada</TableHead>
                     <TableHead>Emisión</TableHead>
                     <TableHead>Vencimiento</TableHead>
+                    <TableHead className="max-w-[120px] truncate" title="IVA / AIU">IVA / AIU</TableHead>
                     <TableHead>Valor Total</TableHead>
                     <TableHead>Saldo Pendiente</TableHead>
                     <TableHead>Estado</TableHead>
@@ -267,13 +270,25 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                             <TableCell className="font-mono font-bold">{fac.numero || fac.id}</TableCell>
                             <TableCell>
                                 <div className="flex flex-col">
-                                    <span className="font-medium">{fac.cotizacion?.cliente?.nombre || "Cliente General"}</span>
-                                    {fac.cotizacion?.numero && (
+                                    <span className="font-medium">{fac.cliente?.nombre || fac.cotizacion?.cliente?.nombre || "Cliente General"}</span>
+                                    {(fac.cliente?.documento || fac.cotizacion?.cliente?.documento) && (
                                         <span className="text-xs text-muted-foreground">
-                                            {fac.cotizacion.numero}
+                                            NIT: {fac.cliente?.documento || fac.cotizacion?.cliente?.documento}
                                         </span>
                                     )}
                                 </div>
+                            </TableCell>
+                            <TableCell>
+                                {fac.cotizacion && fac.cotizacion.numero !== "SIN-REF" ? (
+                                    <div className="flex flex-col">
+                                        <span className="font-medium text-xs">{fac.cotizacion.numero}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col">
+                                        <span className="font-medium text-muted-foreground text-xs">Sin vincular</span>
+                                        <span className="text-[10px] text-muted-foreground">SIN-REF</span>
+                                    </div>
+                                )}
                             </TableCell>
                             <TableCell>{format(new Date(fac.fechaEmision), "dd MMM yyyy", { locale: es })}</TableCell>
                             <TableCell>
@@ -282,6 +297,7 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                                     {isOverdue && <div title="Vencida"><AlertTriangle className="h-3 w-3 text-red-500" /></div>}
                                 </div>
                             </TableCell>
+                            <TableCell className="max-w-[120px] truncate" title={formatCurrency(fac.iva || 0)}>{formatCurrency(fac.iva || 0)}</TableCell>
                             <TableCell>{formatCurrency(fac.valorFacturado)}</TableCell>
                             <TableCell className={cn("font-bold", fac.saldoPendiente > 0 ? "text-red-500" : "text-green-600")}>
                                 {formatCurrency(fac.saldoPendiente)}
@@ -293,16 +309,22 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                                <FacturaHistoryDialog
-                                    factura={fac}
-                                    onFacturaUpdated={onUpdate}
-                                    cuentas={cuentas}
-                                    trigger={
-                                        <Button variant="outline" size="sm" className="text-xs">
-                                            Gestionar
-                                        </Button>
-                                    }
-                                />
+                                <div className="flex items-center justify-end gap-2">
+                                    <EditInvoiceDialog 
+                                        factura={fac} 
+                                        onInvoiceUpdated={onUpdate} 
+                                    />
+                                    <FacturaHistoryDialog
+                                        factura={fac}
+                                        onFacturaUpdated={onUpdate}
+                                        cuentas={cuentas}
+                                        trigger={
+                                            <Button variant="outline" size="sm" className="text-xs">
+                                                Gestionar
+                                            </Button>
+                                        }
+                                    />
+                                </div>
                             </TableCell>
                         </TableRow>
                     );

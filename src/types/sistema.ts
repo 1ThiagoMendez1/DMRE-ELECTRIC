@@ -223,6 +223,7 @@ export interface Factura {
     numero?: string;
     trabajoId?: string;
     clienteId?: string;
+    cliente?: Cliente;
     subtotal?: number;
     iva?: number;
     valorPagado?: number;
@@ -279,6 +280,7 @@ export interface MovimientoFinanciero {
     concepto?: string;
     descripcion?: string;
     valor: number;
+    iva?: number; // Add iva field
     referencia?: string; // Add referencia field
     // Foreign Keys
     facturaId?: string;

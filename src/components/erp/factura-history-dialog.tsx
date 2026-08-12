@@ -155,11 +155,11 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
             return;
         }
 
-        if (monto > saldoPendiente) {
+        if (Math.round(monto) > Math.round(saldoPendiente)) {
             toast({
                 variant: "destructive",
                 title: "Error en Abono",
-                description: `El monto ingresado ($${formatCurrency(monto)}) supera el saldo pendiente ($${formatCurrency(saldoPendiente)}).`
+                description: `El monto ingresado (${formatCurrency(monto)}) supera el saldo pendiente (${formatCurrency(saldoPendiente)}).`
             });
             return;
         }
@@ -299,8 +299,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
             <DialogTrigger asChild>
                 {trigger || (
                     <span className="cursor-pointer hover:underline text-primary font-medium">
-                        {factura.cotizacion?.cliente?.nombre || "Sin Cotización Vinculada"}
-                        {factura.cotizacion?.numero ? ` - ${factura.cotizacion.numero}` : ""}
+                        {factura.cliente?.nombre || factura.cotizacion?.cliente?.nombre || "Sin Cotización Vinculada"}
+                        {factura.cotizacion?.numero && factura.cotizacion?.numero !== "SIN-REF" ? ` - ${factura.cotizacion.numero}` : ""}
                     </span>
                 )}
             </DialogTrigger>
@@ -311,7 +311,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                         Factura {factura.numero || factura.id}
                     </DialogTitle>
                     <DialogDescription>
-                        {factura.cotizacion?.cliente?.nombre || "Cliente Desconocido"} {factura.cotizacion?.numero ? `- ${factura.cotizacion.numero}` : ""} - {formatCurrency(factura.valorFacturado)}
+                        {factura.cliente?.nombre || factura.cotizacion?.cliente?.nombre || "Cliente Desconocido"} {factura.cotizacion?.numero && factura.cotizacion?.numero !== "SIN-REF" ? `- ${factura.cotizacion.numero}` : ""} - {formatCurrency(factura.valorFacturado)}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -334,11 +334,11 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                 </CardHeader>
                                 <CardContent>
                                     <p className="font-semibold">
-                                        {factura.cotizacion?.cliente?.nombre || "N/A"}
-                                        {factura.cotizacion?.numero ? ` - ${factura.cotizacion.numero}` : ""}
+                                        {factura.cliente?.nombre || factura.cotizacion?.cliente?.nombre || "N/A"}
+                                        {factura.cotizacion?.numero && factura.cotizacion?.numero !== "SIN-REF" ? ` - ${factura.cotizacion.numero}` : ""}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">{factura.cotizacion?.cliente?.documento || ""}</p>
-                                    <p className="text-xs text-muted-foreground">{factura.cotizacion?.cliente?.telefono || ""}</p>
+                                    <p className="text-xs text-muted-foreground">{factura.cliente?.documento || factura.cotizacion?.cliente?.documento || ""}</p>
+                                    <p className="text-xs text-muted-foreground">{factura.cliente?.telefono || factura.cotizacion?.cliente?.telefono || ""}</p>
                                 </CardContent>
                             </Card>
 
@@ -375,6 +375,36 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                 </CardContent>
                             </Card>
                         </div>
+                        {/* Documento Adjunto */}
+                        {factura.archivoUrl && (
+                            <Card className="mt-4">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm flex items-center gap-2">
+                                        <FileText className="h-4 w-4" /> Soporte Adjunto
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex justify-between items-center bg-muted/30 p-2 rounded-md border">
+                                            <span className="text-sm font-medium truncate">
+                                                Soporte en formato PDF
+                                            </span>
+                                            <Button variant="outline" size="sm" asChild>
+                                                <a href={factura.archivoUrl} target="_blank" rel="noopener noreferrer">
+                                                    Abrir PDF
+                                                </a>
+                                            </Button>
+                                        </div>
+                                        {/* Vista previa opcional si cabe */}
+                                        <iframe 
+                                            src={factura.archivoUrl} 
+                                            className="w-full h-64 border rounded-md" 
+                                            title="Vista previa del soporte"
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
                     </TabsContent>
 
                     {/* ACCIONES TAB */}
@@ -409,10 +439,13 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                         <div>
                                             <label className="text-xs text-muted-foreground">Monto</label>
                                             <Input
-                                                type="number"
-                                                placeholder="0"
-                                                value={abonoMonto}
-                                                onChange={(e) => setAbonoMonto(e.target.value)}
+                                                type="text"
+                                                placeholder="$ 0"
+                                                value={abonoMonto ? formatCurrency(parseFloat(abonoMonto)) : ""}
+                                                onChange={(e) => {
+                                                    const rawValue = e.target.value.replace(/\D/g, '');
+                                                    setAbonoMonto(rawValue);
+                                                }}
                                             />
                                         </div>
                                         <div>

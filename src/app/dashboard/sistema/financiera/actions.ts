@@ -32,10 +32,22 @@ function mapToUI(db: any, cotizacionRaw?: any): Factura {
         } as unknown as Cotizacion;
     }
 
+    let facturaCliente: Cliente | undefined = undefined;
+    if (db.clientes) {
+        facturaCliente = {
+            id: db.clientes.id,
+            nombre: db.clientes.nombre || "Cliente Sin Nombre",
+            documento: db.clientes.documento || "",
+            telefono: db.clientes.telefono || "",
+            direccion: db.clientes.direccion || "",
+        } as Cliente;
+    }
+
     return {
         id: db.id,
         cotizacionId: db.cotizacion_id,
         cotizacion: cotizacion,
+        cliente: facturaCliente,
         fechaEmision: new Date(db.fecha_emision),
         fechaVencimiento: new Date(db.fecha_vencimiento || db.fecha_emision),
         valorFacturado: Number(db.valor_total) || 0,
@@ -111,6 +123,7 @@ export async function getFacturasAction(limit: number = 100): Promise<Factura[]>
         .from("facturas")
         .select(`
             *,
+            clientes (id, nombre, documento, telefono, direccion),
             cotizaciones (
                 id, numero, total, estado, created_at,
                 clientes (id, nombre, documento, telefono, direccion)
@@ -140,6 +153,7 @@ export async function createFacturaAction(factura: Omit<Factura, "id">): Promise
         .insert(dbData)
         .select(`
             *,
+            clientes (id, nombre, documento, telefono, direccion),
             cotizaciones (
                 id, numero, total, estado, created_at,
                 clientes (id, nombre, documento, telefono, direccion)
@@ -175,6 +189,7 @@ export async function updateFacturaAction(id: string, factura: Partial<Factura>)
         .eq("id", id)
         .select(`
             *,
+            clientes (id, nombre, documento, telefono, direccion),
             cotizaciones (
                 id, numero, total, estado, created_at,
                 clientes (id, nombre, documento, telefono, direccion)
@@ -267,6 +282,7 @@ export async function registrarPagoFacturaAction(
         .eq("id", facturaId)
         .select(`
             *,
+            clientes (id, nombre, documento, telefono, direccion),
             cotizaciones (
                 id, numero, total, estado, created_at,
                 clientes (id, nombre, documento, telefono, direccion)

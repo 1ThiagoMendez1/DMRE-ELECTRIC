@@ -99,6 +99,7 @@ export function FacturarTrabajosDialog({ onFacturaCreated, nextId }: FacturarTra
             cotizacionId: selected.id,
             cotizacion: selected as Cotizacion,
             clienteId: selected.clienteId,
+            cliente: selected.cliente as any,
             trabajoId: selected.trabajoId || undefined,
             fechaEmision: new Date(fechaEmision),
             fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : new Date(fechaEmision),
