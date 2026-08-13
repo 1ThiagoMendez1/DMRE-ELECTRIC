@@ -102,9 +102,9 @@ interface ErpContextType {
     deductInventoryItem: (id: string, cantidad: number) => Promise<boolean>;
 
     // Proveedor Actions
-    updateProveedor: (updated: Proveedor) => void;
-    addProveedor: (prov: Proveedor) => void;
-    deleteProveedor: (id: string) => void;
+    addProveedor: (prov: Proveedor) => Promise<void>;
+    updateProveedor: (prov: Proveedor) => Promise<void>;
+    deleteProveedor: (id: string) => Promise<void>;
 
     // Vehiculo Actions
     updateVehiculo: (veh: Vehiculo) => void;
@@ -500,13 +500,23 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const { id, ...rest } = prov;
             const saved = await createProveedorAction(rest);
             setProveedores(prev => [saved, ...prev]);
-        } catch (error) { console.error("Failed to add proveedor:", error); }
+            toast({ title: "Proveedor agregado", description: "El proveedor se guardó exitosamente." });
+        } catch (error: any) { 
+            console.error("Failed to add proveedor:", error); 
+            toast({ title: "Error al guardar", description: error.message || "No se pudo agregar el proveedor.", variant: "destructive" });
+            throw error;
+        }
     };
     const updateProveedor = async (updated: Proveedor) => {
         try {
             const saved = await updateProveedorAction(updated.id, updated);
             setProveedores(prev => prev.map(p => p.id === saved.id ? saved : p));
-        } catch (error) { console.error("Failed to update proveedor:", error); }
+            toast({ title: "Proveedor actualizado", description: "Los cambios se guardaron exitosamente." });
+        } catch (error: any) { 
+            console.error("Failed to update proveedor:", error); 
+            toast({ title: "Error al actualizar", description: error.message || "No se pudo actualizar el proveedor.", variant: "destructive" });
+            throw error;
+        }
     };
     const deleteProveedor = async (id: string) => {
         try {

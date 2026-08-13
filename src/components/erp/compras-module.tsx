@@ -101,9 +101,12 @@ export function ComprasModule() {
                             <TableRow>
                                 <TableHead>Fecha</TableHead>
                                 <TableHead>Factura No.</TableHead>
+                                <TableHead>Proveedor</TableHead>
+                                <TableHead>NIT Proveedor</TableHead>
                                 <TableHead>Compra Ref. (CM)</TableHead>
                                 <TableHead>Oferta Ref.</TableHead>
                                 <TableHead>Cliente</TableHead>
+                                <TableHead className="text-right">IVA</TableHead>
                                 <TableHead className="text-right">Valor Factura</TableHead>
                                 <TableHead className="text-right">Pagado</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
@@ -114,7 +117,7 @@ export function ComprasModule() {
                         <TableBody>
                             {filteredCompras.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                                    <TableCell colSpan={13} className="h-24 text-center text-muted-foreground">
                                         No se encontraron compras registradas.
                                     </TableCell>
                                 </TableRow>
@@ -133,6 +136,12 @@ export function ComprasModule() {
                                                 {format(localD, "dd/MM/yyyy")}
                                             </TableCell>
                                             <TableCell>{compra.numeroFactura}</TableCell>
+                                            <TableCell className="max-w-[150px] truncate" title={compra.cotizacionProveedor?.proveedor?.nombre || "Sin Proveedor"}>
+                                                {compra.cotizacionProveedor?.proveedor?.nombre || <span className="text-muted-foreground italic">N/A</span>}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-sm text-muted-foreground">
+                                                {compra.cotizacionProveedor?.proveedor?.nit || "N/A"}
+                                            </TableCell>
                                             <TableCell>
                                                 {compra.cotizacionProveedor ? (
                                                     <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
@@ -147,6 +156,9 @@ export function ComprasModule() {
                                             </TableCell>
                                             <TableCell className="max-w-[150px] truncate">
                                                 {compra.cotizacion?.cliente?.nombre || "Sin Vincular"}
+                                            </TableCell>
+                                            <TableCell className="text-right font-semibold text-muted-foreground">
+                                                {formatCurrency(compra.iva || 0)}
                                             </TableCell>
                                             <TableCell className="text-right font-semibold">
                                                 {formatCurrency(compra.valorFactura)}

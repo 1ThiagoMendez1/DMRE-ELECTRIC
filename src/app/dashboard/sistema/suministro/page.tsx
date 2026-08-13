@@ -54,7 +54,7 @@ export default function SuministroPage() {
     const [isDetailOpen, setIsDetailOpen] = useState(false);
 
     const handleCreateSupplier = (newProv: any) => {
-        addProveedor(newProv);
+        return addProveedor(newProv);
     };
 
     const handleRegisterPayment = (id: string) => {

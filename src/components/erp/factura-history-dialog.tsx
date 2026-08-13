@@ -17,7 +17,9 @@ import {
     History,
     Banknote,
     Calendar,
-    Wallet
+    Wallet,
+    Pencil,
+    Loader2
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -101,6 +103,12 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
     );
     const [nota, setNota] = useState("");
 
+    // Edit details states
+    const [editNumero, setEditNumero] = useState(factura.numero || factura.id);
+    const [editFechaEmision, setEditFechaEmision] = useState(format(new Date(factura.fechaEmision), "yyyy-MM-dd"));
+    const [editFechaVencimiento, setEditFechaVencimiento] = useState(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
+    const [isSavingDetails, setIsSavingDetails] = useState(false);
+
     // Track local saldo
     const [saldoPendiente, setSaldoPendiente] = useState(factura.saldoPendiente);
     const [anticipoTotal, setAnticipoTotal] = useState(factura.anticipoRecibido);
@@ -112,6 +120,10 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         setFechaVencimiento(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
         setAbonoMonto("");
         setAdelantoMonto("");
+
+        setEditNumero(factura.numero || factura.id);
+        setEditFechaEmision(format(new Date(factura.fechaEmision), "yyyy-MM-dd"));
+        setEditFechaVencimiento(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
     }, [factura]);
 
     // Movimientos history (Mock for now, would replace with real fetch if implementing full audit log)
@@ -282,6 +294,29 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         setNota("");
     };
 
+    const handleGuardarDetalles = async () => {
+        setIsSavingDetails(true);
+        try {
+            await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate API
+
+            const updatedInvoice = {
+                ...factura,
+                id: editNumero,
+                numero: editNumero,
+                fechaEmision: new Date(editFechaEmision + 'T12:00:00'),
+                fechaVencimiento: new Date(editFechaVencimiento + 'T12:00:00'),
+            };
+
+            onFacturaUpdated(updatedInvoice);
+            toast({
+                title: "Detalles Actualizados",
+                description: `Los detalles de la factura han sido modificados.`,
+            });
+        } finally {
+            setIsSavingDetails(false);
+        }
+    };
+
     const getMovimientoIcon = (tipo: MovimientoFactura['tipo']) => {
         switch (tipo) {
             case 'ABONO': return <DollarSign className="h-4 w-4 text-green-500" />;
@@ -324,6 +359,52 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
 
                     {/* DETALLES TAB */}
                     <TabsContent value="detalles" className="flex-1 overflow-auto space-y-4 mt-4">
+                        {/* Editar Detalles */}
+                        <Card className="border-l-4 border-l-blue-500">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Pencil className="h-4 w-4 text-blue-600" /> Editar Información Base
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="text-xs font-semibold block mb-1">N° Factura</label>
+                                        <Input
+                                            value={editNumero}
+                                            onChange={(e) => setEditNumero(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-semibold block mb-1">Fecha Emisión</label>
+                                        <Input
+                                            type="date"
+                                            value={editFechaEmision}
+                                            onChange={(e) => setEditFechaEmision(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-semibold block mb-1">Fecha Vencimiento</label>
+                                        <Input
+                                            type="date"
+                                            value={editFechaVencimiento}
+                                            onChange={(e) => setEditFechaVencimiento(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex justify-end">
+                                    <Button 
+                                        onClick={handleGuardarDetalles} 
+                                        disabled={isSavingDetails || !editNumero || !editFechaEmision || !editFechaVencimiento}
+                                        size="sm"
+                                    >
+                                        {isSavingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Guardar Cambios
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Client Info */}
                             <Card>

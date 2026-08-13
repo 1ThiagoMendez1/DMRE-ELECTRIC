@@ -37,7 +37,8 @@ const formSchema = z.object({
     nit: z.string().min(6, "NIT/Documento inválido"),
     categoria: z.enum(["MATERIALES", "SERVICIOS", "MIXTO"] as const),
     correo: z.string().email("Correo electrónico inválido"),
-    datosBancarios: z.string().min(5, "Datos bancarios requeridos"),
+    bancoNombre: z.string().min(2, "Nombre de banco requerido"),
+    bancoCuenta: z.string().min(5, "Número de cuenta requerido"),
     notas: z.string().optional(),
 });
 
@@ -55,19 +56,29 @@ export function CreateSupplierDialog({ onSupplierCreated }: CreateSupplierDialog
             nit: "",
             categoria: "MATERIALES",
             correo: "",
-            datosBancarios: "",
+            bancoNombre: "",
+            bancoCuenta: "",
             notas: ""
         },
     });
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: z.infer<typeof formSchema>) {
         const newSupplier = {
             id: `PROV-${Math.floor(Math.random() * 1000)}`,
-            ...values
+            nombre: values.nombre,
+            nit: values.nit,
+            categoria: values.categoria,
+            correo: values.correo,
+            datosBancarios: `${values.bancoNombre} - ${values.bancoCuenta}`,
+            notas: values.notas
         };
-        onSupplierCreated(newSupplier);
-        setOpen(false);
-        form.reset();
+        try {
+            await onSupplierCreated(newSupplier);
+            setOpen(false);
+            form.reset();
+        } catch (error) {
+            // El proveedor-erp ya mostró un toast con el error
+        }
     }
 
     return (
@@ -150,19 +161,34 @@ export function CreateSupplierDialog({ onSupplierCreated }: CreateSupplierDialog
                                 </FormItem>
                             )}
                         />
-                        <FormField
-                            control={form.control}
-                            name="datosBancarios"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Datos Bancarios</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Ej: Bancolombia Ahorros 123..." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="bancoNombre"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nombre del Banco</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ej: Bancolombia" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="bancoCuenta"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Número de Cuenta</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ej: 123456789 (Ahorros)" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
                         <FormField
                             control={form.control}
                             name="notas"

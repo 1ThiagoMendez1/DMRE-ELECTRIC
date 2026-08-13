@@ -134,7 +134,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
 
     const onSubmit = async (values: z.infer<typeof compraSchema>) => {
         const data = {
-            cotizacionId: values.cotizacionId || undefined,
+            cotizacionId: values.cotizacionId === "sin_oferta" ? undefined : (values.cotizacionId || undefined),
             cotizacionProveedorId: values.cotizacionProveedorId || undefined,
             numeroFactura: values.numeroFactura,
             iva: Number(values.iva),
@@ -240,6 +240,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
+                                                <SelectItem value="sin_oferta">Sin Oferta</SelectItem>
                                                 {approvedQuotes.map((q) => (
                                                     <SelectItem key={q.id} value={q.id}>
                                                         {q.numero} - {q.cliente?.nombre} ({q.descripcionTrabajo})
@@ -258,7 +259,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                 render={({ field }) => {
                                     const selectedOfferId = form.watch("cotizacionId");
                                     const filteredCMs = approvedSupplierQuotes.filter(
-                                        cp => !selectedOfferId || cp.cotizacionId === selectedOfferId
+                                        cp => (!selectedOfferId || selectedOfferId === "sin_oferta") ? true : cp.cotizacionId === selectedOfferId
                                     );
 
                                     return (

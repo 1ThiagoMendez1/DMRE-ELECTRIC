@@ -84,6 +84,19 @@ export async function createProveedorAction(proveedorInput: Omit<Proveedor, "id"
     const supabase = await createClient();
     const proveedor = { ...proveedorInput } as Partial<Proveedor>;
 
+    // Validar duplicado por NIT
+    if (proveedor.nit) {
+        const { data: existing } = await supabase
+            .from("proveedores")
+            .select("id")
+            .eq("nit", proveedor.nit)
+            .maybeSingle();
+            
+        if (existing) {
+            throw new Error(`Ya existe un proveedor registrado con el NIT: ${proveedor.nit}`);
+        }
+    }
+
     if (!proveedor.codigo || proveedor.codigo.trim() === "") {
         proveedor.codigo = await getNextCode(supabase);
     }
@@ -106,6 +119,21 @@ export async function createProveedorAction(proveedorInput: Omit<Proveedor, "id"
 
 export async function updateProveedorAction(id: string, proveedor: Partial<Proveedor>): Promise<Proveedor> {
     const supabase = await createClient();
+    
+    // Validar duplicado por NIT
+    if (proveedor.nit) {
+        const { data: existing } = await supabase
+            .from("proveedores")
+            .select("id")
+            .eq("nit", proveedor.nit)
+            .neq("id", id)
+            .maybeSingle();
+            
+        if (existing) {
+            throw new Error(`Ya existe otro proveedor registrado con el NIT: ${proveedor.nit}`);
+        }
+    }
+
     const dbData = mapToDB(proveedor);
 
     const { data, error } = await supabase

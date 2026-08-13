@@ -27,7 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateFacturaDialog } from "@/components/erp/create-factura-dialog";
 import { FacturarTrabajosDialog } from "@/components/erp/facturar-trabajos-dialog";
 import { FacturaHistoryDialog } from "@/components/erp/factura-history-dialog";
-import { EditInvoiceDialog } from "@/components/erp/edit-invoice-dialog";
+
 import { useErp } from "@/components/providers/erp-provider";
 import { useToast } from "@/hooks/use-toast";
 import { Factura, CuentaBancaria } from "@/types/sistema";
@@ -310,10 +310,7 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                             </TableCell>
                             <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                    <EditInvoiceDialog 
-                                        factura={fac} 
-                                        onInvoiceUpdated={onUpdate} 
-                                    />
+
                                     <FacturaHistoryDialog
                                         factura={fac}
                                         onFacturaUpdated={onUpdate}

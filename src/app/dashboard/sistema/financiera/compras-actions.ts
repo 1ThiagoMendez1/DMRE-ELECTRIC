@@ -175,6 +175,49 @@ export async function updateCompraAction(id: string, compra: Partial<CompraFinan
 
 export async function deleteCompraAction(id: string): Promise<boolean> {
     const supabase = await createClient();
+
+    // Fetch compra to get details for movement deletion
+    const { data: compra, error: getError } = await supabase
+        .from("compras_financiera")
+        .select("*")
+        .eq("id", id)
+        .single();
+        
+    if (getError) {
+        console.error("Error fetching compra to delete:", getError);
+        throw new Error("Failed to fetch compra for deletion");
+    }
+
+    // If there was a payment, try to find and delete the associated movement
+    if (compra.valor_pago && compra.valor_pago > 0) {
+        const descripcionQuery = `%Pago de factura ${compra.numero_factura}%`;
+        
+        const { data: movs } = await supabase
+            .from("movimientos_financieros")
+            .select("id, cuenta_id, valor")
+            .eq("tipo", "EGRESO")
+            .eq("categoria", "PROVEEDORES")
+            .eq("valor", compra.valor_pago)
+            .ilike("descripcion", descripcionQuery);
+            
+        if (movs && movs.length > 0) {
+            // Delete the first matching movement
+            const mov = movs[0];
+            const { error: deleteMovError } = await supabase
+                .from("movimientos_financieros")
+                .delete()
+                .eq("id", mov.id);
+                
+            // Restore the account balance
+            if (!deleteMovError && mov.cuenta_id) {
+                await supabase.rpc("update_cuenta_saldo", {
+                    cuenta_uuid: mov.cuenta_id,
+                    delta_valor: mov.valor
+                });
+            }
+        }
+    }
+
     const { error } = await supabase
         .from("compras_financiera")
         .delete()
