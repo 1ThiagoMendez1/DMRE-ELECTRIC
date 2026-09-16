@@ -139,23 +139,23 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                        <Label htmlFor="fecha" className="text-right">Fecha</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 py-4">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="fecha" className="text-xs font-semibold text-muted-foreground">Fecha</Label>
                         <Input
                             id="fecha"
                             type="date"
                             value={fecha}
                             onChange={(e) => setFecha(e.target.value)}
                             disabled={!isEditing}
-                            className="col-span-1 md:col-span-3"
+                            className="w-full"
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                        <Label htmlFor="tipo" className="text-right">Tipo</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="tipo" className="text-xs font-semibold text-muted-foreground">Tipo</Label>
                         <Select value={tipo} onValueChange={(v) => setTipo(v as TipoMovimiento)} disabled={!isEditing}>
-                            <SelectTrigger className="col-span-1 md:col-span-3">
+                            <SelectTrigger className="w-full">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -165,10 +165,10 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                        <Label htmlFor="categoria" className="text-right">Categoría</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="categoria" className="text-xs font-semibold text-muted-foreground">Categoría</Label>
                         <Select value={categoria} onValueChange={(v) => setCategoria(v as CategoriaMovimiento)} disabled={!isEditing}>
-                            <SelectTrigger className="col-span-1 md:col-span-3">
+                            <SelectTrigger className="w-full">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -184,51 +184,51 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                        <Label htmlFor="concepto" className="text-right">Concepto</Label>
-                        <Input
-                            id="concepto"
-                            value={concepto}
-                            onChange={(e) => setConcepto(e.target.value)}
-                            disabled={!isEditing}
-                            className="col-span-1 md:col-span-3"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                        <Label htmlFor="tercero" className="text-right">Tercero</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="tercero" className="text-xs font-semibold text-muted-foreground">Tercero</Label>
                         <Input
                             id="tercero"
                             value={tercero}
                             onChange={(e) => setTercero(e.target.value)}
                             disabled={!isEditing}
-                            className="col-span-1 md:col-span-3"
+                            className="w-full"
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                        <Label htmlFor="valor" className="text-right">Valor</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="valor" className="text-xs font-semibold text-muted-foreground">Valor</Label>
                         <Input
                             id="valor"
                             type="number"
                             value={valor}
                             onChange={(e) => setValor(e.target.value)}
                             disabled={!isEditing}
-                            className="col-span-1 md:col-span-3 font-mono font-bold"
+                            className="w-full font-mono font-bold"
                         />
                     </div>
 
                     {!isEditing && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Cuenta</Label>
-                            <div className="col-span-1 md:col-span-3 text-sm font-medium border p-2 rounded-md bg-muted/50">
-                                {movimiento.cuenta.nombre} ({movimiento.cuenta.tipo})
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-semibold text-muted-foreground">Cuenta</Label>
+                            <div className="text-sm font-medium border px-3 py-2 rounded-md bg-muted/50 truncate h-10 flex items-center">
+                                {movimiento.cuenta?.nombre || "Sin cuenta"} {movimiento.cuenta?.tipo ? `(${movimiento.cuenta.tipo})` : ""}
                             </div>
                         </div>
                     )}
 
+                    <div className="space-y-1.5 col-span-1 sm:col-span-2 md:col-span-3">
+                        <Label htmlFor="concepto" className="text-xs font-semibold text-muted-foreground">Concepto</Label>
+                        <Input
+                            id="concepto"
+                            value={concepto}
+                            onChange={(e) => setConcepto(e.target.value)}
+                            disabled={!isEditing}
+                            className="w-full"
+                        />
+                    </div>
+
                     {movimiento.comprobanteUrl && (
-                        <Card className="col-span-1 md:col-span-4 mt-2">
+                        <Card className="col-span-1 sm:col-span-2 md:col-span-3 mt-2">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm flex items-center gap-2">
                                     <FileText className="h-4 w-4" /> Soporte Adjunto

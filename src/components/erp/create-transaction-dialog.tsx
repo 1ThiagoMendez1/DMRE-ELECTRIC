@@ -30,7 +30,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus, FileText, Upload, Loader2, X } from "lucide-react";
+import { Plus, FileText, Upload, Loader2, X, ExternalLink, Eye } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { CuentaBancaria, TipoMovimiento, CategoriaMovimiento, Cotizacion, ObligacionFinanciera, MovimientoFinanciero } from "@/types/sistema";
 import { createClient } from "@/utils/supabase/client";
@@ -93,6 +93,7 @@ interface CreateTransactionDialogProps {
 export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimientos = [], onTransactionCreated }: CreateTransactionDialogProps) {
     const [open, setOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadedFileName, setUploadedFileName] = useState<string>("");
     const supabase = createClient();
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -173,6 +174,21 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
         }
     }, [watchCategoria, supabase]);
 
+    // Auto-actualizar IVA si cambia tipo o categoría
+    useEffect(() => {
+        const subscription = form.watch((value, { name }) => {
+            if (name === "categoria" || name === "tipo") {
+                const currentValor = Number(value.valor) || 0;
+                if (value.tipo === "TRANSFERENCIA" || value.categoria === "NOMINA") {
+                    form.setValue("iva", 0, { shouldValidate: true });
+                } else if (currentValor > 0) {
+                    form.setValue("iva", Math.round(currentValor * 0.19), { shouldValidate: true });
+                }
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, [form]);
+
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -185,8 +201,9 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
 
         try {
             setIsUploading(true);
+            setUploadedFileName(file.name);
             const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt}`;
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const filePath = `comprobantes/${fileName}`;
 
             const { error: uploadError, data } = await supabase.storage
@@ -199,13 +216,19 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                 .from('imagenes')
                 .getPublicUrl(filePath);
 
-            form.setValue('comprobanteUrl', publicUrl);
+            form.setValue('comprobanteUrl', publicUrl, { shouldValidate: true });
         } catch (error) {
             console.error('Error uploading file:', error);
             alert("Error al subir el archivo");
+            setUploadedFileName("");
         } finally {
             setIsUploading(false);
         }
+    };
+
+    const handleRemoveFile = () => {
+        form.setValue('comprobanteUrl', '');
+        setUploadedFileName('');
     };
 
     function onSubmit(values: z.infer<typeof formSchema>) {
@@ -267,6 +290,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
 
         setOpen(false);
         form.reset();
+        setUploadedFileName("");
     }
 
     return (
@@ -428,6 +452,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                         if (emp) {
                                                             if ('salario' in emp) {
                                                                 form.setValue("valor", emp.salario);
+                                                                form.setValue("iva", 0);
                                                             }
                                                             if ('identificacion' in emp && emp.identificacion) {
                                                                 form.setValue("identificacion", emp.identificacion);
@@ -574,9 +599,28 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                 name="valor"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Valor</FormLabel>
+                                        <FormLabel>Valor (COP)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" placeholder="0" {...field} />
+                                            <Input
+                                                type="text"
+                                                inputMode="numeric"
+                                                placeholder="$ 0 COP"
+                                                value={field.value ? formatCurrency(Number(field.value)) : ""}
+                                                onChange={(e) => {
+                                                    const raw = e.target.value.replace(/\D/g, "");
+                                                    const num = raw ? parseInt(raw, 10) : 0;
+                                                    field.onChange(num);
+
+                                                    const tipo = form.getValues("tipo");
+                                                    const cat = form.getValues("categoria");
+                                                    if (tipo === "TRANSFERENCIA" || cat === "NOMINA") {
+                                                        form.setValue("iva", 0, { shouldValidate: true });
+                                                    } else {
+                                                        form.setValue("iva", Math.round(num * 0.19), { shouldValidate: true });
+                                                    }
+                                                }}
+                                                className="font-medium"
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -587,15 +631,60 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                 name="iva"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>IVA</FormLabel>
+                                        <div className="flex items-center justify-between">
+                                            <FormLabel>IVA (19%)</FormLabel>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const currentVal = Number(form.getValues("valor")) || 0;
+                                                        form.setValue("iva", Math.round(currentVal * 0.19), { shouldValidate: true });
+                                                    }}
+                                                    className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-primary font-medium transition-colors"
+                                                    title="Calcular 19% de IVA"
+                                                >
+                                                    19%
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => form.setValue("iva", 0, { shouldValidate: true })}
+                                                    className="text-[10px] px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 text-muted-foreground font-medium transition-colors"
+                                                    title="Sin IVA (0%)"
+                                                >
+                                                    0%
+                                                </button>
+                                            </div>
+                                        </div>
                                         <FormControl>
-                                            <Input type="number" placeholder="0" {...field} />
+                                            <Input
+                                                type="text"
+                                                inputMode="numeric"
+                                                placeholder="$ 0 COP"
+                                                value={field.value ? formatCurrency(Number(field.value)) : ""}
+                                                onChange={(e) => {
+                                                    const raw = e.target.value.replace(/\D/g, "");
+                                                    const num = raw ? parseInt(raw, 10) : 0;
+                                                    field.onChange(num);
+                                                }}
+                                                className="font-medium"
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
                         </div>
+
+                        {Number(form.watch("valor") || 0) > 0 && (
+                            <div className="flex items-center justify-between px-3 py-2 bg-primary/5 rounded-md border border-primary/15 text-xs">
+                                <span className="text-muted-foreground font-medium">
+                                    Total del movimiento (Valor + IVA):
+                                </span>
+                                <span className="font-bold text-sm text-primary">
+                                    {formatCurrency((Number(form.watch("valor")) || 0) + (Number(form.watch("iva")) || 0))} COP
+                                </span>
+                            </div>
+                        )}
 
                         <FormField
                             control={form.control}
@@ -605,20 +694,54 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                     <FormLabel>Soporte (PDF)</FormLabel>
                                     <div className="flex flex-col gap-2">
                                         {field.value ? (
-                                            <div className="flex items-center justify-between p-2 border rounded-md bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                                                <div className="flex items-center gap-2 overflow-hidden">
-                                                    <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
-                                                    <span className="text-xs truncate max-w-[200px]">Comprobante cargado</span>
+                                            <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card/60 dark:bg-card/40 shadow-sm">
+                                                <div className="flex items-center justify-between gap-2 border-b pb-2">
+                                                    <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                                                        <div className="p-1.5 rounded-md bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 shrink-0">
+                                                            <FileText className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="truncate">
+                                                            <p className="text-xs font-semibold text-foreground truncate max-w-[200px] sm:max-w-[320px]">
+                                                                {uploadedFileName || "Comprobante cargado (PDF)"}
+                                                            </p>
+                                                            <p className="text-[10px] text-green-600 dark:text-green-400 font-medium">
+                                                                Soporte listo para registrar
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <Button 
+                                                            type="button" 
+                                                            variant="outline" 
+                                                            size="sm" 
+                                                            className="h-7 px-2 text-xs flex items-center gap-1 hover:bg-primary/10 hover:text-primary"
+                                                            onClick={() => window.open(field.value, '_blank')}
+                                                            title="Abrir PDF en pestaña nueva"
+                                                        >
+                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                            <span className="hidden sm:inline">Abrir</span>
+                                                        </Button>
+                                                        <Button 
+                                                            type="button" 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={handleRemoveFile}
+                                                            title="Quitar comprobante"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                                <Button 
-                                                    type="button" 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-6 w-6"
-                                                    onClick={() => form.setValue('comprobanteUrl', '')}
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
+
+                                                {/* Vista previa embebida del PDF */}
+                                                <div className="relative w-full h-72 border rounded-md overflow-hidden bg-background shadow-inner">
+                                                    <iframe 
+                                                        src={field.value} 
+                                                        className="w-full h-full border-0" 
+                                                        title="Vista previa del soporte PDF"
+                                                    />
+                                                </div>
                                             </div>
                                         ) : (
                                             <div className="relative">
@@ -629,9 +752,9 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                     disabled={isUploading}
                                                     className="cursor-pointer pr-10"
                                                 />
-                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
                                                     {isUploading ? (
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
                                                     ) : (
                                                         <Upload className="h-4 w-4" />
                                                     )}
@@ -639,7 +762,9 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                             </div>
                                         )}
                                         <p className="text-[10px] text-muted-foreground italic">
-                                            Sube el PDF del soporte bancario o factura.
+                                            {field.value 
+                                                ? "Verifique los datos del documento en la vista previa antes de registrar." 
+                                                : "Sube el PDF del soporte bancario o factura para ver la vista previa."}
                                         </p>
                                     </div>
                                     <FormMessage />
