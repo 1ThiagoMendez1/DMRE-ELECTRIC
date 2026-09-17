@@ -99,17 +99,43 @@ export async function updateCuentaBancariaAction(id: string, cuenta: Partial<Cue
 // MOVIMIENTOS FINANCIEROS
 // =============================================
 
+function parseConceptoMetadata(rawConcepto: string = "") {
+    let cleanConcepto = rawConcepto || "";
+    let nit: string | undefined = undefined;
+    let iva: number | undefined = undefined;
+
+    const idMatch = cleanConcepto.match(/\(ID:\s*([^)]+)\)/i) || cleanConcepto.match(/\(NIT:\s*([^)]+)\)/i);
+    if (idMatch) {
+        nit = idMatch[1].trim();
+        cleanConcepto = cleanConcepto.replace(idMatch[0], "").trim();
+    }
+
+    const ivaMatch = cleanConcepto.match(/\(IVA:\s*([^)]+)\)/i);
+    if (ivaMatch) {
+        const parsed = parseFloat(ivaMatch[1].replace(/[^0-9.]/g, ""));
+        if (!isNaN(parsed)) iva = parsed;
+        cleanConcepto = cleanConcepto.replace(ivaMatch[0], "").trim();
+    }
+
+    cleanConcepto = cleanConcepto.replace(/\s+/g, " ").trim();
+
+    return { cleanConcepto, nit, iva };
+}
+
 function mapMovimientoToUI(db: any): MovimientoFinanciero {
+    const { cleanConcepto, nit, iva: parsedIva } = parseConceptoMetadata(db.concepto);
+
     return {
         id: db.id,
         fecha: new Date(db.fecha),
         tipo: db.tipo,
         categoria: db.categoria || "OTROS",
-        concepto: db.concepto,
+        concepto: cleanConcepto || db.concepto,
         descripcion: db.descripcion,
         valor: Number(db.valor) || 0,
+        iva: db.iva !== undefined && db.iva !== null ? Number(db.iva) : (parsedIva ?? 0),
         tercero: db.tercero,
-        identificacion: db.identificacion,
+        identificacion: db.identificacion || nit,
         referencia: db.referencia, // Added
         cuentaId: db.cuenta_id,
         // Extended fields
@@ -129,20 +155,31 @@ function mapMovimientoToUI(db: any): MovimientoFinanciero {
 
 function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
     let conceptoFinal = ui.concepto || "";
+    // Remove existing ID and IVA tags to avoid duplication
+    conceptoFinal = conceptoFinal
+        .replace(/\(ID:\s*[^)]+\)/gi, "")
+        .replace(/\(NIT:\s*[^)]+\)/gi, "")
+        .replace(/\(IVA:\s*[^)]+\)/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
     if (ui.identificacion && ui.identificacion.trim() !== "") {
-        conceptoFinal += ` (ID: ${ui.identificacion})`;
+        conceptoFinal += ` (ID: ${ui.identificacion.trim()})`;
+    }
+    if (ui.iva !== undefined && ui.iva !== null && Number(ui.iva) > 0) {
+        conceptoFinal += ` (IVA: ${Math.round(Number(ui.iva))})`;
     }
 
-    return {
-        fecha: ui.fecha,
+    const payload: any = {
+        fecha: ui.fecha ? (ui.fecha instanceof Date ? ui.fecha.toISOString() : ui.fecha) : undefined,
         tipo: ui.tipo,
         categoria: ui.categoria,
         concepto: conceptoFinal,
         descripcion: ui.descripcion,
         valor: ui.valor,
         tercero: ui.tercero,
-        referencia: ui.referencia, // Added
         // identificacion: ui.identificacion, // Removed to avoid PGRST204 crash
+        // referencia: ui.referencia, // Removed to avoid PGRST204 crash
         cuenta_id: ui.cuentaId,
         factura_id: ui.facturaId,
         trabajo_id: ui.trabajoId,
@@ -152,10 +189,18 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
         registrado_por: ui.registradoPor,
         aprobado: ui.aprobado,
         aprobado_por: ui.aprobadoPor,
-        cotizacion_id: ui.cotizacionId === 'none' ? null : ui.cotizacionId,
+        cotizacion_id: ui.cotizacionId === 'none' || !ui.cotizacionId ? null : ui.cotizacionId,
         cuotas: ui.cuotas,
         cuota_actual: ui.cuotaActual,
     };
+
+    Object.keys(payload).forEach(key => {
+        if (payload[key] === undefined) {
+            delete payload[key];
+        }
+    });
+
+    return payload;
 }
 
 export async function getMovimientosFinancierosAction(): Promise<MovimientoFinanciero[]> {
@@ -214,7 +259,7 @@ export async function updateMovimientoFinancieroAction(id: string, movimiento: P
 
     if (error) {
         console.error("Error updating movimiento_financiero:", error);
-        throw new Error("Failed to update movimiento_financiero");
+        throw new Error(`Failed to update movimiento_financiero: ${error.message}`);
     }
 
     revalidatePath("/dashboard/sistema/financiera");

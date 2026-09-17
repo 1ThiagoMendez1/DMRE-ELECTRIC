@@ -87,6 +87,7 @@ export default function FinancieraPage() {
         addCuentaBancaria,
         updateCuentaBancaria,
         addMovimientoFinanciero,
+        updateMovimientoFinanciero,
         addObligacionFinanciera,
         updateObligacionFinanciera,
         cotizaciones,
@@ -105,17 +106,71 @@ export default function FinancieraPage() {
     // Map movements to ensure it has valor/concepto if DB uses monto/descripcion
     const movimientos = movementsRaw.map(m => {
         let esSimple = false;
+        let tercero = m.tercero;
+        let identificacion = m.identificacion;
+        let iva = m.iva;
+        let concepto = m.concepto || m.descripcion || "Sin concepto";
+
+        // 1. Extraer ID/NIT desde el concepto si viene con formato (ID: ...) o (NIT: ...)
+        const idMatch = concepto.match(/\(ID:\s*([^)]+)\)/i) || concepto.match(/\(NIT:\s*([^)]+)\)/i);
+        if (idMatch) {
+            if (!identificacion) identificacion = idMatch[1].trim();
+            concepto = concepto.replace(idMatch[0], "").trim();
+        }
+
+        // 2. Extraer IVA desde el concepto si viene con formato (IVA: ...)
+        const ivaMatch = concepto.match(/\(IVA:\s*([^)]+)\)/i);
+        if (ivaMatch) {
+            if (iva === undefined || iva === null || iva === 0) {
+                const parsed = parseFloat(ivaMatch[1].replace(/[^0-9.]/g, ""));
+                if (!isNaN(parsed)) iva = parsed;
+            }
+            concepto = concepto.replace(ivaMatch[0], "").trim();
+        }
+        concepto = concepto.replace(/\s+/g, " ").trim();
+
+        // 3. Vincular con Factura / Cotización si aplica (ej. "Pago Factura E204")
         if (m.trabajoId) {
             const cot = cotizaciones.find(c => c.id === m.trabajoId);
             if (cot?.tipo === 'SIMPLIFICADA') esSimple = true;
-        } else if (m.facturaId) {
-            const fac = facturas.find(f => f.id === m.facturaId);
-            if (fac && fac.cotizacion?.tipo === 'SIMPLIFICADA') esSimple = true;
+        } else if (m.facturaId || concepto.toLowerCase().includes('factura')) {
+            const fac = m.facturaId
+                ? facturas.find(f => f.id === m.facturaId)
+                : facturas.find(f => f.numero && concepto.toLowerCase().includes(f.numero.toLowerCase()));
+
+            if (fac) {
+                if (fac.cotizacion?.tipo === 'SIMPLIFICADA') esSimple = true;
+
+                // Si no tiene tercero asignado, tomarlo del cliente de la factura
+                if (!tercero || tercero === "Sin tercero" || tercero.trim() === "") {
+                    tercero = fac.cliente?.nombre || fac.cotizacion?.cliente?.nombre || tercero;
+                }
+
+                // Si no tiene NIT asignado, tomarlo del cliente de la factura
+                if (!identificacion || identificacion === "N/A" || identificacion.trim() === "") {
+                    identificacion = fac.cliente?.documento || fac.cotizacion?.cliente?.documento || identificacion;
+                }
+
+                // Si el IVA no está definido o es 0, tomarlo de la factura o cotización
+                if (!iva || iva === 0) {
+                    const cotRef = fac.cotizacionId ? cotizaciones.find(c => c.id === fac.cotizacionId) : undefined;
+                    iva = (fac.iva ?? 0) > 0 ? (fac.iva ?? 0) : (fac.cotizacion?.iva || cotRef?.iva || 0);
+                }
+            }
         }
+
+        // 4. Si el IVA sigue en 0 o no está definido, calcular el 19% por defecto (excepto Nómina y Préstamos)
+        if ((!iva || iva === 0) && m.categoria !== 'NOMINA' && m.categoria !== 'PRESTAMOS') {
+            iva = Math.round((m.valor || 0) * 0.19);
+        }
+
         return {
             ...m,
+            tercero: tercero || "Sin tercero",
+            identificacion: identificacion || "N/A",
+            iva: iva || 0,
             valor: m.valor || 0,
-            concepto: m.concepto || m.descripcion || "Sin concepto",
+            concepto: concepto || "Sin concepto",
             cuenta: m.cuenta || cuentas.find(c => c.id === m.cuentaId) || { nombre: "Cuenta Desconocida" },
             esSimple
         };
@@ -236,9 +291,18 @@ export default function FinancieraPage() {
         toast({ title: "Transacción registrada", description: "El movimiento ha sido guardado exitosamente." });
     };
 
-    const handleUpdateTransaction = (updatedMov: MovimientoFinanciero) => {
-        // updateMovimientoFinanciero(updatedMov); // If exists
-        toast({ title: "Movimiento actualizado", description: "Los detalles han sido guardados." });
+    const handleUpdateTransaction = async (updatedMov: MovimientoFinanciero) => {
+        try {
+            await updateMovimientoFinanciero(updatedMov);
+            toast({ title: "Movimiento actualizado", description: "Los detalles han sido guardados exitosamente." });
+        } catch (error) {
+            console.error("Error al actualizar movimiento:", error);
+            toast({
+                title: "Error al actualizar",
+                description: "No se pudieron guardar los cambios en la base de datos.",
+                variant: "destructive"
+            });
+        }
     };
 
     const handleCreateObligacion = (newObligacion: ObligacionFinanciera) => {

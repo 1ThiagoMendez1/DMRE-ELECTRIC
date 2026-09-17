@@ -234,10 +234,10 @@ export async function registrarPagoFacturaAction(
 ): Promise<Factura> {
     const supabase = await createClient();
 
-    // 1. Get current Invoice
+    // 1. Get current Factura
     const { data: facturaRef, error: fError } = await supabase
         .from("facturas")
-        .select("valor_total, valor_pagado, saldo_pendiente, numero")
+        .select("valor_total, valor_pagado, saldo_pendiente, numero, iva, subtotal, cliente_id, clientes(id, nombre, documento), cotizacion_id, cotizaciones(id, iva)")
         .eq("id", facturaId)
         .single();
 
@@ -248,13 +248,23 @@ export async function registrarPagoFacturaAction(
     const nuevoSaldo = (Number(facturaRef.valor_total) || 0) - nuevoPago;
     const nuevoEstado = nuevoSaldo <= 0 ? 'PAGADA' : 'PARCIAL';
 
+    const clienteNombre = (facturaRef as any)?.clientes?.nombre || null;
+    const clienteDoc = (facturaRef as any)?.clientes?.documento || null;
+    const cotIva = Number((facturaRef as any)?.cotizaciones?.iva) || 0;
+    const facIva = Number(facturaRef.iva) || cotIva || Math.round(monto * 0.19);
+
+    let conceptoTxt = `Pago Factura ${facturaRef.numero}`;
+    if (clienteDoc) conceptoTxt += ` (ID: ${clienteDoc})`;
+    if (facIva > 0) conceptoTxt += ` (IVA: ${facIva})`;
+
     // 3. Create Financial Movement (INGRESO)
     const { error: movError } = await supabase
         .from("movimientos_financieros")
         .insert({
             tipo: 'INGRESO',
             categoria: 'VENTAS',
-            concepto: `Pago Factura ${facturaRef.numero}`,
+            tercero: clienteNombre,
+            concepto: conceptoTxt,
             descripcion: concepto || `Abono a factura ${facturaRef.numero}`,
             valor: monto,
             fecha: fecha,

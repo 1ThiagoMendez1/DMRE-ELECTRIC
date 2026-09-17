@@ -137,8 +137,17 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
             runningTotal -= valor;
         }
 
-        row.getCell('A').value = `${mov.concepto || ''} ${mov.tercero ? ` - ${mov.tercero}` : ''}`;
-        row.getCell('B').value = mov.identificacion || '';
+        let concepto = mov.concepto || '';
+        let nit = mov.identificacion || '';
+        const idMatch = concepto.match(/\(ID:\s*([^)]+)\)/i) || concepto.match(/\(NIT:\s*([^)]+)\)/i);
+        if (idMatch) {
+            if (!nit) nit = idMatch[1].trim();
+            concepto = concepto.replace(idMatch[0], '').trim();
+        }
+        concepto = concepto.replace(/\(IVA:\s*[^)]+\)/gi, '').replace(/\s+/g, ' ').trim();
+
+        row.getCell('A').value = `${concepto} ${mov.tercero && mov.tercero !== 'Sin tercero' ? ` - ${mov.tercero}` : ''}`;
+        row.getCell('B').value = nit;
         row.getCell('C').value = format(new Date(mov.fecha), 'd/MM/yyyy');
         row.getCell('D').value = isIngreso ? valor : null;
         row.getCell('E').value = !isIngreso ? valor : null;

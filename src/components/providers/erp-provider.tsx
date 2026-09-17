@@ -669,8 +669,11 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const updateMovimientoFinanciero = async (updated: MovimientoFinanciero) => {
         try {
             const saved = await updateMovimientoFinancieroAction(updated.id, updated);
-            setMovimientosFinancieros(prev => prev.map(m => m.id === saved.id ? saved : m));
-        } catch (error) { console.error("Error updating movimiento:", error); }
+            setMovimientosFinancieros(prev => prev.map(m => m.id === saved.id ? { ...m, ...saved, cuenta: m.cuenta || saved.cuenta } : m));
+        } catch (error) { 
+            console.error("Error updating movimiento:", error); 
+            throw error;
+        }
     };
 
     // =============================================

@@ -31,7 +31,7 @@ import { generateReceipt } from "@/lib/pdf-generator";
 interface MovimientoDetailDialogProps {
     movimiento: MovimientoFinanciero;
     movimientos?: MovimientoFinanciero[];
-    onMovimientoUpdated: (mov: MovimientoFinanciero) => void;
+    onMovimientoUpdated: (mov: MovimientoFinanciero) => Promise<void> | void;
     trigger?: React.ReactNode;
 }
 
@@ -42,7 +42,9 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
     // Form states
     const [concepto, setConcepto] = useState(movimiento.concepto);
     const [tercero, setTercero] = useState(movimiento.tercero);
+    const [identificacion, setIdentificacion] = useState(movimiento.identificacion || "");
     const [valor, setValor] = useState(movimiento.valor.toString());
+    const [iva, setIva] = useState(movimiento.iva !== undefined ? movimiento.iva.toString() : "0");
     const [fecha, setFecha] = useState(movimiento.fecha ? new Date(movimiento.fecha).toISOString().split('T')[0] : ""); // YYYY-MM-DD
     const [categoria, setCategoria] = useState<CategoriaMovimiento>(movimiento.categoria);
     const [tipo, setTipo] = useState<TipoMovimiento>(movimiento.tipo);
@@ -51,7 +53,9 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
         if (open) {
             setConcepto(movimiento.concepto);
             setTercero(movimiento.tercero);
+            setIdentificacion(movimiento.identificacion || "");
             setValor(movimiento.valor.toString());
+            setIva(movimiento.iva !== undefined ? movimiento.iva.toString() : "0");
             setFecha(movimiento.fecha ? new Date(movimiento.fecha).toISOString().split('T')[0] : "");
             setCategoria(movimiento.categoria);
             setTipo(movimiento.tipo);
@@ -59,21 +63,25 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
         }
     }, [open, movimiento]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const updatedMovimiento: MovimientoFinanciero = {
             ...movimiento,
             concepto,
             tercero,
+            identificacion,
             valor: parseFloat(valor) || 0,
-            fecha: new Date(fecha),
+            iva: parseFloat(iva) || 0,
+            fecha: fecha ? new Date(fecha + "T12:00:00") : movimiento.fecha,
             categoria,
             tipo,
-            // Account info remains same for now unless we add account selector
         };
 
-        onMovimientoUpdated(updatedMovimiento);
-        setIsEditing(false);
-        // Don't close, just exit edit mode
+        try {
+            await onMovimientoUpdated(updatedMovimiento);
+            setIsEditing(false);
+        } catch (error) {
+            console.error("Save failed in dialog:", error);
+        }
     };
 
     const generateConsecutive = (tipo: string, fechaVal?: string | Date) => {
@@ -196,6 +204,18 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                     </div>
 
                     <div className="space-y-1.5">
+                        <Label htmlFor="identificacion" className="text-xs font-semibold text-muted-foreground">NIT / Identificación</Label>
+                        <Input
+                            id="identificacion"
+                            value={identificacion}
+                            onChange={(e) => setIdentificacion(e.target.value)}
+                            disabled={!isEditing}
+                            placeholder="NIT o Documento"
+                            className="w-full"
+                        />
+                    </div>
+
+                    <div className="space-y-1.5">
                         <Label htmlFor="valor" className="text-xs font-semibold text-muted-foreground">Valor</Label>
                         <Input
                             id="valor"
@@ -204,6 +224,43 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                             onChange={(e) => setValor(e.target.value)}
                             disabled={!isEditing}
                             className="w-full font-mono font-bold"
+                        />
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="iva" className="text-xs font-semibold text-muted-foreground">IVA</Label>
+                            {isEditing && (
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const currentVal = parseFloat(valor) || 0;
+                                            setIva(Math.round(currentVal * 0.19).toString());
+                                        }}
+                                        className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-primary font-medium transition-colors"
+                                        title="Calcular 19%"
+                                    >
+                                        19%
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIva("0")}
+                                        className="text-[10px] px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 text-muted-foreground font-medium transition-colors"
+                                        title="Sin IVA"
+                                    >
+                                        0%
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <Input
+                            id="iva"
+                            type="number"
+                            value={iva}
+                            onChange={(e) => setIva(e.target.value)}
+                            disabled={!isEditing}
+                            className="w-full font-mono"
                         />
                     </div>
 

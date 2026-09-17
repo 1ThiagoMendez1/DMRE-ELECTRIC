@@ -285,6 +285,7 @@ export interface MovimientoFinanciero {
     // Foreign Keys
     facturaId?: string;
     trabajoId?: string;
+    cotizacionId?: string;
     cuentaPorPagarId?: string;
     compraId?: string;
     obligacionId?: string;
