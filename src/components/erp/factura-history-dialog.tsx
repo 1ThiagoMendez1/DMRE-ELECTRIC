@@ -40,7 +40,9 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
+    DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
@@ -109,6 +111,12 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
     const [editFechaVencimiento, setEditFechaVencimiento] = useState(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
     const [isSavingDetails, setIsSavingDetails] = useState(false);
 
+    // Retención y descripción al marcar como PAGADA
+    const [retencionMonto, setRetencionMonto] = useState<string>(factura.retencionRenta ? factura.retencionRenta.toString() : "");
+    const [descripcionRetencion, setDescripcionRetencion] = useState<string>(factura.observaciones || "");
+    const [isRetentionModalOpen, setIsRetentionModalOpen] = useState(false);
+    const [isSubmittingEstado, setIsSubmittingEstado] = useState(false);
+
     // Track local saldo
     const [saldoPendiente, setSaldoPendiente] = useState(factura.saldoPendiente);
     const [anticipoTotal, setAnticipoTotal] = useState(factura.anticipoRecibido);
@@ -120,6 +128,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         setFechaVencimiento(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
         setAbonoMonto("");
         setAdelantoMonto("");
+        setRetencionMonto(factura.retencionRenta ? factura.retencionRenta.toString() : "");
+        setDescripcionRetencion(factura.observaciones || "");
 
         setEditNumero(factura.numero || factura.id);
         setEditFechaEmision(format(new Date(factura.fechaEmision), "yyyy-MM-dd"));
@@ -239,24 +249,51 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
     };
 
     const handleCambiarEstado = () => {
-        if (nuevoEstado === factura.estado) return;
+        if (nuevoEstado === factura.estado && nuevoEstado !== 'PAGADA') return;
 
-        const entry: MovimientoFactura = {
-            id: Date.now().toString(),
-            fecha: new Date(),
-            tipo: 'ESTADO_CAMBIO',
-            descripcion: `Estado cambiado de ${factura.estado} a ${nuevoEstado}`,
-            usuario: 'Usuario Actual',
-            estadoAnterior: factura.estado,
-            estadoNuevo: nuevoEstado,
-        };
-
-        // setMovimientos([entry, ...movimientos]); // Removed after switching to ERP context derivation
+        if (nuevoEstado === 'PAGADA') {
+            setIsRetentionModalOpen(true);
+            return;
+        }
 
         onFacturaUpdated({
             ...factura,
             estado: nuevoEstado
         });
+        toast({ title: "Estado Actualizado", description: `El estado ha cambiado a ${nuevoEstado}.` });
+    };
+
+    const handleConfirmarPagoConRetencion = async () => {
+        setIsSubmittingEstado(true);
+        try {
+            const retencion = parseFloat(retencionMonto) || 0;
+            const nuevoNeto = Math.max(0, factura.valorFacturado - retencion);
+
+            const updatedInvoice: Factura = {
+                ...factura,
+                estado: 'PAGADA',
+                retencionRenta: retencion,
+                saldoPendiente: 0,
+                valorPagado: nuevoNeto,
+                observaciones: descripcionRetencion.trim() || factura.observaciones,
+            };
+
+            await onFacturaUpdated(updatedInvoice);
+            setSaldoPendiente(0);
+            setIsRetentionModalOpen(false);
+            toast({
+                title: "Factura Pagada",
+                description: `Estado actualizado a Pagada${retencion > 0 ? ` con retención de ${formatCurrency(retencion)}` : ""}.`,
+            });
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error al actualizar",
+                description: error?.message || "No se pudo actualizar la factura."
+            });
+        } finally {
+            setIsSubmittingEstado(false);
+        }
     };
 
     const handleActualizarFecha = () => {
@@ -330,7 +367,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <>
+            <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 {trigger || (
                     <span className="cursor-pointer hover:underline text-primary font-medium">
@@ -448,6 +486,12 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                             <span className="text-muted-foreground">Pagado:</span>
                                             <span className="font-mono text-green-600">{formatCurrency(factura.valorPagado || (factura.valorFacturado - factura.saldoPendiente))}</span>
                                         </div>
+                                        {Number(factura.retencionRenta) > 0 && (
+                                            <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                                                <span>Retención:</span>
+                                                <span className="font-mono font-medium">-{formatCurrency(factura.retencionRenta)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between mt-2 pt-2 border-t font-bold text-lg">
                                             <span className="text-red-500">Pendiente:</span>
                                             <span className="text-red-500">{formatCurrency(saldoPendiente)}</span>
@@ -456,6 +500,23 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                 </CardContent>
                             </Card>
                         </div>
+
+                        {/* Observaciones de la Factura */}
+                        {factura.observaciones && (
+                            <Card className="mt-4">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-blue-600" /> Observaciones / Descripción
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-line bg-muted/30 p-3 rounded-md border">
+                                        {factura.observaciones}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Documento Adjunto */}
                         {factura.archivoUrl && (
                             <Card className="mt-4">
@@ -572,7 +633,11 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-                                            <Button variant="secondary" onClick={handleCambiarEstado} disabled={nuevoEstado === factura.estado}>
+                                            <Button 
+                                                variant="secondary" 
+                                                onClick={handleCambiarEstado} 
+                                                disabled={nuevoEstado === factura.estado && nuevoEstado !== 'PAGADA'}
+                                            >
                                                 Actualizar
                                             </Button>
                                         </div>
@@ -635,5 +700,101 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                 </Tabs>
             </DialogContent>
         </Dialog>
+
+        {/* MODAL DE CONFIRMACIÓN: ESTADO PAGADA CON RETENCIÓN Y DESCRIPCIÓN */}
+        <Dialog open={isRetentionModalOpen} onOpenChange={setIsRetentionModalOpen}>
+            <DialogContent className="sm:max-w-[480px]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-base">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        Confirmar Factura Pagada
+                    </DialogTitle>
+                    <DialogDescription>
+                        Factura {factura.numero || factura.id} • Total Facturado: {formatCurrency(factura.valorFacturado)}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                    {/* Input de Retención con formato de moneda */}
+                    <div className="space-y-1.5">
+                        <Label htmlFor="retencion-input" className="text-xs font-semibold">
+                            Retención de Factura
+                        </Label>
+                        <div className="relative">
+                            <Input
+                                id="retencion-input"
+                                type="text"
+                                placeholder="$ 0"
+                                className="font-mono text-base font-medium"
+                                value={retencionMonto ? formatCurrency(parseFloat(retencionMonto)) : ""}
+                                onChange={(e) => {
+                                    const rawValue = e.target.value.replace(/\D/g, "");
+                                    setRetencionMonto(rawValue);
+                                }}
+                            />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                            Ingrese el valor retenido en la factura (ReteFuente, ReteICA, ReteIVA). Si no aplica retención, déjelo en $ 0.
+                        </p>
+                    </div>
+
+                    {/* Resumen de Valores en tiempo real */}
+                    <div className="p-3 bg-muted/40 rounded-lg border text-xs space-y-1.5">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Total Facturado:</span>
+                            <span className="font-semibold font-mono">{formatCurrency(factura.valorFacturado)}</span>
+                        </div>
+                        <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                            <span>Retención Descontada:</span>
+                            <span className="font-semibold font-mono">
+                                -{formatCurrency(parseFloat(retencionMonto) || 0)}
+                            </span>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between font-bold text-sm text-green-600 dark:text-green-400 pt-0.5">
+                            <span>Neto Recibido / Pagado:</span>
+                            <span className="font-mono">
+                                {formatCurrency(Math.max(0, factura.valorFacturado - (parseFloat(retencionMonto) || 0)))}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Campo de Descripción u Observaciones */}
+                    <div className="space-y-1.5">
+                        <Label htmlFor="descripcion-retencion" className="text-xs font-semibold">
+                            Descripción / Observaciones (Opcional)
+                        </Label>
+                        <Textarea
+                            id="descripcion-retencion"
+                            placeholder="Agregue alguna descripción o detalle sobre el pago o la retención..."
+                            value={descripcionRetencion}
+                            onChange={(e) => setDescripcionRetencion(e.target.value)}
+                            rows={3}
+                        />
+                    </div>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-0">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsRetentionModalOpen(false)}
+                        disabled={isSubmittingEstado}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={handleConfirmarPagoConRetencion}
+                        disabled={isSubmittingEstado}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                        {isSubmittingEstado && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Confirmar y Actualizar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    </>
     );
 }

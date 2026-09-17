@@ -43,9 +43,9 @@ export function ComprasModule() {
     const [searchTerm, setSearchTerm] = useState("");
 
     const filteredCompras = comprasFinanciera.filter(c => 
-        c.numeroFactura.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.cotizacion?.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.cotizacion?.cliente?.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+        (c.numeroFactura || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.cotizacion?.numero || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.cotizacion?.cliente?.nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const totalFacturado = filteredCompras.reduce((acc, curr) => acc + curr.valorFactura, 0);

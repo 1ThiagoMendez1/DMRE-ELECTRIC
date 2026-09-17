@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Search, Package, Code, Bolt, Plus } from "lucide-react";
+import { Search, Package, Code, Bolt, Plus, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,13 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     Table,
     TableBody,
@@ -33,6 +40,7 @@ interface ItemOptions {
     descripcion: string;
     valorUnitario: number;
     _extraText?: string;
+    fechaCreacion?: Date | string;
     // Add other properties that might be needed from InventarioItem or CodigoTrabajo
     // For products
     sku?: string;
@@ -59,9 +67,10 @@ interface ProductSelectorDialogProps {
     serviciosLogistica?: any[]; // using any since ServicioLogistica is not directly exported in this file but mapped in the component
 }
 
-export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inventario, codigosTrabajo, instalaciones }: ProductSelectorDialogProps) {
+export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inventario, codigosTrabajo, instalaciones, serviciosLogistica }: ProductSelectorDialogProps) {
     const [searchTerm, setSearchTerm] = useState("");
     const [activeFilter, setActiveFilter] = useState<'ALL' | 'PRODUCTO' | 'SUMINISTRO' | 'INSTALACION' | 'SERVICIO'>('ALL');
+    const [sortOrder, setSortOrder] = useState<'recientes' | 'antiguos' | 'nombre' | 'codigo'>('recientes');
     const [serviciosState, setServiciosState] = useState<ServicioLogistica[]>([]);
     const [instalacionesState, setInstalacionesState] = useState<Instalacion[]>([]);
 
@@ -74,7 +83,8 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
         supabase
             .from("servicios_logistica")
             .select("*")
-            .order("created_at", { ascending: false })
+            .order("created_at", { ascending: false, nullsFirst: false })
+            .order("codigo", { ascending: false })
             .then(({ data, error }) => {
                 if (!error && data) {
                     setServiciosState(data.map((sl: any) => ({
@@ -82,6 +92,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                         codigo: sl.codigo,
                         nombre: sl.nombre,
                         costo: Number(sl.costo || 0),
+                        createdAt: sl.created_at ? new Date(sl.created_at) : undefined,
                     })));
                 } else if (error) {
                     console.error("Error fetching servicios:", error);
@@ -92,6 +103,8 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
         supabase
             .from("instalaciones")
             .select("*")
+            .order("created_at", { ascending: false, nullsFirst: false })
+            .order("codigo", { ascending: false })
             .then(({ data, error }) => {
                 if (!error && data) {
                     setInstalacionesState(data.map((i: any) => ({
@@ -100,6 +113,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                         descripcion: i.descripcion || "",
                         valorCalculado: Number(i.valor_calculado) || 0,
                         activo: i.activo,
+                        fechaCreacion: new Date(i.created_at || i.fecha_creacion || Date.now()),
                     })));
                 } else if (error) {
                     console.error("Error fetching instalaciones:", error);
@@ -108,6 +122,9 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
     }, [open]);
 
     const filteredItems = useMemo(() => {
+        const effectiveInstalaciones = instalacionesState.length > 0 ? instalacionesState : (instalaciones || []);
+        const effectiveServicios = serviciosState.length > 0 ? serviciosState : (serviciosLogistica || []);
+
         const products: ItemOptions[] = (inventario || []).map(p => ({
             id: p.id,
             tipo: 'PRODUCTO',
@@ -119,6 +136,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
             precioProveedor: p.precioProveedor,
             costoMateriales: p.costoMateriales,
             _extraText: p.categoria,
+            fechaCreacion: (p as any).created_at || p.fechaCreacion,
             searchStr: `${p.descripcion} ${p.sku} ${p.categoria}`.toLowerCase()
         }));
 
@@ -137,13 +155,12 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                 manoDeObra: s.manoDeObra,
                 costoTotal: s.costoTotal, // Keep original costTotal for calculation if needed
                 cantidad: invMatch?.cantidad ?? 0, // Extract stock organically
+                fechaCreacion: (s as any).created_at || s.fechaCreacion,
                 searchStr: `${s.nombre} ${s.codigo} ${s.descripcion}`.toLowerCase()
             };
         });
 
-
-
-        const installs: ItemOptions[] = instalacionesState.map(i => {
+        const installs: ItemOptions[] = effectiveInstalaciones.map(i => {
             const invMatch = (inventario || []).find(inv => inv.sku === i.codigo || inv.item === i.codigo);
             return {
                 id: i.id,
@@ -157,11 +174,12 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                 manoDeObra: i.valorCalculado,
                 costoTotal: i.valorCalculado,
                 cantidad: invMatch?.cantidad ?? 0,
+                fechaCreacion: (i as any).created_at || i.fechaCreacion,
                 searchStr: `${i.descripcion} ${i.codigo}`.toLowerCase()
             };
         });
 
-        const srvLogistica: ItemOptions[] = serviciosState.map(sl => {
+        const srvLogistica: ItemOptions[] = effectiveServicios.map((sl: any) => {
             const invMatch = (inventario || []).find(inv => inv.sku === sl.codigo || inv.item === sl.codigo);
             return {
                 id: sl.id,
@@ -175,6 +193,7 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                 manoDeObra: sl.costo,
                 costoTotal: sl.costo,
                 cantidad: invMatch?.cantidad ?? 0,
+                fechaCreacion: sl.created_at || sl.createdAt,
                 searchStr: `${sl.nombre} ${sl.codigo}`.toLowerCase()
             };
         });
@@ -198,12 +217,41 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
         }
 
         if (searchTerm) {
-            const lowerDate = searchTerm.toLowerCase();
-            all = all.filter(item => item.searchStr?.includes(lowerDate));
+            const lowerTerm = searchTerm.toLowerCase();
+            all = all.filter(item => item.searchStr?.includes(lowerTerm));
         }
 
+        // Ordenamiento
+        all.sort((a, b) => {
+            if (sortOrder === 'recientes') {
+                const timeA = a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0;
+                const timeB = b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0;
+                if (timeA !== timeB && timeA > 0 && timeB > 0) {
+                    return timeB - timeA;
+                }
+                if (timeB > 0 && timeA === 0) return 1;
+                if (timeA > 0 && timeB === 0) return -1;
+                // Si la fecha es igual o inexistente, desempatar por código numérico descendente (ej: IN-0006 antes que IN-0001)
+                return (b.codigo || '').localeCompare(a.codigo || '', undefined, { numeric: true });
+            } else if (sortOrder === 'antiguos') {
+                const timeA = a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0;
+                const timeB = b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0;
+                if (timeA !== timeB && timeA > 0 && timeB > 0) {
+                    return timeA - timeB;
+                }
+                if (timeA > 0 && timeB === 0) return -1;
+                if (timeB > 0 && timeA === 0) return 1;
+                return (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true });
+            } else if (sortOrder === 'nombre') {
+                return (a.descripcion || '').localeCompare(b.descripcion || '', undefined, { sensitivity: 'base' });
+            } else if (sortOrder === 'codigo') {
+                return (a.codigo || '').localeCompare(b.codigo || '', undefined, { numeric: true });
+            }
+            return 0;
+        });
+
         return all;
-    }, [searchTerm, activeFilter, inventario, codigosTrabajo, instalacionesState, serviciosState]);
+    }, [searchTerm, activeFilter, sortOrder, inventario, codigosTrabajo, instalaciones, instalacionesState, serviciosState, serviciosLogistica]);
 
     const handleSelect = (item: ItemOptions) => {
         const isService = item.tipo === 'SERVICIO';
@@ -254,45 +302,80 @@ export function ProductSelectorDialog({ open, onOpenChange, onItemSelected, inve
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex gap-2 py-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Buscar por nombre, código o descripción..."
-                            className="pl-8"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                <div className="space-y-3 py-3">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar por nombre, código o descripción..."
+                                className="pl-8 text-sm"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <Select value={sortOrder} onValueChange={(val: any) => setSortOrder(val)}>
+                                <SelectTrigger className="w-full sm:w-[195px] h-9 text-xs">
+                                    <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                                    <SelectValue placeholder="Ordenar por" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="recientes" className="text-xs font-medium">
+                                        Más recientes primero
+                                    </SelectItem>
+                                    <SelectItem value="antiguos" className="text-xs">
+                                        Más antiguos primero
+                                    </SelectItem>
+                                    <SelectItem value="nombre" className="text-xs">
+                                        Nombre (A - Z)
+                                    </SelectItem>
+                                    <SelectItem value="codigo" className="text-xs">
+                                        Código
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
-                    <div className="flex gap-1 border rounded-md p-1 bg-muted/20">
-                        <Button
-                            variant={activeFilter === 'ALL' ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => setActiveFilter('ALL')}
-                        >
-                            Todos
-                        </Button>
-                        <Button
-                            variant={activeFilter === 'SUMINISTRO' ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => setActiveFilter('SUMINISTRO')}
-                        >
-                            <Code className="mr-2 h-3 w-3" /> Suministros
-                        </Button>
-                        <Button
-                            variant={activeFilter === 'INSTALACION' ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => setActiveFilter('INSTALACION')}
-                        >
-                            <Bolt className="mr-2 h-3 w-3" /> Instalaciones
-                        </Button>
-                        <Button
-                            variant={activeFilter === 'SERVICIO' ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => setActiveFilter('SERVICIO')}
-                        >
-                            <Bolt className="mr-2 h-3 w-3" /> Servicios
-                        </Button>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap gap-1 border rounded-md p-1 bg-muted/20">
+                            <Button
+                                variant={activeFilter === 'ALL' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className="h-7 text-xs px-2.5"
+                                onClick={() => setActiveFilter('ALL')}
+                            >
+                                Todos
+                            </Button>
+                            <Button
+                                variant={activeFilter === 'SUMINISTRO' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className="h-7 text-xs px-2.5"
+                                onClick={() => setActiveFilter('SUMINISTRO')}
+                            >
+                                <Code className="mr-1.5 h-3 w-3" /> Suministros
+                            </Button>
+                            <Button
+                                variant={activeFilter === 'INSTALACION' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className="h-7 text-xs px-2.5"
+                                onClick={() => setActiveFilter('INSTALACION')}
+                            >
+                                <Bolt className="mr-1.5 h-3 w-3" /> Instalaciones
+                            </Button>
+                            <Button
+                                variant={activeFilter === 'SERVICIO' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className="h-7 text-xs px-2.5"
+                                onClick={() => setActiveFilter('SERVICIO')}
+                            >
+                                <Bolt className="mr-1.5 h-3 w-3" /> Servicios
+                            </Button>
+                        </div>
+
+                        <div className="text-xs text-muted-foreground font-medium pr-1">
+                            {filteredItems.length} {filteredItems.length === 1 ? 'item disponible' : 'items disponibles'}
+                        </div>
                     </div>
                 </div>
 

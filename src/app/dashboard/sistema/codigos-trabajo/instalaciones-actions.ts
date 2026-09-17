@@ -53,7 +53,9 @@ export async function getInstalacionesAction(): Promise<Instalacion[]> {
 
     const { data, error } = await supabase
         .from("instalaciones")
-        .select("*");
+        .select("*")
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .order("codigo", { ascending: false });
 
     if (error) {
         console.error("Error fetching instalaciones:", error);
@@ -65,7 +67,8 @@ export async function getInstalacionesAction(): Promise<Instalacion[]> {
     return mapped.sort((a, b) => {
         const dateA = a.fechaCreacion ? a.fechaCreacion.getTime() : 0;
         const dateB = b.fechaCreacion ? b.fechaCreacion.getTime() : 0;
-        return dateB - dateA;
+        if (dateB !== dateA) return dateB - dateA;
+        return (b.codigo || "").localeCompare(a.codigo || "", undefined, { numeric: true });
     });
 }
 

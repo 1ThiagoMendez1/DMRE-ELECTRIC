@@ -72,10 +72,31 @@ export function BillingModule() {
 
     // Filter Logic
     const filteredFacturas = useMemo(() => {
+        const normalizeText = (text?: string | null) => {
+            if (!text) return "";
+            return text
+                .toString()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .trim();
+        };
+
+        const query = normalizeText(invoiceSearch);
+        const tokens = query ? query.split(/\s+/).filter(Boolean) : [];
+
         return facturas.filter(f => {
-            const matchesSearch = (f.numero || f.id).toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-                f.cotizacion?.cliente?.nombre.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-                f.cotizacion?.numero?.toLowerCase().includes(invoiceSearch.toLowerCase());
+            const clientName = f.cliente?.nombre || (f.cotizacion?.cliente?.nombre !== "Sin Cotización Vinculada" ? f.cotizacion?.cliente?.nombre : "") || "";
+            const clientDoc = f.cliente?.documento || f.cotizacion?.cliente?.documento || "";
+            const quoteNum = f.cotizacion && f.cotizacion.numero !== "SIN-REF" ? f.cotizacion.numero : "";
+            const invoiceNum = f.numero || f.id || "";
+            const obs = f.observaciones || "";
+
+            const searchPool = [invoiceNum, clientName, clientDoc, quoteNum, obs]
+                .map(normalizeText)
+                .join(" ");
+
+            const matchesSearch = tokens.length === 0 || tokens.every(token => searchPool.includes(token));
             
             // Si la factura no tiene cotizacion, asumimos que es normal por defecto a menos que queramos aislarla
             const tipo = f.cotizacion?.tipo || 'NORMAL';

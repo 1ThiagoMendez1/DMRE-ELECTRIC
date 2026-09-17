@@ -8,13 +8,20 @@ import {
     CardTitle, 
     CardDescription 
 } from "@/components/ui/card";
-import { 
-    Select, 
-    SelectContent, 
-    SelectItem, 
-    SelectTrigger, 
-    SelectValue 
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
 import { 
     Table, 
     TableBody, 
@@ -36,7 +43,10 @@ import {
     History,
     ArrowUpRight,
     ArrowDownRight,
-    Info
+    Info,
+    Check,
+    ChevronsUpDown,
+    X
 } from "lucide-react";
 import { 
     ResponsiveContainer, 
@@ -57,6 +67,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
 export function ProjectProfitabilityModule() {
     const { cotizaciones, movimientosFinancieros, comprasFinanciera } = useErp();
     const [selectedCotizacionId, setSelectedCotizacionId] = useState<string>("");
+    const [open, setOpen] = useState<boolean>(false);
 
     // Get only approved or in-progress quotes
     const activeQuotes = useMemo(() => 
@@ -152,19 +163,77 @@ export function ProjectProfitabilityModule() {
                             <CardTitle>Rentabilidad y Análisis de Proyectos</CardTitle>
                             <CardDescription>Seguimiento de costos vs presupuesto de la oferta en tiempo real.</CardDescription>
                         </div>
-                        <div className="w-full md:w-[400px]">
-                            <Select value={selectedCotizacionId} onValueChange={setSelectedCotizacionId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione una oferta para analizar..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {activeQuotes.map(q => (
-                                        <SelectItem key={q.id} value={q.id}>
-                                            {q.numero} - {q.cliente?.nombre} ({q.descripcionTrabajo})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                        <div className="flex items-center gap-2 w-full md:w-[450px]">
+                            <Popover open={open} onOpenChange={setOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={open}
+                                        className="w-full justify-between font-normal text-left h-10 px-3 bg-background"
+                                    >
+                                        <span 
+                                            className="truncate" 
+                                            title={selectedQuote ? `${selectedQuote.numero} - ${selectedQuote.cliente?.nombre || ''} (${selectedQuote.descripcionTrabajo || ''})` : undefined}
+                                        >
+                                            {selectedQuote
+                                                ? `${selectedQuote.numero} - ${selectedQuote.cliente?.nombre || 'Sin cliente'} (${selectedQuote.descripcionTrabajo || ''})`
+                                                : "Seleccione una oferta para analizar..."}
+                                        </span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[320px] md:min-w-[450px] p-0" align="end">
+                                    <Command
+                                        filter={(value, search) => {
+                                            const normVal = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                                            const normSearch = search.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                                            return normVal.includes(normSearch) ? 1 : 0;
+                                        }}
+                                    >
+                                        <CommandInput placeholder="Buscar por número, cliente o descripción..." />
+                                        <CommandList>
+                                            <CommandEmpty>No se encontraron ofertas.</CommandEmpty>
+                                            <CommandGroup>
+                                                {activeQuotes.map(q => {
+                                                    const label = `${q.numero} - ${q.cliente?.nombre || 'Sin cliente'} (${q.descripcionTrabajo || ''})`;
+                                                    const isSelected = selectedCotizacionId === q.id;
+                                                    return (
+                                                        <CommandItem
+                                                            key={q.id}
+                                                            value={`${q.numero} ${q.cliente?.nombre || ''} ${q.descripcionTrabajo || ''}`}
+                                                            onSelect={() => {
+                                                                setSelectedCotizacionId(isSelected ? "" : q.id);
+                                                                setOpen(false);
+                                                            }}
+                                                            className="cursor-pointer flex items-center min-w-0"
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4 shrink-0",
+                                                                    isSelected ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                            <span className="truncate" title={label}>{label}</span>
+                                                        </CommandItem>
+                                                    );
+                                                })}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                            {selectedCotizacionId && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground"
+                                    onClick={() => setSelectedCotizacionId("")}
+                                    title="Limpiar selección"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </CardHeader>
