@@ -31,10 +31,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { startOfYear, endOfYear, isWithinInterval } from "date-fns";
-import { Landmark, Wallet, History, Search, X } from "lucide-react";
+import { Landmark, Wallet, History, Search, X, Download } from "lucide-react";
 import { CuentaBancaria, MovimientoFinanciero } from "@/types/sistema";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { generateExcelReport } from "@/lib/excel-generator";
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
@@ -46,6 +47,7 @@ interface CuentaHistoryDialogProps {
 
 export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHistoryDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +57,22 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
     });
     const [categoryFilter, setCategoryFilter] = useState("TODAS");
     const [typeFilter, setTypeFilter] = useState("TODOS");
+
+    const handleExportExcel = async () => {
+        setIsExporting(true);
+        try {
+            await generateExcelReport(filteredMovimientos, {
+                cuentaId: cuenta.id,
+            }, {
+                cuentas: [cuenta],
+                allMovimientos: accountMovimientos,
+            });
+        } catch (error) {
+            console.error("Error al exportar Excel de la cuenta:", error);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
 
     // Base movements for this account (filter by cuentaId or cuenta.id)
@@ -195,16 +213,28 @@ export function CuentaHistoryDialog({ cuenta, movimientos, trigger }: CuentaHist
                         Detalle de movimientos, fechas y análisis.
                     </DialogDescription>
                     {cuenta.saldoActual !== undefined && (
-                        <div className="flex gap-4 pt-2">
-                            <Badge variant="outline" className="text-base px-3 py-1 bg-background/50">
-                                Saldo Actual: <span className="font-bold ml-2">{formatCurrency(cuenta.saldoActual)}</span>
-                            </Badge>
-                            <Badge variant="outline" className="text-base px-3 py-1 bg-green-500/10 text-green-700 border-green-200">
-                                Ingresos (Vista): <span className="font-bold ml-2">{formatCurrency(totalIngresos)}</span>
-                            </Badge>
-                            <Badge variant="outline" className="text-base px-3 py-1 bg-red-500/10 text-red-700 border-red-200">
-                                Egresos (Vista): <span className="font-bold ml-2">{formatCurrency(totalEgresos)}</span>
-                            </Badge>
+                        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                            <div className="flex flex-wrap gap-4">
+                                <Badge variant="outline" className="text-base px-3 py-1 bg-background/50">
+                                    Saldo Actual: <span className="font-bold ml-2">{formatCurrency(cuenta.saldoActual)}</span>
+                                </Badge>
+                                <Badge variant="outline" className="text-base px-3 py-1 bg-green-500/10 text-green-700 border-green-200">
+                                    Ingresos (Vista): <span className="font-bold ml-2">{formatCurrency(totalIngresos)}</span>
+                                </Badge>
+                                <Badge variant="outline" className="text-base px-3 py-1 bg-red-500/10 text-red-700 border-red-200">
+                                    Egresos (Vista): <span className="font-bold ml-2">{formatCurrency(totalEgresos)}</span>
+                                </Badge>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleExportExcel}
+                                disabled={isExporting}
+                                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                {isExporting ? "Generando..." : "Exportar Excel"}
+                            </Button>
                         </div>
                     )}
                 </DialogHeader>

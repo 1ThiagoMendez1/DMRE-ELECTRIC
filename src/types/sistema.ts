@@ -282,6 +282,7 @@ export interface MovimientoFinanciero {
     valor: number;
     iva?: number; // Add iva field
     referencia?: string; // Add referencia field
+    esSimple?: boolean;
     // Foreign Keys
     facturaId?: string;
     trabajoId?: string;

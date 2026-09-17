@@ -1,15 +1,25 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { MovimientoFinanciero } from '@/types/sistema';
+import { CuentaBancaria, MovimientoFinanciero } from '@/types/sistema';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-interface ExcelFilterState {
+export interface ExcelFilterState {
     mes?: string;
     ano?: string;
+    cuentaId?: string;
 }
 
-export const generateExcelReport = async (movimientos: MovimientoFinanciero[], filters?: ExcelFilterState) => {
+export interface ExcelReportOptions {
+    cuentas?: CuentaBancaria[];
+    allMovimientos?: MovimientoFinanciero[];
+}
+
+export const generateExcelReport = async (
+    movimientos: MovimientoFinanciero[],
+    filters?: ExcelFilterState,
+    options?: ExcelReportOptions
+) => {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'DMRE';
     workbook.created = new Date();
@@ -18,12 +28,12 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
 
     // --- Definir Columnas ---
     worksheet.columns = [
-        { header: '', key: 'descripcion', width: 45 },
-        { header: '', key: 'nit', width: 15 },
-        { header: '', key: 'fecha', width: 15 },
+        { header: '', key: 'descripcion', width: 48 },
+        { header: '', key: 'nit', width: 16 },
+        { header: '', key: 'fecha', width: 14 },
         { header: '', key: 'ingresos', width: 20 },
         { header: '', key: 'egresos', width: 20 },
-        { header: '', key: 'total', width: 20 }
+        { header: '', key: 'total', width: 22 }
     ];
 
     // --- Cargar Logo ---
@@ -37,13 +47,33 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
             });
             // Añadir logo en A1:A6
             worksheet.addImage(logoImageId, {
-                tl: { col: 0, row: 0 },
-                br: { col: 1, row: 6 },
+                tl: { col: 0, row: 0 } as any,
+                br: { col: 1, row: 6 } as any,
                 editAs: 'oneCell'
             });
         }
     } catch (error) {
         console.error("Error al cargar el logo para Excel:", error);
+    }
+
+    // --- Identificar Cuenta y Saldo Inicial ---
+    const cuentas = options?.cuentas || [];
+    const allMovimientos = options?.allMovimientos || movimientos;
+
+    // Detectar si el reporte es para una cuenta específica o si todos los movimientos pertenecen a una misma cuenta
+    let selectedCuenta: CuentaBancaria | undefined;
+    if (filters?.cuentaId && filters.cuentaId !== 'TODOS') {
+        selectedCuenta = cuentas.find(c => c.id === filters.cuentaId);
+    }
+
+    // Si no vino especificado en filtros, verificar si todos los movimientos pertenecen a la misma cuenta
+    if (!selectedCuenta && movimientos.length > 0) {
+        const uniqueCuentaIds = Array.from(new Set(
+            movimientos.map(m => m.cuentaId || (m.cuenta && m.cuenta.id)).filter(Boolean)
+        ));
+        if (uniqueCuentaIds.length === 1) {
+            selectedCuenta = cuentas.find(c => c.id === uniqueCuentaIds[0]) || (movimientos[0].cuenta as CuentaBancaria);
+        }
     }
 
     // --- Cabeceras de Empresa ---
@@ -52,7 +82,7 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
     worksheet.mergeCells('B1:F2');
     const titleCell = worksheet.getCell('B1');
     titleCell.value = 'DISEÑO Y MONTAJE DE REDES ELÉCTRICAS D.M.R.E';
-    titleCell.font = { name: 'Arial', size: 16, italic: true, color: { argb: 'FF87CEEB' }, bold: true }; // Light blue cursive-like
+    titleCell.font = { name: 'Arial', size: 16, italic: true, color: { argb: 'FF87CEEB' }, bold: true };
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
     // Nombre
@@ -76,7 +106,14 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
     contactCell.font = { name: 'Arial', size: 10, italic: true, bold: true };
     contactCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    // Dejar fila 6 en blanco
+    // Fila 6: Detalle de Cuenta si está seleccionada
+    if (selectedCuenta) {
+        worksheet.mergeCells('B6:F6');
+        const cuentaHeaderCell = worksheet.getCell('B6');
+        cuentaHeaderCell.value = `CUENTA: ${selectedCuenta.nombre.toUpperCase()}${selectedCuenta.numeroCuenta ? ` - N° ${selectedCuenta.numeroCuenta}` : ''}${selectedCuenta.banco ? ` (${selectedCuenta.banco})` : ''}`;
+        cuentaHeaderCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1F4E79' } };
+        cuentaHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
     
     // --- Subcabecera (MES / AÑO) ---
     const mesActual = filters?.mes || format(new Date(), 'MMMM', { locale: es }).toUpperCase();
@@ -96,7 +133,7 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
     worksheet.getCell('F7').value = anoActual;
     worksheet.getCell('F7').alignment = { horizontal: 'center' };
 
-    // --- Cabeceras de Tabla ---
+    // --- Cabeceras de Tabla (Fila 8) ---
     const headers = ['DESCRIPCION INGRESOS Y GASTOS', 'NIT', 'FECHA', 'INGRESOS', 'EGRESOS', 'TOTAL'];
     const headerRow = worksheet.getRow(8);
     headerRow.values = headers;
@@ -117,15 +154,99 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
         };
     });
 
-    // --- Fila de Saldo Inicial (Opcional, se establece a 0 si no hay histórico previo al filtro) ---
-    // Según la imagen hay un saldo inicial, por ahora lo omitiremos si no hay data de saldo inicial
-    let runningTotal = 0;
-    
     // Ordenar movimientos por fecha ascendente
     const sortedMovimientos = [...movimientos].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 
-    // --- Llenar Datos ---
+    // --- Cálculo del Saldo Inicial / Anterior ---
+    let saldoInicialPeriodo = 0;
+
+    if (selectedCuenta) {
+        const accountId = selectedCuenta.id;
+        const firstMovTime = sortedMovimientos.length > 0 ? new Date(sortedMovimientos[0].fecha).getTime() : Date.now();
+        
+        // Movimientos históricos de esta cuenta
+        const accountMovs = allMovimientos.filter(m => 
+            (m.cuentaId === accountId || (m.cuenta && m.cuenta.id === accountId)) && !m.esSimple
+        );
+        
+        // Movimientos anteriores al inicio del reporte
+        const priorMovs = accountMovs.filter(m => new Date(m.fecha).getTime() < firstMovTime);
+        const priorNet = priorMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
+
+        // Si la cuenta tiene saldoInicial explícito > 0
+        if (selectedCuenta.saldoInicial !== undefined && selectedCuenta.saldoInicial !== null && Number(selectedCuenta.saldoInicial) > 0) {
+            saldoInicialPeriodo = Number(selectedCuenta.saldoInicial) + priorNet;
+        } else {
+            // Reconstruir a partir del saldoActual actual
+            const allNet = accountMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
+            const saldoAlInicio = Number(selectedCuenta.saldoActual || 0) - allNet;
+            saldoInicialPeriodo = saldoAlInicio + priorNet;
+        }
+    } else if (sortedMovimientos.length > 0) {
+        // Reporte consolidado de múltiples cuentas
+        const uniqueCuentaIds = Array.from(new Set(
+            sortedMovimientos.map(m => m.cuentaId || (m.cuenta && m.cuenta.id)).filter(Boolean)
+        ));
+        
+        const firstMovTime = new Date(sortedMovimientos[0].fecha).getTime();
+
+        uniqueCuentaIds.forEach(accId => {
+            const cuentaObj = cuentas.find(c => c.id === accId);
+            if (!cuentaObj) return;
+
+            const accountMovs = allMovimientos.filter(m => 
+                (m.cuentaId === accId || (m.cuenta && m.cuenta.id === accId)) && !m.esSimple
+            );
+            const priorMovs = accountMovs.filter(m => new Date(m.fecha).getTime() < firstMovTime);
+            const priorNet = priorMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
+
+            if (cuentaObj.saldoInicial !== undefined && cuentaObj.saldoInicial !== null && Number(cuentaObj.saldoInicial) > 0) {
+                saldoInicialPeriodo += Number(cuentaObj.saldoInicial) + priorNet;
+            } else {
+                const allNet = accountMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
+                const saldoAlInicio = Number(cuentaObj.saldoActual || 0) - allNet;
+                saldoInicialPeriodo += saldoAlInicio + priorNet;
+            }
+        });
+    }
+
+    let runningTotal = saldoInicialPeriodo;
+    let currentRowIdx = 8;
+
+    // Fila de SALDO INICIAL / ANTERIOR (Fila 9)
+    if (sortedMovimientos.length > 0) {
+        currentRowIdx++;
+        const initialRow = worksheet.addRow({});
+        const firstFechaStr = format(new Date(sortedMovimientos[0].fecha), 'd/MM/yyyy');
+
+        initialRow.getCell('A').value = selectedCuenta 
+            ? `SALDO ANTERIOR / INICIAL (${selectedCuenta.nombre})`
+            : 'SALDO ANTERIOR / INICIAL';
+        initialRow.getCell('A').font = { bold: true };
+        initialRow.getCell('B').value = '';
+        initialRow.getCell('C').value = firstFechaStr;
+        initialRow.getCell('C').alignment = { horizontal: 'center' };
+        initialRow.getCell('D').value = null;
+        initialRow.getCell('E').value = null;
+        initialRow.getCell('F').value = saldoInicialPeriodo;
+        initialRow.getCell('F').font = { bold: true };
+
+        initialRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            if (colNumber >= 4) {
+                cell.numFmt = '"$"#,##0.00;[Red]\-"$"#,##0.00';
+            }
+        });
+    }
+
+    // --- Llenar Datos de Movimientos (Fila 10 en adelante) ---
     sortedMovimientos.forEach((mov) => {
+        currentRowIdx++;
         const row = worksheet.addRow({});
         
         const isIngreso = mov.tipo === 'INGRESO';
@@ -146,12 +267,22 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
         }
         concepto = concepto.replace(/\(IVA:\s*[^)]+\)/gi, '').replace(/\s+/g, ' ').trim();
 
-        row.getCell('A').value = `${concepto} ${mov.tercero && mov.tercero !== 'Sin tercero' ? ` - ${mov.tercero}` : ''}`;
+        const terceroText = mov.tercero && mov.tercero !== 'Sin tercero' ? ` - ${mov.tercero}` : '';
+        const cuentaBadge = (!selectedCuenta && mov.cuenta?.nombre) ? ` [${mov.cuenta.nombre}]` : '';
+
+        row.getCell('A').value = `${concepto}${terceroText}${cuentaBadge}`;
         row.getCell('B').value = nit;
         row.getCell('C').value = format(new Date(mov.fecha), 'd/MM/yyyy');
+        row.getCell('C').alignment = { horizontal: 'center' };
         row.getCell('D').value = isIngreso ? valor : null;
         row.getCell('E').value = !isIngreso ? valor : null;
-        row.getCell('F').value = runningTotal;
+
+        // Fórmula dinámica en Excel: Total anterior + Ingresos - Egresos
+        const prevRowIdx = currentRowIdx - 1;
+        row.getCell('F').value = {
+            formula: `F${prevRowIdx}+D${currentRowIdx}-E${currentRowIdx}`,
+            result: runningTotal
+        };
 
         // Estilos para la fila
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -171,12 +302,13 @@ export const generateExcelReport = async (movimientos: MovimientoFinanciero[], f
 
     // Ajustar alto de las primeras filas para el logo
     for (let i = 1; i <= 6; i++) {
-        worksheet.getRow(i).height = 20; // Aproximado para dar espacio al logo
+        worksheet.getRow(i).height = 20;
     }
 
     // Generar archivo
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     
-    saveAs(blob, `Reporte_Financiero_${mesActual}_${anoActual}.xlsx`);
+    const cuentaSuffix = selectedCuenta ? `_${selectedCuenta.nombre.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
+    saveAs(blob, `Reporte_Financiero${cuentaSuffix}_${mesActual}_${anoActual}.xlsx`);
 };

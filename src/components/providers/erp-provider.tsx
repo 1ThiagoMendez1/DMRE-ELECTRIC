@@ -660,6 +660,12 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const { id, ...rest } = mov;
             const saved = await createMovimientoFinancieroAction(rest as any);
             setMovimientosFinancieros(prev => [saved, ...prev]);
+            if (mov.cuentaId && mov.valor) {
+                const delta = mov.tipo === "INGRESO" ? Number(mov.valor) : -Number(mov.valor);
+                setCuentasBancarias(prev => prev.map(c => 
+                    c.id === mov.cuentaId ? { ...c, saldoActual: Number(c.saldoActual || 0) + delta } : c
+                ));
+            }
         } catch (error) { 
             console.error("Error adding movimiento:", error); 
             throw error;
@@ -670,6 +676,12 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         try {
             const saved = await updateMovimientoFinancieroAction(updated.id, updated);
             setMovimientosFinancieros(prev => prev.map(m => m.id === saved.id ? { ...m, ...saved, cuenta: m.cuenta || saved.cuenta } : m));
+            try {
+                const updatedCuentas = await getCuentasBancariasAction();
+                setCuentasBancarias(updatedCuentas);
+            } catch (e) {
+                console.warn("No se pudo refrescar cuentas tras actualizar movimiento:", e);
+            }
         } catch (error) { 
             console.error("Error updating movimiento:", error); 
             throw error;

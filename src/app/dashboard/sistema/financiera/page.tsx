@@ -171,7 +171,7 @@ export default function FinancieraPage() {
             iva: iva || 0,
             valor: m.valor || 0,
             concepto: concepto || "Sin concepto",
-            cuenta: m.cuenta || cuentas.find(c => c.id === m.cuentaId) || { nombre: "Cuenta Desconocida" },
+            cuenta: cuentas.find(c => c.id === m.cuentaId || (m.cuenta && c.id === m.cuenta.id)) || m.cuenta || { nombre: "Cuenta Desconocida" },
             esSimple
         };
     }) as any[];
@@ -207,9 +207,13 @@ export default function FinancieraPage() {
         try {
             const filterState = {
                 mes: filterFecha ? format(new Date(filterFecha + "T12:00:00"), 'MMMM', { locale: es }) : undefined,
-                ano: filterFecha ? format(new Date(filterFecha + "T12:00:00"), 'yyyy') : undefined
+                ano: filterFecha ? format(new Date(filterFecha + "T12:00:00"), 'yyyy') : undefined,
+                cuentaId: filterCuenta !== "TODOS" ? filterCuenta : undefined,
             };
-            await generateExcelReport(movimientosFiltrados, filterState);
+            await generateExcelReport(movimientosFiltrados, filterState, {
+                cuentas,
+                allMovimientos: movimientos,
+            });
             toast({
                 title: "Excel generado",
                 description: "El reporte se ha descargado correctamente.",

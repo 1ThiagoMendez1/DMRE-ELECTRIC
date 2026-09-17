@@ -67,6 +67,7 @@ export function EditAccountDialog({ cuenta, onAccountUpdated, trigger }: EditAcc
             banco: banco || (tipo === 'BANCO' || tipo === 'CREDITO' ? nombre : undefined),
             tipo,
             saldoActual: parseFloat(saldo),
+            saldoInicial: cuenta.saldoInicial !== undefined ? cuenta.saldoInicial : parseFloat(saldo),
             cupoTotal: tipo === 'CREDITO' ? parseFloat(cupoTotal) : undefined,
             fechaCorte: tipo === 'CREDITO' ? parseInt(fechaCorte) : undefined,
             fechaPago: tipo === 'CREDITO' ? parseInt(fechaPago) : undefined,

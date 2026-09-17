@@ -50,6 +50,7 @@ export function CreateAccountDialog({ onAccountCreated }: CreateAccountDialogPro
             numeroCuenta: numero,
             banco: banco || nombre,
             tipo,
+            saldoInicial: parseFloat(saldo) || 0,
             saldoActual: parseFloat(saldo) || 0,
             cupoTotal: tipo === 'CREDITO' ? parseFloat(cupoTotal) : undefined,
             fechaCorte: tipo === 'CREDITO' ? parseInt(fechaCorte) : undefined,
