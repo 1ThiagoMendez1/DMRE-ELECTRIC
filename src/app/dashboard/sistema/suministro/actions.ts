@@ -11,8 +11,8 @@ function mapToUI(db: any): Proveedor {
         nombre: db.nombre,
         nit: db.nit || "",
         categoria: db.categoria || "MIXTO",
-        datosBancarios: typeof db.datos_bancarios === 'object'
-            ? JSON.stringify(db.datos_bancarios)
+        datosBancarios: db.datos_bancarios && typeof db.datos_bancarios === "object"
+            ? (typeof db.datos_bancarios.texto === "string" ? db.datos_bancarios.texto : JSON.stringify(db.datos_bancarios))
             : db.datos_bancarios || "",
         correo: db.correo || "",
         // Extended fields from DB
@@ -27,6 +27,16 @@ function mapToUI(db: any): Proveedor {
     };
 }
 
+// La información bancaria puede ser texto libre o un objeto JSON.
+// No hacer JSON.parse sin validar: impedía guardar proveedores con números de cuenta.
+function normalizeBankData(value?: string) {
+    if (!value?.trim()) return {};
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" ? parsed : { texto: value };
+    } catch { return { texto: value.trim() }; }
+}
+
 // UI -> DB mapping
 function mapToDB(ui: Partial<Proveedor>) {
     return {
@@ -39,7 +49,7 @@ function mapToDB(ui: Partial<Proveedor>) {
         correo: ui.correo,
         telefono: ui.telefono,
         contacto: ui.contacto,
-        datos_bancarios: ui.datosBancarios ? JSON.parse(ui.datosBancarios) : {},
+        datos_bancarios: normalizeBankData(ui.datosBancarios),
         calificacion: ui.calificacion,
         activo: ui.activo ?? true,
         notas: ui.notas,
