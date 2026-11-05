@@ -37,6 +37,7 @@ export function BillingModule() {
     const { facturas, addFactura, updateFactura, cotizaciones, cuentasBancarias } = useErp();
     const { toast } = useToast();
     const [invoiceSearch, setInvoiceSearch] = useState("");
+    const [monthFilter, setMonthFilter] = useState("");
     const [facturasFilter, setFacturasFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("NORMAL");
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
         vencidas: false,
@@ -102,9 +103,11 @@ export function BillingModule() {
             const tipo = f.cotizacion?.tipo || 'NORMAL';
             const matchesType = facturasFilter === 'TODAS' || tipo === facturasFilter;
 
-            return matchesSearch && matchesType;
+            const fecha = new Date(f.fechaEmision);
+            const matchesMonth = !monthFilter || (monthFilter === format(fecha, 'yyyy-MM'));
+            return matchesSearch && matchesType && matchesMonth;
         });
-    }, [facturas, invoiceSearch, facturasFilter]);
+    }, [facturas, invoiceSearch, facturasFilter, monthFilter]);
 
     // Grouping Logic
     const groups = useMemo(() => {
@@ -125,6 +128,12 @@ export function BillingModule() {
 
         return { vencidas, pendientes, pagadas };
     }, [filteredFacturas]);
+
+    const totals = useMemo(() => filteredFacturas.reduce((a, f) => ({
+        facturado: a.facturado + f.valorFacturado,
+        retenciones: a.retenciones + f.retencionRenta + f.retencionIca + f.retencionIva,
+        pendiente: a.pendiente + f.saldoPendiente,
+    }), { facturado: 0, retenciones: 0, pendiente: 0 }), [filteredFacturas]);
 
     // Handlers
     const handleCreateInvoice = (newInvoice: Factura) => {
@@ -155,8 +164,8 @@ export function BillingModule() {
             <CardHeader>
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <CardTitle>Gestión de Facturación y Cartera</CardTitle>
-                    <div className="flex items-center gap-2">
-                        <div className="relative w-64">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative w-full sm:w-64">
                             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Buscar factura o cliente..."
@@ -172,6 +181,7 @@ export function BillingModule() {
                                 <TabsTrigger value="TODAS">Todas</TabsTrigger>
                             </TabsList>
                         </Tabs>
+                        <Input type="month" value={monthFilter} aria-label="Filtrar facturas por mes" onChange={e => setMonthFilter(e.target.value)} className="w-full sm:w-40" />
                         <FacturarTrabajosDialog
                             onFacturaCreated={handleCreateInvoice}
                             nextId={nextInvoiceId}
@@ -185,6 +195,11 @@ export function BillingModule() {
                 </div>
             </CardHeader>
             <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                    <div className="p-3 border rounded-lg"><p className="text-xs text-muted-foreground">Facturado (filtro)</p><p className="font-bold">{formatCurrency(totals.facturado)}</p></div>
+                    <div className="p-3 border rounded-lg"><p className="text-xs text-muted-foreground">Retenciones (filtro)</p><p className="font-bold">{formatCurrency(totals.retenciones)}</p></div>
+                    <div className="p-3 border rounded-lg"><p className="text-xs text-muted-foreground">Pendiente (filtro)</p><p className="font-bold">{formatCurrency(totals.pendiente)}</p></div>
+                </div>
                 <div className="space-y-4">
                     {/* GROUP: VENCIDAS */}
                     <div className="border rounded-lg overflow-hidden">
@@ -277,7 +292,9 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                     <TableHead>Emisión</TableHead>
                     <TableHead>Vencimiento</TableHead>
                     <TableHead className="max-w-[120px] truncate" title="IVA / AIU">IVA / AIU</TableHead>
+                    <TableHead>Subtotal</TableHead>
                     <TableHead>Valor Total</TableHead>
+                    <TableHead>Retenciones</TableHead>
                     <TableHead>Saldo Pendiente</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -319,7 +336,9 @@ function InvoiceTable({ items, onUpdate, cuentas, rowClassName }: {
                                 </div>
                             </TableCell>
                             <TableCell className="max-w-[120px] truncate" title={formatCurrency(fac.iva || 0)}>{formatCurrency(fac.iva || 0)}</TableCell>
+                            <TableCell>{formatCurrency(fac.subtotal ?? Math.max(0, fac.valorFacturado - (fac.iva || 0)))}</TableCell>
                             <TableCell>{formatCurrency(fac.valorFacturado)}</TableCell>
+                            <TableCell>{formatCurrency((fac.retencionRenta || 0) + (fac.retencionIca || 0) + (fac.retencionIva || 0))}</TableCell>
                             <TableCell className={cn("font-bold", fac.saldoPendiente > 0 ? "text-red-500" : "text-green-600")}>
                                 {formatCurrency(fac.saldoPendiente)}
                             </TableCell>
