@@ -31,6 +31,7 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
     const { cotizaciones, deductInventoryItem, codigosTrabajo } = useErp();
     const { toast } = useToast();
     const [isDeducting, setIsDeducting] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
 
     // Helper for recursive deduction
     const deductRecursive = async (currentCode: any, multiplier: number = 1) => {
@@ -169,7 +170,8 @@ export function WorkCodeDetailDialog({ open, onOpenChange, code }: WorkCodeDetai
                                 {isDeducting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
                                 Registrar Uso
                             </Button>
-                            <EditWorkCodeDialog code={code} />
+                            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>Editar</Button>
+                            <EditWorkCodeDialog code={code} open={editOpen} onClose={() => setEditOpen(false)} />
                         </div>
                     </div>
                 </DialogHeader>
