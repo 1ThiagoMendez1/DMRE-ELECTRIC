@@ -16,12 +16,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DotacionItem, Empleado, DotacionVariant } from "@/types/sistema";
-import { HardHat } from "lucide-react";
+import { HardHat, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface NewEntregaDialogProps {
     items: DotacionItem[];
     empleados: Empleado[];
-    onSave: (data: any) => void;
+    onSave: (data: any) => Promise<void>;
 }
 
 const formSchema = z.object({
@@ -34,6 +35,8 @@ const formSchema = z.object({
 
 export function NewEntregaDialog({ items, empleados, onSave }: NewEntregaDialogProps) {
     const [open, setOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const { toast } = useToast();
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -45,11 +48,15 @@ export function NewEntregaDialog({ items, empleados, onSave }: NewEntregaDialogP
     const selectedDotacionId = form.watch("dotacionId");
     const selectedItem = items.find(i => i.id === selectedDotacionId);
 
-    const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
         const item = items.find(i => i.id === values.dotacionId)!;
         const variant = item.variantes.find(v => v.id === values.varianteId)!;
         const empleado = empleados.find(e => e.id === values.empleadoId)!;
 
+        if (values.cantidad > variant.cantidadDisponible) {
+            form.setError("cantidad", { message: "No hay suficientes unidades disponibles." });
+            return;
+        }
         const entregaData = {
             id: `ENT-${Date.now()}`,
             fecha: new Date(),
@@ -66,9 +73,14 @@ export function NewEntregaDialog({ items, empleados, onSave }: NewEntregaDialogP
             observacion: values.observacion || ""
         };
 
-        onSave(entregaData);
-        setOpen(false);
-        form.reset();
+        setSaving(true);
+        try {
+            await onSave(entregaData);
+            setOpen(false);
+            form.reset();
+        } catch (error) {
+            toast({ title: "No se registró la entrega", description: error instanceof Error ? error.message : "Comprueba el inventario y vuelve a intentarlo.", variant: "destructive" });
+        } finally { setSaving(false); }
     };
 
     return (
@@ -188,7 +200,7 @@ export function NewEntregaDialog({ items, empleados, onSave }: NewEntregaDialogP
                         />
 
                         <DialogFooter>
-                            <Button type="submit">Asignar</Button>
+                            <Button type="submit" disabled={saving || items.length === 0 || empleados.length === 0}>{saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Asignar</Button>
                         </DialogFooter>
                     </form>
                 </Form>
