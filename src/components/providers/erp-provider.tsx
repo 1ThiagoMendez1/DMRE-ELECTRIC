@@ -20,7 +20,7 @@ import { createInstalacionAction, updateInstalacionAction, deleteInstalacionActi
 import { getVehiculosAction, createVehiculoAction, updateVehiculoAction, deleteVehiculoAction, getGastosVehiculosAction, createGastoVehiculoAction, updateGastoVehiculoAction, deleteGastoVehiculoAction } from "@/app/dashboard/sistema/activos/actions";
 import { getCotizacionesAction, createCotizacionAction, updateCotizacionAction, deleteCotizacionAction } from "@/app/dashboard/sistema/cotizacion/actions";
 import { getFacturasAction, createFacturaAction, updateFacturaAction } from "@/app/dashboard/sistema/financiera/actions";
-import { getDotacionItemsAction, getEntregasDotacionAction, createEntregaDotacionAction, updateDotacionItemAction, updateEntregaDotacionAction } from "@/app/dashboard/sistema/dotacion/actions";
+import { getDotacionItemsAction, getEntregasDotacionAction, createDotacionItemAction, createEntregaDotacionAction, updateDotacionItemAction, updateEntregaDotacionAction } from "@/app/dashboard/sistema/dotacion/actions";
 import { getCuentasPorPagarAction, updateCuentaPorPagarAction, payCuentaPorPagarAction, createCuentaPorPagarAction, deleteCuentaPorPagarAction } from "@/app/dashboard/sistema/suministro/cuentas-actions";
 import { getCuentasBancariasAction, createCuentaBancariaAction, updateCuentaBancariaAction, getMovimientosFinancierosAction, createMovimientoFinancieroAction, updateMovimientoFinancieroAction } from "@/app/dashboard/sistema/financiera/bancos-actions";
 import { getObligacionesFinancierasAction, createObligacionFinancieraAction, updateObligacionFinancieraAction, deleteObligacionFinancieraAction } from "@/app/dashboard/sistema/financiera/obligaciones-actions";
@@ -112,6 +112,7 @@ interface ErpContextType {
     deleteVehiculo: (id: string) => void;
 
     // Dotacion Actions
+    addDotacionItem: (item: Omit<DotacionItem, "id">) => Promise<void>;
     updateDotacionItem: (item: DotacionItem) => void;
     updateEntregaDotacion: (id: string, updates: Partial<EntregaDotacion>) => void;
     addEntregaDotacion: (entrega: EntregaDotacion) => void;
@@ -547,6 +548,10 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     };
 
     // DOTACION ACTIONS
+    const addDotacionItem = async (item: Omit<DotacionItem, "id">) => {
+        const saved = await createDotacionItemAction(item);
+        setDotacionItems(prev => [saved, ...prev]);
+    };
     const updateDotacionItem = async (updated: DotacionItem) => {
         try {
             const saved = await updateDotacionItemAction(updated.id, updated);
@@ -554,11 +559,17 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         } catch (error) { console.error("Failed to update dotacion item:", error); }
     };
     const addEntregaDotacion = async (entrega: EntregaDotacion) => {
-        try {
-            const { id, ...rest } = entrega;
-            const saved = await createEntregaDotacionAction(rest);
-            setEntregasDotacion(prev => [saved, ...prev]);
-        } catch (error) { console.error("Failed to add entrega dotacion:", error); }
+        const { id, ...rest } = entrega;
+        const saved = await createEntregaDotacionAction(rest);
+        setEntregasDotacion(prev => [saved, ...prev]);
+        // Se actualiza el stock local después de que la escritura remota fue aceptada.
+        setDotacionItems(prev => prev.map(item => ({
+            ...item, variantes: item.variantes.map(v => {
+                const entregado = entrega.items.filter(e => e.varianteId === v.id)
+                    .reduce((sum, e) => sum + e.cantidad, 0);
+                return entregado ? { ...v, cantidadDisponible: Math.max(0, v.cantidadDisponible - entregado) } : v;
+            })
+        })));
     };
 
     const updateEntregaDotacion = async (id: string, updates: Partial<EntregaDotacion>) => {
@@ -1005,7 +1016,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             addGastoVehiculo,
             updateGastoVehiculo,
             deleteGastoVehiculo,
-            updateDotacionItem, addEntregaDotacion,
+            addDotacionItem, updateDotacionItem, addEntregaDotacion,
             updateEntregaDotacion,
             updateCuentaPorPagar: updateCuentaPorPagarHandler,
             addCuentaPorPagar,
