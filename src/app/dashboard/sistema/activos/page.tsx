@@ -52,6 +52,8 @@ import {
 
 import { formatCurrency } from "@/lib/utils";
 import { CreateVehicleDialog } from "@/components/erp/create-vehicle-dialog";
+import { EditVehicleDialog } from "@/components/erp/edit-vehicle-dialog";
+import { ActivosDashboard } from "@/components/erp/activos-dashboard";
 import { RegisterExpenseDialog } from "@/components/erp/register-expense-dialog";
 import { VehicleDetailDialog } from "@/components/erp/vehicle-detail-dialog";
 import { GastoVehiculo, Vehiculo } from "@/types/sistema";
@@ -62,6 +64,7 @@ export default function ActivosPage() {
         gastosVehiculos: gastos,
         cuentasBancarias: cuentas,
         addVehiculo,
+        updateVehiculo,
         addGastoVehiculo,
         deleteVehiculo,
         deleteGastoVehiculo,
@@ -204,6 +207,7 @@ export default function ActivosPage() {
 
                 {/* --- RESUMEN TAB --- */}
                 <TabsContent value="resumen" className="space-y-6">
+                    <ActivosDashboard vehiculos={vehiculos} gastos={gastos} />
                     {/* Filters */}
                     <div className="flex flex-wrap items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
                         <div className="flex flex-col gap-1">
@@ -389,6 +393,7 @@ export default function ActivosPage() {
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-2">
+                                                        <EditVehicleDialog vehiculo={veh} onVehicleUpdated={updateVehiculo} />
                                                         <Button variant="ghost" size="sm" onClick={() => handleOpenDetail(veh)}>Ver Detalle</Button>
                                                         {isAdmin && (
                                                             <Button
