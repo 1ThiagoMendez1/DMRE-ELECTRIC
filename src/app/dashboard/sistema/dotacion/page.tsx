@@ -1,89 +1,58 @@
 "use client";
 
-import { useState } from "react";
-import { HardHat, Package, Plus, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { HardHat, Package, Search, ClipboardCheck, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
 import { useErp } from "@/components/providers/erp-provider";
+import { CreateDotacionItemDialog } from "@/components/erp/create-dotacion-item-dialog";
+import { NewEntregaDialog } from "@/components/erp/new-entrega-dialog";
 
 export default function DotacionPage() {
-    const { toast } = useToast();
-    const { dotacionItems: inventory, entregasDotacion: entregas } = useErp();
-    const [searchTerm, setSearchTerm] = useState("");
-
+    const { dotacionItems, entregasDotacion, empleados, addDotacionItem, addEntregaDotacion } = useErp();
+    const [search, setSearch] = useState("");
+    const stock = useMemo(() => dotacionItems.flatMap(item =>
+        item.variantes.map(v => ({ ...v, nombre: item.descripcion, itemId: item.id, minimo: item.stockMinimo || 0, categoria: item.categoria }))
+    ), [dotacionItems]);
+    const filtered = stock.filter(v => [v.nombre, v.talla, v.color].join(" ").toLowerCase().includes(search.toLowerCase()));
+    const pendientes = entregasDotacion.filter(e => e.estado === "ASIGNADO").length;
+    const stockBajo = stock.filter(v => v.cantidadDisponible <= v.minimo).length;
     return (
-        <div className="flex flex-col space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-6 pb-10">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Gestión de Dotación</h1>
-                    <p className="text-muted-foreground">Entrega y control de uniformes y EPP.</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Gestión de Dotación</h1>
+                    <p className="text-muted-foreground">Registro, existencias y trazabilidad de uniformes y EPP.</p>
                 </div>
-                <Button onClick={() => toast({ title: "Nueva Entrega", description: "Formulario de entrega en desarrollo" })}>
-                    <Plus className="mr-2 h-4 w-4" /> Nueva Entrega
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <CreateDotacionItemDialog onCreated={addDotacionItem} />
+                    <NewEntregaDialog items={dotacionItems} empleados={empleados} onSave={addEntregaDotacion} />
+                </div>
             </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Package className="h-5 w-5" /> Inventario Disponible
-                        </CardTitle>
+            <div className="grid gap-4 sm:grid-cols-3">
+                <Card className="border-l-4 border-l-primary"><CardContent className="flex gap-3 items-center p-5"><Package className="text-primary" /><div><p className="text-xs text-muted-foreground">Referencias</p><p className="text-2xl font-bold">{dotacionItems.length}</p></div></CardContent></Card>
+                <Card className="border-l-4 border-l-amber-500"><CardContent className="flex gap-3 items-center p-5"><AlertTriangle className="text-amber-500" /><div><p className="text-xs text-muted-foreground">Variantes en stock bajo</p><p className="text-2xl font-bold">{stockBajo}</p></div></CardContent></Card>
+                <Card className="border-l-4 border-l-sky-500"><CardContent className="flex gap-3 items-center p-5"><ClipboardCheck className="text-sky-500" /><div><p className="text-xs text-muted-foreground">Entregas por confirmar</p><p className="text-2xl font-bold">{pendientes}</p></div></CardContent></Card>
+            </div>
+            <div className="grid gap-6 xl:grid-cols-2">
+                <Card className="min-w-0">
+                    <CardHeader className="space-y-3">
+                        <CardTitle className="flex gap-2 items-center"><Package className="h-5 w-5" /> Inventario de dotación</CardTitle>
+                        <div className="relative"><Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Buscar artículo, talla o color" value={search} onChange={e=>setSearch(e.target.value)} /></div>
                     </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Item</TableHead>
-                                    <TableHead>Talla</TableHead>
-                                    <TableHead className="text-right">Stock</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {inventory.map((item) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell>{item.descripcion}</TableCell>
-                                        <TableCell>{item.talla}</TableCell>
-                                        <TableCell className="text-right font-bold text-primary">{item.cantidadDisponible}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
+                    <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Artículo</TableHead><TableHead>Talla y color</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Disponible</TableHead></TableRow></TableHeader>
+                        <TableBody>{filtered.length ? filtered.map(v => <TableRow key={v.id}><TableCell className="font-medium">{v.nombre}<p className="text-xs text-muted-foreground">{v.categoria}</p></TableCell><TableCell>{v.talla} · {v.color}</TableCell><TableCell>{v.cantidadDisponible <= v.minimo ? <Badge variant="destructive">Stock bajo</Badge> : <Badge variant="secondary">Disponible</Badge>}</TableCell><TableCell className="text-right font-mono font-semibold">{v.cantidadDisponible}</TableCell></TableRow>) : <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No hay referencias que coincidan. Utiliza «Registrar dotación» para crear una.</TableCell></TableRow>}</TableBody>
+                    </Table></div></CardContent>
                 </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <HardHat className="h-5 w-5" /> Historial Entregas
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Empleado</TableHead>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead>Item</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {entregas.slice(0, 5).map((entrega) => (
-                                    <TableRow key={entrega.id}>
-                                        <TableCell className="font-medium">{entrega.empleado.nombreCompleto}</TableCell>
-                                        <TableCell>{format(entrega.fecha, "dd MMM", { locale: es })}</TableCell>
-                                        <TableCell>{entrega.items[0].descripcion}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
+                <Card className="min-w-0">
+                    <CardHeader><CardTitle className="flex gap-2 items-center"><HardHat className="h-5 w-5" /> Historial de entregas</CardTitle></CardHeader>
+                    <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Empleado</TableHead><TableHead>Fecha</TableHead><TableHead>Artículo</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
+                        <TableBody>{entregasDotacion.length ? entregasDotacion.slice(0, 30).map(e=><TableRow key={e.id}><TableCell className="font-medium">{e.empleado?.nombreCompleto || "Empleado"}</TableCell><TableCell>{format(new Date(e.fecha), "dd MMM yyyy", {locale: es})}</TableCell><TableCell>{e.items.map(i=>i.descripcion || i.detalle).join(", ")}</TableCell><TableCell><Badge variant={e.estado==="ENTREGADO"?"default":"outline"}>{e.estado}</Badge></TableCell></TableRow>) : <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No hay entregas registradas.</TableCell></TableRow>}</TableBody>
+                    </Table></div></CardContent>
                 </Card>
             </div>
         </div>
