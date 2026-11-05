@@ -653,19 +653,19 @@ export const initialRoles: Role[] = [
     {
         id: "ROLE-ADMIN",
         name: "Administrador",
-        descripcion: "Acceso total al sistema",,
+        description: "Acceso total al sistema",
         permissions: []
     },
     {
         id: "ROLE-ENGINEER",
         name: "Ingeniero",
-        descripcion: "Gestión de operaciones y proyectos",,
+        description: "Gestión de operaciones y proyectos",
         permissions: []
     },
     {
         id: "ROLE-VIEWER",
         name: "Visualizador",
-        descripcion: "Solo lectura en todos los módulos",,
+        description: "Solo lectura en todos los módulos",
         permissions: []
     }
 ];
