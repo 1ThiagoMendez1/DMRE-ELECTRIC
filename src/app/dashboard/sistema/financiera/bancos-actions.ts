@@ -133,7 +133,7 @@ function mapMovimientoToUI(db: any): MovimientoFinanciero {
         concepto: cleanConcepto || db.concepto,
         descripcion: db.descripcion,
         valor: Number(db.valor) || 0,
-        iva: db.iva !== undefined && db.iva !== null ? Number(db.iva) : (parsedIva ?? 0),
+        iva: parsedIva !== undefined ? parsedIva : (db.iva !== undefined && db.iva !== null ? Number(db.iva) : 0),
         tercero: db.tercero,
         identificacion: db.identificacion || nit,
         referencia: db.referencia, // Added
@@ -167,7 +167,7 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
         conceptoFinal += ` (ID: ${ui.identificacion.trim()})`;
     }
     if (ui.iva !== undefined && ui.iva !== null && Number(ui.iva) > 0) {
-        conceptoFinal += ` (IVA: ${Math.round(Number(ui.iva))})`;
+        conceptoFinal += ` (IVA: ${Number(Number(ui.iva).toFixed(2))})`;
     }
 
     const payload: any = {
