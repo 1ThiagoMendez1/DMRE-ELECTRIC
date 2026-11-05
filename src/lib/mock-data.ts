@@ -652,27 +652,21 @@ export const initialAgenda = generateAgenda(25);
 export const initialRoles: Role[] = [
     {
         id: "ROLE-ADMIN",
-        nombre: "Administrador",
-        descripcion: "Acceso total al sistema",
-        permisos: [],
-        color: "bg-red-500",
-        isSystemRole: true
+        name: "Administrador",
+        descripcion: "Acceso total al sistema",,
+        permissions: []
     },
     {
         id: "ROLE-ENGINEER",
-        nombre: "Ingeniero",
-        descripcion: "Gestión de operaciones y proyectos",
-        permisos: [],
-        color: "bg-blue-500",
-        isSystemRole: true
+        name: "Ingeniero",
+        descripcion: "Gestión de operaciones y proyectos",,
+        permissions: []
     },
     {
         id: "ROLE-VIEWER",
-        nombre: "Visualizador",
-        descripcion: "Solo lectura en todos los módulos",
-        permisos: [],
-        color: "bg-gray-500",
-        isSystemRole: true
+        name: "Visualizador",
+        descripcion: "Solo lectura en todos los módulos",,
+        permissions: []
     }
 ];
 
@@ -696,6 +690,7 @@ const generateOrdenesCompra = (count: number, proveedores: Proveedor[], inventar
 
             return {
                 id: `OC-DET-${i}-${j}`,
+                ordenCompraId: `OC-${i + 1}`,
                 inventarioId: itemInv.id,
                 descripcion: itemInv.descripcion,
                 cantidad: qty,
