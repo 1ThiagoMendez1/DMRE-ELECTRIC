@@ -20,7 +20,7 @@ function mapDotacionItemToUI(db: any, variantes: any[] = []): DotacionItem {
             color: v.color || "",
             cantidadDisponible: Number(v.cantidad_disponible) || 0,
         })),
-        stockMinimo: Number(db.stock_minimo) || 0,
+        stockMinimo: Number(variantes[0]?.cantidad_minima) || 0,
         fechaVencimiento: db.fecha_vencimiento ? new Date(db.fecha_vencimiento) : undefined,
         codigo: db.codigo,
         activo: db.activo,
@@ -34,7 +34,6 @@ function mapDotacionItemToDB(ui: Partial<DotacionItem>) {
         categoria: ui.categoria,
         genero: ui.genero,
         activo: ui.activo ?? true,
-        stock_minimo: ui.stockMinimo,
     };
 }
 
@@ -94,6 +93,7 @@ export async function createDotacionItemAction(item: Omit<DotacionItem, "id">): 
                 talla: v.talla,
                 color: v.color,
                 cantidad_disponible: v.cantidadDisponible,
+                cantidad_minima: item.stockMinimo ?? 0,
             })))
             .select("*");
         if (variantError) {
@@ -131,6 +131,7 @@ export async function updateDotacionItemAction(id: string, item: Partial<Dotacio
                 talla: variante.talla,
                 color: variante.color,
                 cantidad_disponible: variante.cantidadDisponible,
+                ...(item.stockMinimo !== undefined ? { cantidad_minima: item.stockMinimo } : {}),
             };
             if (variante.id) {
                 const { error: variantError } = await supabase.from("dotacion_variantes")
@@ -174,7 +175,7 @@ function mapEntregaToUI(db: any, empleado?: any, items?: any[]): EntregaDotacion
             detalle: `${i.talla || ""} - ${i.color || ""}`,
             cantidad: Number(i.cantidad) || 1,
         })),
-        estado: db.estado || "PENDIENTE",
+        estado: db.estado === "PENDIENTE" ? (db.fecha_aceptacion ? "ACEPTADO" : "ASIGNADO") : (db.estado || "ASIGNADO"),
         usuarioAsigna: db.entregado_por,
         fechaAceptacion: db.fecha_aceptacion ? new Date(db.fecha_aceptacion) : undefined,
         fechaEntrega: db.fecha_entrega ? new Date(db.fecha_entrega) : undefined,
@@ -240,7 +241,7 @@ export async function createEntregaDotacionAction(entrega: Omit<EntregaDotacion,
         .insert({
             empleado_id: entrega.empleadoId,
             fecha: entrega.fecha,
-            estado: entrega.estado || "PENDIENTE",
+            estado: "PENDIENTE", // Valor válido del enum SQL; UI lo muestra como ASIGNADO
             observaciones: entrega.observacion,
         })
         .select()
@@ -292,7 +293,7 @@ export async function updateEntregaDotacionAction(id: string, updates: Partial<E
     const supabase = await createClient();
 
     const dbUpdates: any = {
-        estado: updates.estado,
+        estado: updates.estado === "ACEPTADO" || updates.estado === "ASIGNADO" ? "PENDIENTE" : updates.estado,
         observaciones: updates.observacion,
     };
 
