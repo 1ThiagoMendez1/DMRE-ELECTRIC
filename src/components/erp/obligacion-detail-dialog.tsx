@@ -42,7 +42,7 @@ import { calculateAmortizationSchedule } from "@/lib/financial-math";
 
 interface ObligacionDetailDialogProps {
     obligacion: ObligacionFinanciera;
-    onObligacionUpdated: (obligacion: ObligacionFinanciera) => void;
+    onObligacionUpdated: (obligacion: ObligacionFinanciera) => Promise<void> | void;
     trigger?: React.ReactNode;
 }
 
@@ -61,7 +61,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
     // Payment Form state
     const [pagoTipo, setPagoTipo] = useState<TipoPago>('CUOTA');
     const [pagoValor, setPagoValor] = useState("");
-    const [pagoFecha, setPagoFecha] = useState(new Date().toISOString().split('T')[0]);
+    const [pagoFecha, setPagoFecha] = useState(format(new Date(), "yyyy-MM-dd"));
     const [cuentaId, setCuentaId] = useState("");
     const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
 
@@ -74,7 +74,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
     // Fetch fresh data when dialog opens
     useEffect(() => {
         if (open) {
-            refreshData();
+            void refreshData();
         } else {
             setLocalObligacion(obligacion);
             setEntidad(obligacion.entidad);
@@ -140,14 +140,19 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
         );
     }, [localObligacion]);
 
-    const handleSaveGeneral = () => {
+    const handleSaveGeneral = async () => {
         const updated: ObligacionFinanciera = {
             ...localObligacion,
             entidad,
             saldoCapital: parseFloat(saldo)
         };
-        onObligacionUpdated(updated);
-        setLocalObligacion(updated);
+        try {
+            await onObligacionUpdated(updated);
+            setLocalObligacion(updated);
+        } catch (error) {
+            toast({ title: "No se guardaron los cambios", description: error instanceof Error ? error.message : "Compruebe los datos.", variant: "destructive" });
+            return;
+        }
         setIsEditing(false);
     };
 
@@ -163,6 +168,10 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
             return;
         }
 
+        if (calcCapital < 0 || calcCapital > localObligacion.saldoCapital + 0.01) {
+            toast({ title: "Desglose inválido", description: "El abono al capital no puede ser negativo ni superar el saldo.", variant: "destructive" });
+            return;
+        }
         const nuevoSaldo = localObligacion.saldoCapital - calcCapital;
 
         setIsLoading(true);
@@ -191,7 +200,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
 
             const updatedObligacion = await registrarPagoObligacionAction({
                 obligacionId: localObligacion.id,
-                fecha: new Date(pagoFecha),
+                fecha: new Date(pagoFecha + "T12:00:00"),
                 valor: valor,
                 interes: calcInteres,
                 capital: calcCapital,
@@ -211,7 +220,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
             toast({ title: "Pago registrado", description: "El abono ha sido guardado correctamente." });
         } catch (error) {
             console.error("Error registering payment:", error);
-            toast({ title: "Error", description: "No se pudo registrar el pago. Revise la consola.", variant: "destructive" });
+            toast({ title: "No se completó el proceso", description: error instanceof Error ? error.message : "Compruebe la conexión y revise el historial antes de repetir el pago.", variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
@@ -226,7 +235,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[800px] h-[85vh] flex flex-col">
+            <DialogContent className="w-[min(96vw,920px)] max-w-[96vw] h-[min(90dvh,860px)] max-h-[90dvh] flex flex-col overflow-hidden p-4 sm:p-6">
                 <DialogHeader>
                     <div className="flex justify-between items-center">
                         <DialogTitle className="flex items-center gap-2">
@@ -240,10 +249,10 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                 </DialogHeader>
 
                 <Tabs defaultValue="pagos" className="flex-1 overflow-hidden flex flex-col mt-4">
-                    <TabsList className="grid w-full grid-cols-1 md:grid-cols-3">
-                        <TabsTrigger value="pagos">Registrar & Historial</TabsTrigger>
-                        <TabsTrigger value="amortizacion">Proyección Dinámica</TabsTrigger>
-                        <TabsTrigger value="detalle">Info. General</TabsTrigger>
+                    <TabsList className="flex w-full overflow-x-auto gap-1 justify-start">
+                        <TabsTrigger className="shrink-0 min-w-[130px] text-xs sm:text-sm" value="pagos">Registrar & Historial</TabsTrigger>
+                        <TabsTrigger className="shrink-0 min-w-[130px] text-xs sm:text-sm" value="amortizacion">Proyección Dinámica</TabsTrigger>
+                        <TabsTrigger className="shrink-0 min-w-[130px] text-xs sm:text-sm" value="detalle">Info. General</TabsTrigger>
                     </TabsList>
 
                     {/* --- DETAILS TAB --- */}
@@ -313,7 +322,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                     </TabsContent>
 
                     {/* --- PAYMENTS & HISTORY TAB --- */}
-                    <TabsContent value="pagos" className="flex-1 overflow-hidden flex flex-col mt-2">
+                    <TabsContent value="pagos" className="flex-1 min-h-0 overflow-y-auto flex flex-col mt-2">
                         {/* PAYMENT FORM */}
                         <div className="p-4 border rounded-md bg-muted/20 mb-4 space-y-4">
                             <div className="flex justify-between items-start">
@@ -348,7 +357,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                         </div>
                                         <div>
                                             <Label>Valor Total a Pagar</Label>
-                                            <Input type="number" placeholder="0" value={pagoValor} onChange={e => setPagoValor(e.target.value)} />
+                                            <Input type="number" min="0.01" step="0.01" placeholder="0.00" value={pagoValor} onChange={e => setPagoValor(e.target.value)} />
                                         </div>
                                     </div>
                                     <div>
@@ -405,7 +414,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                         </div>
 
                         {/* HISTORY TABLE */}
-                        <div className="flex-1 overflow-auto rounded-md border bg-background">
+                        <div className="min-h-[180px] max-h-[340px] overflow-auto rounded-md border bg-background">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -425,9 +434,9 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        localObligacion.pagos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((pago) => {
+                                        [...localObligacion.pagos].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((pago) => {
                                             const d = new Date(pago.fecha);
-                                            const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+                                            const localD = d;
                                             return (
                                             <TableRow key={pago.id}>
                                                 <TableCell>{format(localD, "dd MMM yyyy", { locale: es })}</TableCell>
