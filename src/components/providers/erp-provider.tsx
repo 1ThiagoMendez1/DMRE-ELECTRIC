@@ -115,7 +115,7 @@ interface ErpContextType {
     addDotacionItem: (item: Omit<DotacionItem, "id">) => Promise<void>;
     updateDotacionItem: (item: DotacionItem) => void;
     updateEntregaDotacion: (id: string, updates: Partial<EntregaDotacion>) => void;
-    addEntregaDotacion: (entrega: EntregaDotacion) => void;
+    addEntregaDotacion: (entrega: EntregaDotacion) => Promise<void>;
 
     // Gastos Vehiculo Actions
     addGastoVehiculo: (gasto: GastoVehiculo, cuentaId?: string) => void;
