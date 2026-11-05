@@ -182,7 +182,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                 if (value.tipo === "TRANSFERENCIA" || value.categoria === "NOMINA") {
                     form.setValue("iva", 0, { shouldValidate: true });
                 } else if (currentValor > 0) {
-                    form.setValue("iva", Math.round(currentValor * 0.19), { shouldValidate: true });
+                    form.setValue("iva", Number((currentValor * 0.19).toFixed(2)), { shouldValidate: true });
                 }
             }
         });
@@ -194,8 +194,12 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (file.type !== 'application/pdf') {
-            alert("Solo se permiten archivos PDF");
+        if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+            alert("Solo se permiten PDF e imágenes JPG, PNG o WEBP.");
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert("El soporte no puede superar 10 MB.");
             return;
         }
 
@@ -603,21 +607,18 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                         <FormControl>
                                             <Input
                                                 type="text"
-                                                inputMode="numeric"
-                                                placeholder="$ 0 COP"
-                                                value={field.value ? formatCurrency(Number(field.value)) : ""}
+                                                inputMode="decimal"
+                                                placeholder="0.00 (COP)"
+                                                value={field.value === undefined || field.value === null ? "" : String(field.value)}
                                                 onChange={(e) => {
-                                                    const raw = e.target.value.replace(/\D/g, "");
-                                                    const num = raw ? parseInt(raw, 10) : 0;
-                                                    field.onChange(num);
-
+                                                    const raw = e.target.value.replace(",", ".").replace(/[^0-9.]/g, "");
+                                                    if (raw.split(".").length > 2) return;
+                                                    field.onChange(raw);
+                                                    const num = Number(raw) || 0;
                                                     const tipo = form.getValues("tipo");
                                                     const cat = form.getValues("categoria");
-                                                    if (tipo === "TRANSFERENCIA" || cat === "NOMINA") {
-                                                        form.setValue("iva", 0, { shouldValidate: true });
-                                                    } else {
-                                                        form.setValue("iva", Math.round(num * 0.19), { shouldValidate: true });
-                                                    }
+                                                    form.setValue("iva", tipo === "TRANSFERENCIA" || cat === "NOMINA"
+                                                        ? 0 : Number((num * 0.19).toFixed(2)), { shouldValidate: true });
                                                 }}
                                                 className="font-medium"
                                             />
@@ -638,7 +639,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                     type="button"
                                                     onClick={() => {
                                                         const currentVal = Number(form.getValues("valor")) || 0;
-                                                        form.setValue("iva", Math.round(currentVal * 0.19), { shouldValidate: true });
+                                                        form.setValue("iva", Number((currentVal * 0.19).toFixed(2)), { shouldValidate: true });
                                                     }}
                                                     className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-primary font-medium transition-colors"
                                                     title="Calcular 19% de IVA"
@@ -660,11 +661,11 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                 type="text"
                                                 inputMode="numeric"
                                                 placeholder="$ 0 COP"
-                                                value={field.value ? formatCurrency(Number(field.value)) : ""}
+                                                value={field.value === undefined || field.value === null ? "" : String(field.value)}
                                                 onChange={(e) => {
-                                                    const raw = e.target.value.replace(/\D/g, "");
-                                                    const num = raw ? parseInt(raw, 10) : 0;
-                                                    field.onChange(num);
+                                                    const raw = e.target.value.replace(",", ".").replace(/[^0-9.]/g, "");
+                                                    if (raw.split(".").length > 2) return;
+                                                    field.onChange(raw);
                                                 }}
                                                 className="font-medium"
                                             />
@@ -691,7 +692,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                             name="comprobanteUrl"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Soporte (PDF)</FormLabel>
+                                    <FormLabel>Soporte (PDF o imagen)</FormLabel>
                                     <div className="flex flex-col gap-2">
                                         {field.value ? (
                                             <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card/60 dark:bg-card/40 shadow-sm">
@@ -716,7 +717,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                             size="sm" 
                                                             className="h-7 px-2 text-xs flex items-center gap-1 hover:bg-primary/10 hover:text-primary"
                                                             onClick={() => window.open(field.value, '_blank')}
-                                                            title="Abrir PDF en pestaña nueva"
+                                                            title="Abrir soporte en pestaña nueva"
                                                         >
                                                             <ExternalLink className="h-3.5 w-3.5" />
                                                             <span className="hidden sm:inline">Abrir</span>
@@ -736,18 +737,18 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
 
                                                 {/* Vista previa embebida del PDF */}
                                                 <div className="relative w-full h-72 border rounded-md overflow-hidden bg-background shadow-inner">
-                                                    <iframe 
-                                                        src={field.value} 
-                                                        className="w-full h-full border-0" 
-                                                        title="Vista previa del soporte PDF"
-                                                    />
+                                                    {/\.(png|jpe?g|webp)(\?|$)/i.test(field.value) ? (
+                                                        <img src={field.value} alt="Vista previa del soporte" className="w-full h-full object-contain" />
+                                                    ) : (
+                                                        <iframe src={field.value} className="w-full h-full border-0" title="Vista previa del soporte" />
+                                                    )}
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="relative">
                                                 <Input
                                                     type="file"
-                                                    accept=".pdf"
+                                                    accept=".pdf,image/png,image/jpeg,image/webp"
                                                     onChange={handleFileUpload}
                                                     disabled={isUploading}
                                                     className="cursor-pointer pr-10"
@@ -764,7 +765,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                         <p className="text-[10px] text-muted-foreground italic">
                                             {field.value 
                                                 ? "Verifique los datos del documento en la vista previa antes de registrar." 
-                                                : "Sube el PDF del soporte bancario o factura para ver la vista previa."}
+                                                : "Adjunta un PDF o una imagen (JPG, PNG, WEBP) de hasta 10 MB."}
                                         </p>
                                     </div>
                                     <FormMessage />
