@@ -266,7 +266,7 @@ export default function LogisticaPage() {
             <div className="flex justify-between items-start">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Logística e Inventarios</h1>
-                    <p className="text-muted-foreground">Centro de gestión de bienes, suministros y activos.</p>
+                    <p className="text-muted-foreground">Centro de gestión de materiales, suministros y dotación.</p>
                 </div>
                 <AlertConfigDialog />
             </div>
@@ -280,7 +280,6 @@ export default function LogisticaPage() {
                     <TabsTrigger value="instalaciones" className="gap-2"><Bolt className="h-4 w-4" /> Instalaciones</TabsTrigger>
                     <TabsTrigger value="suministro" className="gap-2"><Truck className="h-4 w-4" /> Proveedores</TabsTrigger>
                     <TabsTrigger value="dotacion" className="gap-2"><HardHat className="h-4 w-4" /> Dotación</TabsTrigger>
-                    <TabsTrigger value="activos" className="gap-2"><Car className="h-4 w-4" /> Activos</TabsTrigger>
                     <TabsTrigger value="ejecucion" className="gap-2"><Hammer className="h-4 w-4" /> Ejecución</TabsTrigger>
                 </TabsList>
 
@@ -874,210 +873,7 @@ export default function LogisticaPage() {
                     )}
                 </TabsContent>
 
-                {/* ACTIVOS TAB - WITH SUB-TABS */}
-                <TabsContent value="activos" className="space-y-4">
-                    <Tabs value={activosTab} onValueChange={setActivosTab}>
-                        <TabsList>
-                            <TabsTrigger value="resumen">Resumen</TabsTrigger>
-                            <TabsTrigger value="flota">Flota y Documentación</TabsTrigger>
-                            <TabsTrigger value="bitacora">Bitácora de Gastos</TabsTrigger>
-                        </TabsList>
-
-                        {/* Activos - Resumen */}
-                        <TabsContent value="resumen" className="space-y-4 mt-4">
-                            <ActivosDashboard vehiculos={vehiculos} gastos={gastos} />
-                        </TabsContent>
-
-                        {/* Activos - Flota */}
-                        <TabsContent value="flota" className="mt-4">
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <CardTitle>Flota Vehicular</CardTitle>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                Gestión completa de vehículos y documentación
-                                            </p>
-                                        </div>
-                                        <CreateVehicleDialog onVehicleCreated={handleCreateVehicle} />
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Placa</TableHead>
-                                                <TableHead>Vehículo</TableHead>
-                                                <TableHead>Estado</TableHead>
-                                                <TableHead>Conductor</TableHead>
-                                                <TableHead>SOAT</TableHead>
-                                                <TableHead>Tecno</TableHead>
-                                                <TableHead className="text-right">Gastos</TableHead>
-                                                <TableHead className="text-right">Acciones</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {vehiculos.slice((pageVehiculos - 1) * ITEMS_PER_PAGE, pageVehiculos * ITEMS_PER_PAGE).map((veh) => {
-                                                const vehicleGastos = gastos.filter(g => g.vehiculoId === veh.id);
-                                                const totalVehicleGastos = vehicleGastos.reduce((acc, g) => acc + g.valor, 0);
-
-                                                // Document status semaphore
-                                                const getDocSemaphore = (date: Date) => {
-                                                    const days = differenceInDays(new Date(date), new Date());
-                                                    if (days < 0) return { color: 'bg-red-500', variant: 'destructive' as const };
-                                                    if (days <= 30) return { color: 'bg-amber-500', variant: 'secondary' as const };
-                                                    if (days <= 60) return { color: 'bg-yellow-500', variant: 'outline' as const };
-                                                    return { color: 'bg-green-500', variant: 'default' as const };
-                                                };
-
-                                                const soatStatus = getDocSemaphore(veh.vencimientoSoat);
-                                                const tecnoStatus = getDocSemaphore(veh.vencimientoTecnomecanica);
-
-                                                return (
-                                                    <TableRow
-                                                        key={veh.id}
-                                                        className="cursor-pointer hover:bg-muted/50"
-                                                        onClick={() => {
-                                                            setSelectedVehicle(veh);
-                                                            setVehicleDetailOpen(true);
-                                                        }}
-                                                    >
-                                                        <TableCell className="font-bold">{veh.placa}</TableCell>
-                                                        <TableCell>
-                                                            <div>
-                                                                <div className="text-sm">{veh.marcaModelo}</div>
-                                                                <div className="text-xs text-muted-foreground">{veh.ano} • {veh.color}</div>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={veh.estado === 'OPERATIVO' ? 'default' : veh.estado === 'MANTENIMIENTO' ? 'secondary' : 'outline'}>
-                                                                {veh.estado}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="text-sm">{veh.conductorAsignado || 'Sin asignar'}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-1">
-                                                                <div className={`w-2 h-2 rounded-full ${soatStatus.color}`} />
-                                                                <Badge variant={soatStatus.variant} className="text-[10px]">
-                                                                    {format(veh.vencimientoSoat, "dd/MM/yy", { locale: es })}
-                                                                </Badge>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-1">
-                                                                <div className={`w-2 h-2 rounded-full ${tecnoStatus.color}`} />
-                                                                <Badge variant={tecnoStatus.variant} className="text-[10px]">
-                                                                    {format(veh.vencimientoTecnomecanica, "dd/MM/yy", { locale: es })}
-                                                                </Badge>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-mono text-sm">{formatCurrency(totalVehicleGastos)}</TableCell>
-                                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                <EditVehicleDialog
-                                                                    vehiculo={veh}
-                                                                    onVehicleUpdated={(updated) => {
-                                                                        // Would use updateVehiculo from context if available
-                                                                        toast({ title: "Vehículo actualizado", description: updated.placa });
-                                                                    }}
-                                                                />
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-8 w-8 p-0"
-                                                                    onClick={() => {
-                                                                        setSelectedVehicle(veh);
-                                                                        setVehicleDetailOpen(true);
-                                                                    }}
-                                                                >
-                                                                    👁️
-                                                                </Button>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
-                                    <div className="flex items-center justify-between mt-4">
-                                        <div className="text-sm text-muted-foreground">
-                                            Mostrando {vehiculos.length === 0 ? 0 : Math.min((pageVehiculos - 1) * ITEMS_PER_PAGE + 1, vehiculos.length)} - {Math.min(pageVehiculos * ITEMS_PER_PAGE, vehiculos.length)} de {vehiculos.length} ítems
-                                        </div>
-                                        <div className="flex space-x-2">
-                                            <Button variant="outline" size="sm" onClick={() => setPageVehiculos(p => Math.max(1, p - 1))} disabled={pageVehiculos === 1}>Anterior</Button>
-                                            <Button variant="outline" size="sm" onClick={() => setPageVehiculos(p => p + 1)} disabled={pageVehiculos >= Math.ceil(vehiculos.length / ITEMS_PER_PAGE)}>Siguiente</Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Vehicle Detail Dialog */}
-                            <VehicleDetailDialog
-                                open={vehicleDetailOpen}
-                                onOpenChange={setVehicleDetailOpen}
-                                vehiculo={selectedVehicle}
-                                gastos={gastos}
-                            />
-                        </TabsContent>
-
-                        {/* Activos - Bitácora */}
-                        <TabsContent value="bitacora" className="mt-4">
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex justify-between items-center">
-                                        <CardTitle>Bitácora de Gastos</CardTitle>
-                                        <RegisterExpenseDialog
-                                            vehiculos={vehiculos}
-                                            cuentas={cuentasBancarias}
-                                            onExpenseCreated={handleCreateExpense}
-                                        />
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Fecha</TableHead>
-                                                <TableHead>Vehículo</TableHead>
-                                                <TableHead>Tipo</TableHead>
-                                                <TableHead>Proveedor</TableHead>
-                                                <TableHead className="text-right">Valor</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {gastos.slice((pageGastos - 1) * ITEMS_PER_PAGE, pageGastos * ITEMS_PER_PAGE).map((gasto) => (
-                                                <TableRow key={gasto.id}>
-                                                    <TableCell>{format(gasto.fecha, "dd MMM yy", { locale: es })}</TableCell>
-                                                    <TableCell className="font-medium">{gasto.vehiculo.placa}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline" className="gap-1">
-                                                            {gasto.tipo === 'COMBUSTIBLE' && <Fuel className="h-3 w-3" />}
-                                                            {gasto.tipo === 'MANTENIMIENTO' && <Wrench className="h-3 w-3" />}
-                                                            {gasto.tipo}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>{gasto.proveedor || gasto.tipo}</TableCell>
-                                                    <TableCell className="text-right font-mono">{formatCurrency(gasto.valor)}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                    <div className="flex items-center justify-between mt-4">
-                                        <div className="text-sm text-muted-foreground">
-                                            Mostrando {gastos.length === 0 ? 0 : Math.min((pageGastos - 1) * ITEMS_PER_PAGE + 1, gastos.length)} - {Math.min(pageGastos * ITEMS_PER_PAGE, gastos.length)} de {gastos.length} ítems
-                                        </div>
-                                        <div className="flex space-x-2">
-                                            <Button variant="outline" size="sm" onClick={() => setPageGastos(p => Math.max(1, p - 1))} disabled={pageGastos === 1}>Anterior</Button>
-                                            <Button variant="outline" size="sm" onClick={() => setPageGastos(p => p + 1)} disabled={pageGastos >= Math.ceil(gastos.length / ITEMS_PER_PAGE)}>Siguiente</Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </Tabs>
-                </TabsContent>
-
-                {/* EJECUCION TAB */}
+undefined                {/* EJECUCION TAB */}
                 <TabsContent value="ejecucion" className="space-y-4">
                     <Card>
                         <CardHeader>
