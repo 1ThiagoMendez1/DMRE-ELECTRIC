@@ -1,4 +1,4 @@
-import { Cpu, Network, Wrench, Cable, Bot, LampDesk, User, Package, FileText, ClipboardList, DollarSign, Briefcase } from 'lucide-react';
+import { Cpu, Network, Wrench, Cable, Bot, LampDesk, User, Package, FileText, ClipboardList, DollarSign, Briefcase, Car } from 'lucide-react';
 
 export const services = [
     {
@@ -113,9 +113,9 @@ export const systemNavItems = [
     },
     {
         id: 'operaciones',
-        label: 'Operaciones',
+        label: 'Activos',
         href: '/dashboard/sistema/operaciones',
-        icon: ClipboardList,
+        icon: Car,
     },
     {
         id: 'talento-humano',
