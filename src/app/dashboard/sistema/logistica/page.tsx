@@ -873,7 +873,7 @@ export default function LogisticaPage() {
                     )}
                 </TabsContent>
 
-undefined                {/* EJECUCION TAB */}
+                {/* EJECUCION TAB */}
                 <TabsContent value="ejecucion" className="space-y-4">
                     <Card>
                         <CardHeader>
