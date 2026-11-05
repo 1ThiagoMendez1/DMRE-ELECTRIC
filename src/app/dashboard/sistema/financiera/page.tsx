@@ -159,11 +159,7 @@ export default function FinancieraPage() {
             }
         }
 
-        // 4. Si el IVA sigue en 0 o no está definido, calcular el 19% por defecto (excepto Nómina y Préstamos)
-        if ((!iva || iva === 0) && m.categoria !== 'NOMINA' && m.categoria !== 'PRESTAMOS') {
-            iva = Math.round((m.valor || 0) * 0.19);
-        }
-
+        // El IVA explícitamente igual a 0 debe respetarse; no inventar impuesto en movimientos.
         return {
             ...m,
             tercero: tercero || "Sin tercero",
@@ -176,11 +172,25 @@ export default function FinancieraPage() {
         };
     }) as any[];
 
+    // Fecha contable sin desplazamientos por la conversión UTC del navegador.
+    const fechaContable = (value: Date | string): Date => {
+        const raw = new Date(value);
+        if (!Number.isFinite(raw.getTime())) return new Date();
+        if (raw.getUTCHours() === 0 && raw.getUTCMinutes() === 0) {
+            return new Date(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate(), 12);
+        }
+        const parts = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit"
+        }).formatToParts(raw);
+        const find = (type: string) => Number(parts.find(p => p.type === type)?.value || 0);
+        return new Date(find("year"), find("month") - 1, find("day"), 12);
+    };
+
     // Filtro aplicado para Movimientos Generales
     const movimientosFiltrados = movimientos.filter(mov => {
         if (mov.esSimple) return false;
         const d = new Date(mov.fecha);
-        const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+        const localD = fechaContable(d);
         
         const today = new Date();
         if (fastDateFilter === 'dia') {
@@ -630,7 +640,7 @@ export default function FinancieraPage() {
                                     )}
                                     {movimientosFiltrados.map((mov) => {
                                         const d = new Date(mov.fecha);
-                                        const localD = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+                                        const localD = fechaContable(d);
                                         return (
                                         <TableRow key={mov.id}>
                                             <TableCell>{format(localD, "dd MMM yyyy", { locale: es })}</TableCell>
