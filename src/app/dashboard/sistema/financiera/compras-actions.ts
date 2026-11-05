@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { CompraFinanciera, Cotizacion, Cliente } from "@/types/sistema";
+import { CompraFinanciera, Cotizacion, Cliente, CotizacionProveedor } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
 
 function mapToUI(db: any): CompraFinanciera {
