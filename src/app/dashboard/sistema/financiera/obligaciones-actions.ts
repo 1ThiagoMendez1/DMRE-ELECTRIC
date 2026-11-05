@@ -70,7 +70,7 @@ export async function getObligacionesFinancierasAction(): Promise<ObligacionFina
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("obligaciones_financieras")
-        .select("*")
+        .select("*, obligaciones_pagos(*)")
         .order("created_at", { ascending: false });
 
     if (error) {
@@ -111,6 +111,10 @@ export async function registrarPagoObligacionAction(pago: {
 }): Promise<ObligacionFinanciera> {
     const supabase = await createClient();
 
+    if (!Number.isFinite(pago.valor) || pago.valor <= 0 || pago.capital < 0 || pago.interes < 0 ||
+        Math.abs(pago.valor - pago.capital - pago.interes) > 0.05) {
+        throw new Error("El desglose del pago no coincide con su valor total.");
+    }
     // 1. Insert Payment
     const { error: payError } = await supabase
         .from("obligaciones_pagos")
@@ -128,7 +132,7 @@ export async function registrarPagoObligacionAction(pago: {
 
     // 2. If Bank Account involved, create financial movement (Egreso)
     if (pago.cuentaBancariaId) {
-        await supabase.from("movimientos_financieros").insert({
+        const { error: movError } = await supabase.from("movimientos_financieros").insert({
             tipo: "EGRESO",
             categoria: "PRESTAMOS",
             concepto: "Pago Cuota Obligación",
@@ -138,12 +142,14 @@ export async function registrarPagoObligacionAction(pago: {
             cuenta_id: pago.cuentaBancariaId,
             comprobante_url: pago.comprobanteUrl
         });
+        if (movError) throw new Error("Pago registrado en obligaciones, pero falló el movimiento bancario. Requiere conciliación: " + movError.message);
 
-        // Update bank balance trigger handles the rest or we do RPC
-        await supabase.rpc("update_cuenta_saldo", {
+        // Actualizar saldo únicamente si el movimiento ya fue registrado.
+        const { error: saldoError } = await supabase.rpc("update_cuenta_saldo", {
             cuenta_uuid: pago.cuentaBancariaId,
             delta_valor: -pago.valor
         });
+        if (saldoError) throw new Error("Pago y movimiento registrados, pero falló la actualización del saldo bancario. Requiere conciliación.");
     }
 
     // 3. Trigger in SQL updates the parent 'saldo_capital'
@@ -151,12 +157,13 @@ export async function registrarPagoObligacionAction(pago: {
     revalidatePath("/dashboard/sistema/financiera");
 
     // Return updated obligation
-    const { data: updatedObligacion } = await supabase
+    const { data: updatedObligacion, error: updatedError } = await supabase
         .from("obligaciones_financieras")
         .select("*, obligaciones_pagos(*)")
         .eq("id", pago.obligacionId)
         .single();
 
+    if (updatedError || !updatedObligacion) throw new Error("Pago registrado, pero no pudo actualizarse la vista. Consulte el historial antes de repetirlo.");
     return {
         ...mapObligacionToUI(updatedObligacion),
         pagos: updatedObligacion.obligaciones_pagos ? updatedObligacion.obligaciones_pagos.map((p: any) => ({
