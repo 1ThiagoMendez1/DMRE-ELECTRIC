@@ -25,7 +25,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MovimientoFinanciero, TipoMovimiento, CategoriaMovimiento } from "@/types/sistema";
 import { formatCurrency } from "@/lib/utils";
-import { Pencil, Eye, FileText, ExternalLink, Download } from "lucide-react";
+import { Pencil, Eye, FileText, ExternalLink, Download, Upload, Loader2 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
 import { generateReceipt } from "@/lib/pdf-generator";
 
 interface MovimientoDetailDialogProps {
@@ -38,6 +39,8 @@ interface MovimientoDetailDialogProps {
 export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimientoUpdated, trigger }: MovimientoDetailDialogProps) {
     const [open, setOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [comprobanteUrl, setComprobanteUrl] = useState(movimiento.comprobanteUrl || "");
+    const [isUploading, setIsUploading] = useState(false);
 
     // Form states
     const [concepto, setConcepto] = useState(movimiento.concepto);
@@ -52,6 +55,7 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
     useEffect(() => {
         if (open) {
             setConcepto(movimiento.concepto);
+            setComprobanteUrl(movimiento.comprobanteUrl || "");
             setTercero(movimiento.tercero);
             setIdentificacion(movimiento.identificacion || "");
             setValor(movimiento.valor.toString());
@@ -62,6 +66,34 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
             setIsEditing(false);
         }
     }, [open, movimiento]);
+
+    const handleUploadSupport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+            alert("Formatos permitidos: PDF, JPG, PNG y WEBP.");
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert("El soporte no debe superar 10 MB.");
+            return;
+        }
+        setIsUploading(true);
+        try {
+            const extension = file.name.split(".").pop()?.toLowerCase() || "pdf";
+            const path = `comprobantes/${movimiento.id}-${Date.now()}.${extension}`;
+            const supabase = createClient();
+            const { error } = await supabase.storage.from("imagenes").upload(path, file);
+            if (error) throw error;
+            const { data } = supabase.storage.from("imagenes").getPublicUrl(path);
+            setComprobanteUrl(data.publicUrl);
+        } catch (error) {
+            console.error("Error actualizando soporte", error);
+            alert("No se pudo subir el soporte. Verifique los permisos.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     const handleSave = async () => {
         const updatedMovimiento: MovimientoFinanciero = {
@@ -74,6 +106,7 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
             fecha: fecha ? new Date(fecha + "T12:00:00") : movimiento.fecha,
             categoria,
             tipo,
+            comprobanteUrl,
         };
 
         try {
@@ -220,6 +253,7 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                         <Input
                             id="valor"
                             type="number"
+                            step="0.01"
                             value={valor}
                             onChange={(e) => setValor(e.target.value)}
                             disabled={!isEditing}
@@ -257,6 +291,7 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                         <Input
                             id="iva"
                             type="number"
+                            step="0.01"
                             value={iva}
                             onChange={(e) => setIva(e.target.value)}
                             disabled={!isEditing}
@@ -284,41 +319,47 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                         />
                     </div>
 
-                    {movimiento.comprobanteUrl && (
-                        <Card className="col-span-1 sm:col-span-2 md:col-span-3 mt-2">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm flex items-center gap-2">
-                                    <FileText className="h-4 w-4" /> Soporte Adjunto
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex justify-between items-center bg-muted/30 p-2 rounded-md border">
-                                        <span className="text-sm font-medium truncate">
-                                            Soporte en formato PDF
-                                        </span>
-                                        <Button variant="outline" size="sm" asChild>
-                                            <a href={movimiento.comprobanteUrl} target="_blank" rel="noopener noreferrer">
-                                                Abrir PDF
-                                            </a>
-                                        </Button>
-                                    </div>
-                                    <iframe 
-                                        src={movimiento.comprobanteUrl} 
-                                        className="w-full h-64 border rounded-md" 
-                                        title="Vista previa del soporte"
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                    <div className="col-span-1 sm:col-span-2 md:col-span-3 space-y-3 mt-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <Label className="text-xs font-semibold text-muted-foreground">Soporte adjunto</Label>
+                            {isEditing && comprobanteUrl && (
+                                <Button type="button" size="sm" variant="ghost" onClick={() => setComprobanteUrl("")}>
+                                    Quitar soporte
+                                </Button>
+                            )}
+                        </div>
+                        {comprobanteUrl && (
+                            <Card>
+                                <CardContent className="p-3 space-y-2">
+                                    <a href={comprobanteUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline inline-flex gap-2 items-center">
+                                        <ExternalLink className="h-4 w-4" /> Abrir documento
+                                    </a>
+                                    {/\\.(png|jpe?g|webp)(\\?|$)/i.test(comprobanteUrl) ? (
+                                        <img src={comprobanteUrl} alt="Soporte del movimiento" className="w-full max-h-72 object-contain rounded border" />
+                                    ) : (
+                                        <iframe src={comprobanteUrl} className="w-full h-64 border rounded" title="Vista previa del soporte" />
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                        {isEditing && (
+                            <div className="rounded-md border border-dashed p-3 space-y-2">
+                                <span className="text-xs text-muted-foreground flex items-center gap-2">
+                                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                    {comprobanteUrl ? "Reemplazar soporte" : "Adjuntar soporte"} (PDF o imagen, máximo 10 MB)
+                                </span>
+                                <Input type="file" accept=".pdf,image/jpeg,image/png,image/webp"
+                                    onChange={handleUploadSupport} disabled={isUploading} />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <DialogFooter className="flex justify-between sm:justify-between w-full">
                     {isEditing ? (
                         <>
                             <Button variant="outline" onClick={() => setIsEditing(false)}>Cancelar</Button>
-                            <Button onClick={handleSave}>Guardar Cambios</Button>
+                            <Button onClick={handleSave} disabled={isUploading}>Guardar Cambios</Button>
                         </>
                     ) : (
                         <div className="flex justify-end w-full gap-2">
