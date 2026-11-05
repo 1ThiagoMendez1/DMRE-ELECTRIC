@@ -710,7 +710,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         try {
             const saved = await updateObligacionFinancieraAction(updated.id, updated);
             setObligacionesFinancieras(prev => prev.map(o => o.id === saved.id ? saved : o));
-        } catch (error) { console.error("Error updating obligacion:", error); }
+        } catch (error) { console.error("Error updating obligacion:", error); throw error; }
     };
 
     const deleteObligacionFinanciera = async (id: string) => {
