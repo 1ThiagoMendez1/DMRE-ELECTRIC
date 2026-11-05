@@ -30,6 +30,8 @@ function mapToUI(db: any): CompraFinanciera {
         const cpRaw = db.cotizaciones_proveedor;
         cotizacionProveedor = {
             ...cpRaw,
+            proveedorId: cpRaw.proveedor_id,
+            proveedor: cpRaw.proveedor || undefined,
             fecha: new Date(cpRaw.fecha),
             items: [], // Map if needed
         } as unknown as CotizacionProveedor;
@@ -92,7 +94,8 @@ const COMPRA_SELECT = `
         clientes (id, nombre, documento, telefono, direccion)
     ),
     cotizaciones_proveedor (
-        id, numero, estado, fecha, observaciones
+        id, numero, estado, fecha, observaciones, proveedor_id,
+        proveedor:proveedores(id, nombre, nit)
     )
 `;
 
@@ -129,10 +132,14 @@ export async function createCompraAction(compra: Omit<CompraFinanciera, "id" | "
     }
 
     if (cuentaId && compra.valorPago && compra.valorPago > 0) {
+        const proveedor = data.cotizaciones_proveedor?.proveedor;
+        const tercero = proveedor?.nombre || "Proveedor no vinculado";
+        const nit = proveedor?.nit ? ` (NIT: ${proveedor.nit})` : "";
         const { error: movError } = await supabase.from("movimientos_financieros").insert({
             tipo: "EGRESO",
             categoria: "PROVEEDORES",
-            concepto: "Pago de Compra",
+            tercero,
+            concepto: `Pago de Compra ${compra.numeroFactura || data.numero_factura}${nit}`,
             descripcion: `Pago de factura ${compra.numeroFactura || data.numero_factura}`,
             valor: compra.valorPago,
             fecha: getSafeMiddayUTC(compra.fechaPago || compra.fecha),
@@ -141,12 +148,14 @@ export async function createCompraAction(compra: Omit<CompraFinanciera, "id" | "
 
         if (movError) {
             console.error("Error inserting movement:", movError);
+            throw new Error("Compra registrada, pero falló el movimiento bancario. No repita el pago: solicite conciliación.");
         }
 
-        await supabase.rpc("update_cuenta_saldo", {
+        const { error: saldoError } = await supabase.rpc("update_cuenta_saldo", {
             cuenta_uuid: cuentaId,
             delta_valor: -compra.valorPago
         });
+        if (saldoError) throw new Error("Compra y movimiento registrados, pero el saldo bancario requiere conciliación.");
     }
 
     revalidatePath("/dashboard/sistema/financiera");
