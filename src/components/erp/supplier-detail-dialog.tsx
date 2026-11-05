@@ -212,7 +212,7 @@ export function SupplierDetailDialog({ open, onOpenChange, proveedor }: Supplier
         // Items from supplier quotes
         matchingCotizaciones.forEach(cp => {
             cp.items?.forEach(item => {
-                addItemPoint(item.descripcion, item.valorUnitarioOfrecido, cp.fecha, `Cot. ${cp.numero}`);
+                addItemPoint(item.descripcion, item.valorUnitarioOfrecido ?? 0, cp.fecha, `Cot. ${cp.numero}`);
             });
         });
 
