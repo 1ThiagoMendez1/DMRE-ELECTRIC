@@ -237,6 +237,16 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const loadAllData = async () => {
         setIsLoading(true);
         try {
+            // Lanzar consultas independientes al mismo tiempo en lugar de encadenarlas.
+            const extrasPromise = Promise.all([
+                getTareasAction().catch(() => []),
+                getRolesWithPermissionsAction().catch(() => []),
+                getPermissionsAction().catch(() => []),
+                getCotizacionesProveedorAction().catch(() => []),
+                getConsumosResumenAction().catch(() => ({})),
+                getLiquidacionesAction().catch(() => []),
+                createClient().auth.getUser().catch(() => ({ data: { user: null } })),
+            ]);
             const data = await getInitialErpDataAction();
 
             // Set all states at once
@@ -261,29 +271,14 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setInstalaciones(data.instalaciones);
             setComprasFinanciera(data.comprasFinanciera);
 
-            // Fetch Control System Data and Others
-            const [agendaData, rolesData, permsData, cotProvData] = await Promise.all([
-                getTareasAction(),
-                getRolesWithPermissionsAction(),
-                getPermissionsAction(),
-                getCotizacionesProveedorAction()
-            ]);
+            const [agendaData, rolesData, permsData, cotProvData, consumosData, liqs, authResult] = await extrasPromise;
             setAgenda(agendaData);
             setRoles(rolesData);
             setPermissions(permsData);
             setCotizacionesProveedor(cotProvData);
-
-            // Load consumos resumen
-            const consumosData = await getConsumosResumenAction();
             setConsumosResumen(consumosData);
-
-            // Load liquidations separately for now to avoid breaking existing initial load structure if not updated there
-            const liqs = await getLiquidacionesAction();
             setLiquidacionesNomina(liqs);
-
-            // Set current user if logged in
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = authResult.data.user;
             if (user && data.users) {
                 const found = data.users.find((u: any) => u.id === user.id);
                 if (found) setCurrentUser(found);
