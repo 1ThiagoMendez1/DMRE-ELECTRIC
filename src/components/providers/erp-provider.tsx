@@ -385,13 +385,13 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const { id, ...rest } = factura;
             const saved = await createFacturaAction(rest as any);
             setFacturas(prev => [saved, ...prev]);
-        } catch (error) { console.error("Failed to add factura:", error); }
+        } catch (error) { console.error("Failed to add factura:", error); throw error; }
     };
     const updateFactura = async (updated: Factura) => {
         try {
             const saved = await updateFacturaAction(updated.id, updated);
             setFacturas(prev => prev.map(f => f.id === saved.id ? saved : f));
-        } catch (error) { console.error("Failed to update factura:", error); }
+        } catch (error) { console.error("Failed to update factura:", error); throw error; }
     };
 
     // COTIZACION ACTIONS
