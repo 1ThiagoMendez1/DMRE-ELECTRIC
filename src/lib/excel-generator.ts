@@ -15,6 +15,18 @@ export interface ExcelReportOptions {
     allMovimientos?: MovimientoFinanciero[];
 }
 
+// Mantener el día de registro al exportar fechas ISO o timestamps almacenados en UTC.
+function ledgerDate(value: Date | string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0) {
+        return format(new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12), "dd/MM/yyyy");
+    }
+    return new Intl.DateTimeFormat("es-CO", {
+        timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "numeric"
+    }).format(date);
+}
+
 export const generateExcelReport = async (
     movimientos: MovimientoFinanciero[],
     filters?: ExcelFilterState,
@@ -33,7 +45,9 @@ export const generateExcelReport = async (
         { header: '', key: 'fecha', width: 14 },
         { header: '', key: 'ingresos', width: 20 },
         { header: '', key: 'egresos', width: 20 },
-        { header: '', key: 'total', width: 22 }
+        { header: '', key: 'total', width: 22 },
+        { header: '', key: 'cuenta', width: 25 },
+        { header: '', key: 'retencion', width: 19 }
     ];
 
     // --- Cargar Logo ---
@@ -134,9 +148,10 @@ export const generateExcelReport = async (
     worksheet.getCell('F7').alignment = { horizontal: 'center' };
 
     // --- Cabeceras de Tabla (Fila 8) ---
-    const headers = ['DESCRIPCION INGRESOS Y GASTOS', 'NIT', 'FECHA', 'INGRESOS', 'EGRESOS', 'TOTAL'];
+    const headers = ['DESCRIPCION INGRESOS Y GASTOS', 'NIT', 'FECHA', 'INGRESOS', 'EGRESOS', 'TOTAL', 'CUENTA ORIGEN / DESTINO', 'RETENCIÓN'];
     const headerRow = worksheet.getRow(8);
     headerRow.values = headers;
+    headerRow.height = 32;
     
     headerRow.eachCell((cell) => {
         cell.font = { bold: true, size: 10 };
@@ -217,7 +232,7 @@ export const generateExcelReport = async (
     if (sortedMovimientos.length > 0) {
         currentRowIdx++;
         const initialRow = worksheet.addRow({});
-        const firstFechaStr = format(new Date(sortedMovimientos[0].fecha), 'd/MM/yyyy');
+        const firstFechaStr = ledgerDate(sortedMovimientos[0].fecha);
 
         initialRow.getCell('A').value = selectedCuenta 
             ? `SALDO ANTERIOR / INICIAL (${selectedCuenta.nombre})`
@@ -226,9 +241,9 @@ export const generateExcelReport = async (
         initialRow.getCell('B').value = '';
         initialRow.getCell('C').value = firstFechaStr;
         initialRow.getCell('C').alignment = { horizontal: 'center' };
-        initialRow.getCell('D').value = null;
+        initialRow.getCell('D').value = saldoInicialPeriodo;
         initialRow.getCell('E').value = null;
-        initialRow.getCell('F').value = saldoInicialPeriodo;
+        initialRow.getCell('F').value = { formula: `D${currentRowIdx}-E${currentRowIdx}`, result: saldoInicialPeriodo };
         initialRow.getCell('F').font = { bold: true };
 
         initialRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -238,7 +253,7 @@ export const generateExcelReport = async (
                 bottom: { style: 'thin' },
                 right: { style: 'thin' }
             };
-            if (colNumber >= 4) {
+            if ([4, 5, 6, 8].includes(colNumber)) {
                 cell.numFmt = '"$"#,##0.00;[Red]\-"$"#,##0.00';
             }
         });
@@ -272,10 +287,12 @@ export const generateExcelReport = async (
 
         row.getCell('A').value = `${concepto}${terceroText}${cuentaBadge}`;
         row.getCell('B').value = nit;
-        row.getCell('C').value = format(new Date(mov.fecha), 'd/MM/yyyy');
+        row.getCell('C').value = ledgerDate(mov.fecha);
         row.getCell('C').alignment = { horizontal: 'center' };
         row.getCell('D').value = isIngreso ? valor : null;
         row.getCell('E').value = !isIngreso ? valor : null;
+        row.getCell('G').value = mov.cuenta?.nombre || cuentas.find(c => c.id === mov.cuentaId)?.nombre || 'Sin cuenta';
+        row.getCell('H').value = Number((mov as MovimientoFinanciero & { retencion?: number }).retencion || 0);
 
         // Fórmula dinámica en Excel: Total anterior + Ingresos - Egresos
         const prevRowIdx = currentRowIdx - 1;
@@ -294,7 +311,7 @@ export const generateExcelReport = async (
             };
             
             // Formato de moneda para columnas numéricas
-            if (colNumber >= 4) { // D, E, F
+            if ([4, 5, 6, 8].includes(colNumber)) { // Montos COP
                 cell.numFmt = '"$"#,##0.00;[Red]\-"$"#,##0.00';
             }
         });
@@ -304,6 +321,10 @@ export const generateExcelReport = async (
     for (let i = 1; i <= 6; i++) {
         worksheet.getRow(i).height = 20;
     }
+
+    // Filtro de Excel por fecha, tercero, cuenta y retención, sin cambiar el orden de registro.
+    worksheet.autoFilter = { from: { row: 8, column: 1 }, to: { row: Math.max(8, currentRowIdx), column: 8 } };
+    worksheet.views = [{ state: "frozen", ySplit: 8 }];
 
     // Generar archivo
     const buffer = await workbook.xlsx.writeBuffer();
