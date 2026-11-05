@@ -54,6 +54,7 @@ import { CreateSupplierDialog } from "@/components/erp/create-supplier-dialog";
 import { SupplierDetailDialog } from "@/components/erp/supplier-detail-dialog";
 import { DotacionDetailDialog } from "@/components/erp/dotacion-detail-dialog";
 import { NewEntregaDialog } from "@/components/erp/new-entrega-dialog";
+import { CreateDotacionItemDialog } from "@/components/erp/create-dotacion-item-dialog";
 import { SuministroDashboard } from "@/components/erp/suministro-dashboard";
 import { ActivosDashboard } from "@/components/erp/activos-dashboard";
 import { DotacionMetricsDashboard } from "@/components/erp/dotacion-metrics-dashboard";
@@ -104,6 +105,7 @@ export default function LogisticaPage() {
         addGastoVehiculo,
         updateCuentaPorPagar,
         addEntregaDotacion,
+        addDotacionItem,
         updateDotacionItem,
         addInventarioItem,
         updateInventarioItem,
@@ -614,32 +616,17 @@ export default function LogisticaPage() {
                                 {dotacionItems.length} tipos de dotación
                             </Badge>
                         </div>
-                        <NewEntregaDialog
-                            items={dotacionItems}
-                            empleados={empleados}
-                            onSave={(ent) => {
-                                addEntregaDotacion(ent);
-                                const updatedItems = dotacionItems.map(item => {
-                                    if (item.id === ent.items[0].dotacionId) {
-                                        const newItem = {
-                                            ...item,
-                                            variantes: item.variantes.map(v =>
-                                                v.id === ent.items[0].varianteId
-                                                    ? { ...v, cantidadDisponible: v.cantidadDisponible - ent.items[0].cantidad }
-                                                    : v
-                                            )
-                                        };
-                                        updateDotacionItem(newItem);
-                                        return newItem;
-                                    }
-                                    return item;
-                                });
-                                toast({
-                                    title: "Dotación Asignada",
-                                    description: "La dotación deberá ser aceptada por el empleado antes de marcarse como entregada."
-                                });
-                            }}
-                        />
+                        <div className="flex flex-wrap gap-2">
+                            <CreateDotacionItemDialog onCreated={addDotacionItem} />
+                            <NewEntregaDialog
+                                items={dotacionItems}
+                                empleados={empleados}
+                                onSave={async (entrega) => {
+                                    await addEntregaDotacion(entrega);
+                                    toast({ title: "Dotación asignada", description: "La entrega quedó registrada y el inventario fue actualizado." });
+                                }}
+                            />
+                        </div>
                     </div>
 
                     <div className="grid gap-6 md:grid-cols-2">
