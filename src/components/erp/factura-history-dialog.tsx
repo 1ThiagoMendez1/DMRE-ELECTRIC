@@ -113,6 +113,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
 
     // Retención y descripción al marcar como PAGADA
     const [retencionMonto, setRetencionMonto] = useState<string>(factura.retencionRenta ? factura.retencionRenta.toString() : "");
+    const [retencionIcaMonto, setRetencionIcaMonto] = useState<string>(String(factura.retencionIca || ""));
+    const [retencionIvaMonto, setRetencionIvaMonto] = useState<string>(String(factura.retencionIva || ""));
     const [descripcionRetencion, setDescripcionRetencion] = useState<string>(factura.observaciones || "");
     const [isRetentionModalOpen, setIsRetentionModalOpen] = useState(false);
     const [isSubmittingEstado, setIsSubmittingEstado] = useState(false);
@@ -129,6 +131,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         setAbonoMonto("");
         setAdelantoMonto("");
         setRetencionMonto(factura.retencionRenta ? factura.retencionRenta.toString() : "");
+        setRetencionIcaMonto(String(factura.retencionIca || ""));
+        setRetencionIvaMonto(String(factura.retencionIva || ""));
         setDescripcionRetencion(factura.observaciones || "");
 
         setEditNumero(factura.numero || factura.id);
@@ -266,13 +270,19 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
     const handleConfirmarPagoConRetencion = async () => {
         setIsSubmittingEstado(true);
         try {
-            const retencion = parseFloat(retencionMonto) || 0;
+            const renta = parseFloat(retencionMonto) || 0;
+            const ica = parseFloat(retencionIcaMonto) || 0;
+            const reteiva = parseFloat(retencionIvaMonto) || 0;
+            const retencion = renta + ica + reteiva;
+            if (retencion < 0 || retencion > factura.valorFacturado) throw new Error("La retención no puede superar el valor facturado.");
             const nuevoNeto = Math.max(0, factura.valorFacturado - retencion);
 
             const updatedInvoice: Factura = {
                 ...factura,
                 estado: 'PAGADA',
-                retencionRenta: retencion,
+                retencionRenta: renta,
+                retencionIca: ica,
+                retencionIva: reteiva,
                 saldoPendiente: 0,
                 valorPagado: nuevoNeto,
                 observaciones: descripcionRetencion.trim() || factura.observaciones,
@@ -718,7 +728,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                     {/* Input de Retención con formato de moneda */}
                     <div className="space-y-1.5">
                         <Label htmlFor="retencion-input" className="text-xs font-semibold">
-                            Retención de Factura
+                            Retención en la fuente (COP)
                         </Label>
                         <div className="relative">
                             <Input
@@ -734,8 +744,21 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                             />
                         </div>
                         <p className="text-[11px] text-muted-foreground">
-                            Ingrese el valor retenido en la factura (ReteFuente, ReteICA, ReteIVA). Si no aplica retención, déjelo en $ 0.
+                            Ingrese cada tipo de retención por separado para conservar su desglose tributario.
                         </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <Label htmlFor="reteica-input" className="text-xs">ReteICA (COP)</Label>
+                            <Input id="reteica-input" type="number" step="0.01" min="0" value={retencionIcaMonto}
+                                onChange={e => setRetencionIcaMonto(e.target.value)} placeholder="0.00" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="reteiva-input" className="text-xs">ReteIVA (COP)</Label>
+                            <Input id="reteiva-input" type="number" step="0.01" min="0" value={retencionIvaMonto}
+                                onChange={e => setRetencionIvaMonto(e.target.value)} placeholder="0.00" />
+                        </div>
                     </div>
 
                     {/* Resumen de Valores en tiempo real */}
@@ -747,14 +770,14 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                         <div className="flex justify-between text-amber-600 dark:text-amber-400">
                             <span>Retención Descontada:</span>
                             <span className="font-semibold font-mono">
-                                -{formatCurrency(parseFloat(retencionMonto) || 0)}
+                                -{formatCurrency((parseFloat(retencionMonto) || 0) + (parseFloat(retencionIcaMonto) || 0) + (parseFloat(retencionIvaMonto) || 0))}
                             </span>
                         </div>
                         <Separator />
                         <div className="flex justify-between font-bold text-sm text-green-600 dark:text-green-400 pt-0.5">
                             <span>Neto Recibido / Pagado:</span>
                             <span className="font-mono">
-                                {formatCurrency(Math.max(0, factura.valorFacturado - (parseFloat(retencionMonto) || 0)))}
+                                {formatCurrency(Math.max(0, factura.valorFacturado - ((parseFloat(retencionMonto) || 0) + (parseFloat(retencionIcaMonto) || 0) + (parseFloat(retencionIvaMonto) || 0))))}
                             </span>
                         </div>
                     </div>
