@@ -104,7 +104,7 @@ export interface CotizacionItem {
     cantidadFinal?: number; // Cantidad realmente ejecutada (puede diferir de la ofertada)
 }
 
-export type EstadoCotizacion = 'BORRADOR' | 'EN_REVISION' | 'ENVIADA' | 'APROBADA' | 'RECHAZADA' | 'MODIFICACION';
+export type EstadoCotizacion = 'BORRADOR' | 'EN_REVISION' | 'ENVIADA' | 'APROBADA' | 'RECHAZADA' | 'MODIFICACION' | 'EN_EJECUCION' | 'FINALIZADA';
 export type TipoOferta = 'NORMAL' | 'SIMPLIFICADA';
 
 export interface Cotizacion {
