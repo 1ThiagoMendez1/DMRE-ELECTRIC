@@ -364,7 +364,7 @@ export function EmployeeDetailDialog({
                                                     </TableCell>
                                                     <TableCell>{nov.cantidad}</TableCell>
                                                     <TableCell className={nov.efecto === 'RESTA' ? "text-red-500" : "text-green-600"}>
-                                                        {nov.efecto === 'RESTA' ? '-' : '+'}{formatCurrency(nov.valorCalculado)}
+                                                        {nov.efecto === 'RESTA' ? '-' : '+'}{formatCurrency(nov.valorCalculado ?? 0)}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
