@@ -732,7 +732,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setComprasFinanciera(prev => [saved, ...prev]);
             await loadAllData(); // Refresh to update movimientos and cuentas
             toast({ title: "Compra registrada", description: "La compra ha sido guardada exitosamente." });
-        } catch (error) { console.error("Error adding compra:", error); }
+        } catch (error) { console.error("Error adding compra:", error); throw error; }
     };
 
     const updateCompraFinanciera = async (id: string, compra: Partial<CompraFinanciera>) => {
@@ -740,7 +740,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const saved = await updateCompraAction(id, compra);
             setComprasFinanciera(prev => prev.map(c => c.id === id ? saved : c));
             toast({ title: "Compra actualizada", description: "Los cambios han sido guardados." });
-        } catch (error) { console.error("Error updating compra:", error); }
+        } catch (error) { console.error("Error updating compra:", error); throw error; }
     };
 
     const deleteCompraFinanciera = async (id: string) => {
