@@ -459,7 +459,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                                 form.setValue("iva", 0);
                                                             }
                                                             if ('identificacion' in emp && emp.identificacion) {
-                                                                form.setValue("identificacion", emp.identificacion);
+                                                                form.setValue("identificacion", String(emp.identificacion));
                                                             }
                                                             // Opcionalmente pre-llenar concepto si está vacío
                                                             if (!form.getValues("concepto")) {
