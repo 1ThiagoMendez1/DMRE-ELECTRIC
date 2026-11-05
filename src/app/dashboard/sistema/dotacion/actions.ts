@@ -34,6 +34,7 @@ function mapDotacionItemToDB(ui: Partial<DotacionItem>) {
         categoria: ui.categoria,
         genero: ui.genero,
         activo: ui.activo ?? true,
+        stock_minimo: ui.stockMinimo,
     };
 }
 
@@ -83,19 +84,28 @@ export async function createDotacionItemAction(item: Omit<DotacionItem, "id">): 
         throw new Error("Failed to create dotacion_item");
     }
 
-    // Insert variantes if any
-    if (item.variantes && item.variantes.length > 0) {
-        const variantesData = item.variantes.map(v => ({
-            dotacion_id: data.id,
-            talla: v.talla,
-            color: v.color,
-            cantidad_disponible: v.cantidadDisponible,
-        }));
-        await supabase.from("dotacion_variantes").insert(variantesData);
+    // Guardar variantes y devolver sus IDs reales para poder registrar entregas.
+    let variantes: any[] = [];
+    if (item.variantes?.length) {
+        const { data: inserted, error: variantError } = await supabase
+            .from("dotacion_variantes")
+            .insert(item.variantes.map(v => ({
+                dotacion_id: data.id,
+                talla: v.talla,
+                color: v.color,
+                cantidad_disponible: v.cantidadDisponible,
+            })))
+            .select("*");
+        if (variantError) {
+            console.error("Error creando variantes de dotación:", variantError);
+            throw new Error("El artículo fue creado, pero no se guardaron sus variantes. Revise el inventario.");
+        }
+        variantes = inserted || [];
     }
 
     revalidatePath("/dashboard/sistema/dotacion");
-    return mapDotacionItemToUI(data, item.variantes || []);
+    revalidatePath("/dashboard/sistema/logistica");
+    return mapDotacionItemToUI(data, variantes);
 }
 
 export async function updateDotacionItemAction(id: string, item: Partial<DotacionItem>): Promise<DotacionItem> {
@@ -114,8 +124,29 @@ export async function updateDotacionItemAction(id: string, item: Partial<Dotacio
         throw new Error("Failed to update dotacion_item");
     }
 
+    if (item.variantes) {
+        for (const variante of item.variantes) {
+            const payload = {
+                dotacion_id: id,
+                talla: variante.talla,
+                color: variante.color,
+                cantidad_disponible: variante.cantidadDisponible,
+            };
+            if (variante.id) {
+                const { error: variantError } = await supabase.from("dotacion_variantes")
+                    .update(payload).eq("id", variante.id).eq("dotacion_id", id);
+                if (variantError) throw new Error("No fue posible actualizar la existencia de la variante.");
+            } else {
+                const { error: variantError } = await supabase.from("dotacion_variantes").insert(payload);
+                if (variantError) throw new Error("No fue posible añadir la variante.");
+            }
+        }
+    }
+    const { data: variantes, error: variantesError } = await supabase.from("dotacion_variantes").select("*").eq("dotacion_id", id);
+    if (variantesError) throw new Error("No fue posible actualizar el inventario de dotación.");
     revalidatePath("/dashboard/sistema/dotacion");
-    return mapDotacionItemToUI(data, item.variantes || []);
+    revalidatePath("/dashboard/sistema/logistica");
+    return mapDotacionItemToUI(data, variantes || []);
 }
 
 // =============================================
@@ -190,6 +221,20 @@ export async function getEntregasDotacionAction(): Promise<EntregaDotacion[]> {
 export async function createEntregaDotacionAction(entrega: Omit<EntregaDotacion, "id">): Promise<EntregaDotacion> {
     const supabase = await createClient();
 
+    if (!entrega.empleadoId || !entrega.items?.length) throw new Error("Seleccione un empleado y al menos un artículo.");
+    // Prevalidar el inventario antes de crear el comprobante de entrega.
+    for (const item of entrega.items) {
+        if (!item.varianteId || !Number.isInteger(item.cantidad) || item.cantidad <= 0)
+            throw new Error("Cantidad o variante de dotación inválida.");
+        const { data: stock, error: stockError } = await supabase
+            .from("dotacion_variantes").select("dotacion_id, cantidad_disponible")
+            .eq("id", item.varianteId).single();
+        if (stockError || !stock || stock.dotacion_id !== item.dotacionId)
+            throw new Error("No se encontró la variante seleccionada.");
+        if (Number(stock.cantidad_disponible) < item.cantidad)
+            throw new Error("Stock insuficiente: actualice las existencias antes de asignar la dotación.");
+    }
+
     const { data, error } = await supabase
         .from("entregas_dotacion")
         .insert({
@@ -218,31 +263,30 @@ export async function createEntregaDotacionAction(entrega: Omit<EntregaDotacion,
             color: i.detalle?.split(" - ")[1],
         }));
 
-        await supabase.from("entrega_dotacion_items").insert(itemsData);
+        const { error: itemsError } = await supabase.from("entrega_dotacion_items").insert(itemsData);
+        if (itemsError) throw new Error("No se pudieron guardar los detalles de la entrega.");
 
         // Deduct Stock
         for (const item of entrega.items) {
             if (item.varianteId) {
-                // Get current stock
-                const { data: variantData } = await supabase
+                const { data: variantData, error: readError } = await supabase
+                    .from("dotacion_variantes").select("cantidad_disponible")
+                    .eq("id", item.varianteId).single();
+                if (readError || !variantData || Number(variantData.cantidad_disponible) < item.cantidad)
+                    throw new Error("No hay existencia suficiente para completar la entrega.");
+                const { data: changed, error: updateError } = await supabase
                     .from("dotacion_variantes")
-                    .select("cantidad_disponible")
+                    .update({ cantidad_disponible: Number(variantData.cantidad_disponible) - item.cantidad })
                     .eq("id", item.varianteId)
-                    .single();
-
-                if (variantData) {
-                    const newStock = Math.max(0, Number(variantData.cantidad_disponible) - Number(item.cantidad));
-                    await supabase
-                        .from("dotacion_variantes")
-                        .update({ cantidad_disponible: newStock })
-                        .eq("id", item.varianteId);
-                }
+                    .gte("cantidad_disponible", item.cantidad)
+                    .select("id").maybeSingle();
+                if (updateError || !changed) throw new Error("El stock cambió durante la entrega. Vuelva a intentarlo.");
             }
         }
     }
 
     revalidatePath("/dashboard/sistema/dotacion");
-    return mapEntregaToUI(data, undefined, entrega.items || []);
+    return { ...entrega, id: data.id };
 }
 export async function updateEntregaDotacionAction(id: string, updates: Partial<EntregaDotacion>): Promise<EntregaDotacion> {
     const supabase = await createClient();
