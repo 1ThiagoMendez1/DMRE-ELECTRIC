@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Search, AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Calendar } from "lucide-react";
+import { Search, AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Calendar, FileDown } from "lucide-react";
 
 import {
     Card,
@@ -32,12 +32,14 @@ import { useErp } from "@/components/providers/erp-provider";
 import { useToast } from "@/hooks/use-toast";
 import { Factura, CuentaBancaria } from "@/types/sistema";
 import { formatCurrency, cn } from "@/lib/utils";
+import { exportFacturasExcel } from "@/lib/facturas-excel";
 
 export function BillingModule() {
     const { facturas, addFactura, updateFactura, cotizaciones, cuentasBancarias } = useErp();
     const { toast } = useToast();
     const [invoiceSearch, setInvoiceSearch] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
+    const [isExporting, setIsExporting] = useState(false);
     const [facturasFilter, setFacturasFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("NORMAL");
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
         vencidas: false,
@@ -141,9 +143,9 @@ export function BillingModule() {
         toast({ title: "Factura Creada", description: `Factura ${newInvoice.numero || newInvoice.id} creada correctamente.` });
     };
 
-    const handleInvoiceUpdate = (updated: Factura) => {
-        updateFactura(updated);
-        toast({ title: "Factura Actualizada", description: `Factura ${updated.numero || updated.id} actualizada correctamente.` });
+    const handleInvoiceUpdate = async (updated: Factura) => {
+        await updateFactura(updated);
+        toast({ title: "Factura actualizada", description: `Factura ${updated.numero || updated.id} guardada.` });
     };
 
     // Overdue Check (Run once or when facturas change)
@@ -182,6 +184,16 @@ export function BillingModule() {
                             </TabsList>
                         </Tabs>
                         <Input type="month" value={monthFilter} aria-label="Filtrar facturas por mes" onChange={e => setMonthFilter(e.target.value)} className="w-full sm:w-40" />
+                        <Button type="button" variant="outline" disabled={isExporting} className="gap-2" onClick={async () => {
+                            setIsExporting(true);
+                            try {
+                                await exportFacturasExcel(filteredFacturas, monthFilter);
+                                toast({ title: "Excel generado", description: "El archivo contiene las facturas del filtro aplicado." });
+                            } catch (error) {
+                                console.error(error);
+                                toast({ variant: "destructive", title: "Error exportando", description: error instanceof Error ? error.message : "Compruebe los datos." });
+                            } finally { setIsExporting(false); }
+                        }}><FileDown className="h-4 w-4" /> {isExporting ? "Exportando..." : "Exportar Excel"}</Button>
                         <FacturarTrabajosDialog
                             onFacturaCreated={handleCreateInvoice}
                             nextId={nextInvoiceId}
