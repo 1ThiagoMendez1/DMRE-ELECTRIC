@@ -7,11 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { mockClients, mockQuotes } from "@/lib/data";
 import { ArrowLeft, FileDown } from "lucide-react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
-export default function QuoteDetailsPage({ params }: { params: { id: string }}) {
+export default function QuoteDetailsPage() {
+    const params = useParams<{ id: string }>();
     const quote = mockQuotes.find(q => q.id === params.id);
     const client = mockClients.find(c => c.name === quote?.client);
 
