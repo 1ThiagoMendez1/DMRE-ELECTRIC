@@ -71,7 +71,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { initialClients, initialQuotes, initialFacturas } from "@/lib/mock-data";
-import { EstadoCotizacion } from "@/types/sistema";
+import { EstadoCotizacion, Cotizacion } from "@/types/sistema";
 import { CreateClientDialog } from "@/components/erp/create-client-dialog";
 import { CreateProjectDialog } from "@/components/erp/create-project-dialog";
 import { EditClientDialog } from "@/components/erp/edit-client-dialog";
