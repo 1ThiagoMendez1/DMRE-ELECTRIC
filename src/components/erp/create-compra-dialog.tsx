@@ -79,6 +79,7 @@ interface CreateCompraDialogProps {
 export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
     const [open, setOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [ivaManual, setIvaManual] = useState(false);
     const [soporteUrl, setSoporteUrl] = useState<string | "">(compra?.soporteUrl || "");
     const [fileName, setFileName] = useState<string | "">(compra?.soporteUrl ? "Soporte cargado" : "");
     const { toast } = useToast();
@@ -132,6 +133,17 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
         }
     }, [compra, open, form]);
 
+    // IVA calculado por defecto con opción de sobrescribirlo cuando aplique otra tarifa.
+    useEffect(() => {
+        const subscription = form.watch((values, meta) => {
+            if (meta.name === "valorFactura" && !ivaManual && !compra) {
+                const base = Number(values.valorFactura) || 0;
+                form.setValue("iva", (Math.round(base * 0.19 * 100) / 100).toFixed(2));
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, [form, ivaManual, compra]);
+
     const onSubmit = async (values: z.infer<typeof compraSchema>) => {
         const data = {
             cotizacionId: values.cotizacionId === "sin_oferta" ? undefined : (values.cotizacionId || undefined),
@@ -156,6 +168,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                 await addCompraFinanciera(data);
             }
             setOpen(false);
+            setIvaManual(false);
             if (!compra) {
                 form.reset();
                 setSoporteUrl("");
@@ -333,7 +346,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                                     </Button>
                                                 </FormControl>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
+                                            <PopoverContent className="w-auto max-w-[calc(100vw-2rem)] p-0 overflow-x-auto" align="start">
                                                 <Calendar
                                                     mode="single"
                                                     selected={field.value}
@@ -341,6 +354,10 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                                     disabled={(date) =>
                                                         date > new Date() || date < new Date("1900-01-01")
                                                     }
+                                                    captionLayout="dropdown-buttons"
+                                                    fromYear={2015}
+                                                    toYear={2036}
+                                                    className="max-w-full"
                                                     initialFocus
                                                 />
                                             </PopoverContent>
@@ -359,7 +376,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                     <FormItem>
                                         <FormLabel>Valor de la Factura</FormLabel>
                                         <FormControl>
-                                            <Input type="number" placeholder="0.00" {...field} />
+                                            <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -371,9 +388,9 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                 name="iva"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>IVA</FormLabel>
+                                        <div className="flex justify-between items-center gap-2"><FormLabel>IVA (19% automático)</FormLabel><Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setIvaManual(false); form.setValue("iva", (Math.round((Number(form.getValues("valorFactura")) || 0) * 19) / 100).toFixed(2)); }}>Recalcular 19%</Button></div>
                                         <FormControl>
-                                            <Input type="number" placeholder="0.00" {...field} />
+                                            <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} onChange={e => { setIvaManual(true); field.onChange(e); }} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
