@@ -27,11 +27,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Button } from './ui/button';
-import { LogOut } from 'lucide-react';
 import { dashboardNavItems, systemNavItems } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import Image from 'next/image';
 import { ThemeToggle } from './theme-toggle';
 import { NotificationCenter } from './notification-center';
@@ -41,12 +38,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { currentUser, logout, isLoading } = useErp();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
   return (
     <SidebarProvider defaultOpen={false}>
       <Sidebar collapsible="icon">
@@ -107,29 +98,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter>
-          <div className="flex items-center gap-3 p-2 rounded-md bg-secondary/50 mx-2 group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:bg-transparent">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
-              <AvatarFallback>AD</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col group-data-[collapsible=icon]:hidden overflow-hidden">
-              <span className="text-sm font-semibold truncate">Admin</span>
-              <span className="text-xs text-muted-foreground truncate">admin@dmre.co</span>
-            </div>
-          </div>
-          {mounted ? (
-            <Button
-              variant="ghost"
-              onClick={logout}
-              className="w-full justify-start gap-2 mt-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
-            </Button>
-          ) : (
-            <div className="h-10 w-full" /> // Placeholder to keep layout stable
-          )}
+        <SidebarFooter className="p-2">
+          <AccountMenu />
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
@@ -151,6 +121,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </span>
             <NotificationCenter />
             <ThemeToggle />
+            <AccountMenu compact />
           </div>
         </header>
         <div className="flex-1 p-4 sm:p-6 lg:p-8 pt-6 w-full max-w-full min-w-0">
