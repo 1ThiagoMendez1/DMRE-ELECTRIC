@@ -237,7 +237,48 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const loadAllData = async () => {
         setIsLoading(true);
         try {
-            // Lanzar consultas independientes al mismo tiempo en lugar de encadenarlas.
+            // La identidad y su menú se cargan independientemente del ERP completo.
+            // No exponer navegación hasta comprobar la sesión y los permisos de ese usuario.
+            const authPromise = (async () => {
+                try {
+                    const supabase = createClient();
+                    const { data: { user }, error } = await supabase.auth.getUser();
+                    if (error || !user) return null;
+                    const { data: profile } = await supabase.from("profiles")
+                        .select("id, full_name, email, role, sidebar_access, avatar_url, is_active")
+                        .eq("id", user.id).maybeSingle();
+                    if (profile) {
+                        setCurrentUser({
+                            id: profile.id,
+                            name: profile.full_name || user.email || "Usuario",
+                            email: profile.email || user.email || "",
+                            role: profile.role,
+                            sidebarAccess: profile.sidebar_access || [],
+                            avatar: profile.avatar_url || "",
+                            isActive: profile.is_active !== false,
+                        });
+                    }
+
+                    // Datos de sesión exclusivamente del usuario autenticado.
+                    // El cache del dashboard nunca debe compartirse entre distintas cuentas.
+                    try {
+                        const saved = sessionStorage.getItem(`erp_dashboard_${user.id}`);
+                        if (saved) {
+                            const cache = JSON.parse(saved);
+                            if (Date.now() - cache.time < 10 * 60 * 1000) {
+                                if (Array.isArray(cache.cotizaciones)) setCotizaciones(cache.cotizaciones.map((q: any) => ({ ...q, fecha: new Date(q.fecha) })));
+                                if (Array.isArray(cache.facturas)) setFacturas(cache.facturas.map((f: any) => ({ ...f, fechaEmision: new Date(f.fechaEmision) })));
+                                if (Array.isArray(cache.clientes)) setClientes(cache.clientes);
+                                if (Array.isArray(cache.inventario)) setInventario(cache.inventario);
+                            } else sessionStorage.removeItem(`erp_dashboard_${user.id}`);
+                        }
+                    } catch { /* si el navegador rechaza el caché, cargamos desde Supabase */ }
+                    return user;
+                } catch (error) {
+                    console.warn("No fue posible precargar la cuenta:", error);
+                    return null;
+                }
+            })();
             const extrasPromise = Promise.all([
                 getTareasAction().catch(() => []),
                 getRolesWithPermissionsAction().catch(() => []),
@@ -245,7 +286,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 getCotizacionesProveedorAction().catch(() => []),
                 getConsumosResumenAction().catch(() => ({})),
                 getLiquidacionesAction().catch(() => []),
-                createClient().auth.getUser().catch(() => ({ data: { user: null } })),
+                authPromise,
             ]);
             const data = await getInitialErpDataAction();
 
@@ -271,17 +312,27 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setInstalaciones(data.instalaciones);
             setComprasFinanciera(data.comprasFinanciera);
 
-            const [agendaData, rolesData, permsData, cotProvData, consumosData, liqs, authResult] = await extrasPromise;
+            // Mostrar cifras apenas se reciben, sin esperar agenda, permisos ni otras vistas.
+            setIsLoading(false);
+            const [agendaData, rolesData, permsData, cotProvData, consumosData, liqs, user] = await extrasPromise;
             setAgenda(agendaData);
             setRoles(rolesData);
             setPermissions(permsData);
             setCotizacionesProveedor(cotProvData);
             setConsumosResumen(consumosData);
             setLiquidacionesNomina(liqs);
-            const user = authResult.data.user;
             if (user && data.users) {
                 const found = data.users.find((u: any) => u.id === user.id);
-                if (found) setCurrentUser(found);
+                if (found) setCurrentUser(prev => prev?.id === user.id ? prev : found);
+                try {
+                    sessionStorage.setItem(`erp_dashboard_${user.id}`, JSON.stringify({
+                        time: Date.now(),
+                        cotizaciones: data.cotizaciones,
+                        facturas: data.facturas,
+                        clientes: data.clientes,
+                        inventario: data.inventario,
+                    }));
+                } catch { /* Cache opcional, nunca impedir el uso de la aplicación */ }
             }
 
         } catch (error) {
@@ -292,55 +343,15 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     };
 
 
-    // Hydration from LocalStorage for instant UI
     useEffect(() => {
-        const keys = [
-            'clientes', 'proveedores', 'inventario', 'codigosTrabajo',
-            'vehiculos', 'cotizaciones', 'facturas', 'empleados'
-        ];
-
+        // Limpiar caché global legado: podía reutilizar cifras de otra cuenta.
         try {
-            const cachedCotizaciones = localStorage.getItem('erp_cache_cotizaciones');
-            if (cachedCotizaciones) {
-                const parsed = JSON.parse(cachedCotizaciones);
-                // Convert string dates back to Date objects
-                setCotizaciones(parsed.map((c: any) => ({ ...c, fecha: new Date(c.fecha) })));
-            }
-
-            const cachedInventario = localStorage.getItem('erp_cache_inventario');
-            if (cachedInventario) setInventario(JSON.parse(cachedInventario));
-
-            const cachedClientes = localStorage.getItem('erp_cache_clientes');
-            if (cachedClientes) setClientes(JSON.parse(cachedClientes));
-
-            // ... add others as needed for critical modules
-        } catch (e) {
-            console.warn("Hydration failed:", e);
-        }
-
-        loadAllData();
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith("erp_cache_")) localStorage.removeItem(key);
+            });
+        } catch { /* navegadores con almacenamiento bloqueado */ }
+        void loadAllData();
     }, []);
-
-    // Persistence Effect
-    useEffect(() => {
-        const cacheData = {
-            cotizaciones,
-            inventario,
-            clientes,
-            proveedores,
-            vehiculos,
-            facturas,
-            empleados,
-            cuentasBancarias,
-            comprasFinanciera
-        };
-
-        Object.entries(cacheData).forEach(([key, value]) => {
-            if (value && value.length > 0) {
-                localStorage.setItem(`erp_cache_${key}`, JSON.stringify(value));
-            }
-        });
-    }, [cotizaciones, inventario, clientes, proveedores, vehiculos, facturas, empleados, cuentasBancarias]);
 
     // Realtime Subscriptions
     useEffect(() => {
@@ -975,9 +986,10 @@ export function ErpProvider({ children }: { children: ReactNode }) {
 
             // Clear ERP related cache
             Object.keys(localStorage).forEach(key => {
-                if (key.startsWith('erp_cache_')) {
-                    localStorage.removeItem(key);
-                }
+                if (key.startsWith('erp_cache_')) localStorage.removeItem(key);
+            });
+            Object.keys(sessionStorage).forEach(key => {
+                if (key.startsWith('erp_dashboard_')) sessionStorage.removeItem(key);
             });
 
             // Force redirect to login
