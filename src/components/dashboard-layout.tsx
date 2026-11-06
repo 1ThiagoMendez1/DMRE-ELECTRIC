@@ -34,11 +34,10 @@ import { ThemeToggle } from './theme-toggle';
 import { NotificationCenter } from './notification-center';
 import { AccountMenu } from './account-menu';
 import { useErp } from "@/components/providers/erp-provider";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentUser, logout, isLoading } = useErp();
+  const { currentUser } = useErp();
   return (
     <SidebarProvider defaultOpen={false}>
       <Sidebar collapsible="icon">
@@ -58,16 +57,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <SidebarMenuItem key={`skeleton-${i}`}>
-                      <div className="flex w-full items-center gap-2 overflow-hidden rounded-md p-2">
-                        <Skeleton className="h-4 w-4 shrink-0" />
-                        <Skeleton className="h-4 w-24" />
-                      </div>
-                    </SidebarMenuItem>
-                  ))
-                ) : (
+                {currentUser ? (
                   systemNavItems.map((item) => {
                     // Check permissions
                     const hasAccess = currentUser?.role === 'ADMIN' || currentUser?.sidebarAccess?.includes(item.id);
@@ -94,7 +84,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       </SidebarMenuItem>
                     );
                   })
-                )}
+                ) : null}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
