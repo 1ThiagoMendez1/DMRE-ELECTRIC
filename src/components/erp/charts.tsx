@@ -33,7 +33,7 @@ import {
     CardTitle
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon, Table as TableIcon } from "lucide-react";
+import { BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon, Table as TableIcon, DatabaseZap, RefreshCcw } from "lucide-react";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
@@ -44,6 +44,8 @@ export const DynamicChart = ({
     xAxisKey,
     height = 300,
     color = "#0088FE",
+    loading = false,
+    error = false,
 }: {
     type: string,
     data: any[],
@@ -51,8 +53,41 @@ export const DynamicChart = ({
     xAxisKey?: string,
     height?: number,
     color?: string,
+    loading?: boolean,
+    error?: boolean,
 }) => {
-    if (!data || data.length === 0) return <div className="flex h-full items-center justify-center text-muted-foreground">No data available</div>;
+    // Nunca mostrar «No data available» cuando el backend aún no ha respondido.
+    // Mantener el espacio del gráfico reservado evita saltos bruscos de diseño.
+    if ((!data || data.length === 0) && loading) return (
+        <div className="relative flex w-full flex-col justify-end overflow-hidden rounded-lg" style={{ height }} aria-label="Sincronizando datos del gráfico" aria-busy="true">
+            <div className="absolute inset-0 flex flex-col justify-end gap-4 px-5 pb-7 pt-8">
+                <div className="absolute inset-x-5 top-1/4 border-t border-dashed border-border/50" />
+                <div className="absolute inset-x-5 top-1/2 border-t border-dashed border-border/50" />
+                <div className="absolute inset-x-5 top-3/4 border-t border-dashed border-border/50" />
+                <div className="relative flex h-[75%] items-end justify-around gap-4">
+                    {[44, 72, 58, 87, 54, 79, 62].map((pct, i) => (
+                        <div key={i} className="h-full min-w-0 flex-1 flex items-end">
+                            <div className="w-full rounded-t-md bg-gradient-to-t from-primary/20 via-primary/10 to-primary/[.04] animate-pulse"
+                                style={{ height: `${pct}%`, animationDelay: `${i * 110}ms` }} />
+                        </div>
+                    ))}
+                </div>
+                <div className="relative flex justify-between gap-5">
+                    {[0, 1, 2, 3, 4, 5, 6].map(i => (
+                        <div key={i} className="h-1.5 flex-1 rounded-full bg-muted/65 animate-pulse" />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+    if (!data || data.length === 0) return (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-lg text-center text-muted-foreground" style={{ height }}>
+            {error ? <RefreshCcw className="h-6 w-6 opacity-50" /> : <DatabaseZap className="h-6 w-6 opacity-50" />}
+            <span className="max-w-[260px] text-sm">
+                {error ? "No pudimos actualizar este gráfico. Vuelve a intentarlo." : "Todavía no hay registros para mostrar."}
+            </span>
+        </div>
+    );
 
     if (type === 'table') {
         const keys = Object.keys(data[0]).filter(k => k !== 'fill' && k !== 'name' && k !== 'id'); // basic filter
