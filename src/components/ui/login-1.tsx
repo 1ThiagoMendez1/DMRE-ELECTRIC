@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, CheckCircle2, Eye, EyeOff,
@@ -13,7 +13,8 @@ import {
 
 export default function StartLoginOne() {
   const router = useRouter();
-  const params = useSearchParams();
+  const [linkError, setLinkError] = useState(false);
+  useEffect(() => { setLinkError(new URLSearchParams(window.location.search).has("error")); }, []);
   const supabase = useMemo(() => createClient(), []);
   const [mode, setMode] = useState<"login" | "recovery">("login");
   const [email, setEmail] = useState("");
@@ -139,7 +140,7 @@ export default function StartLoginOne() {
                     </div>
                   </div>
 
-                  {error || params.get("error") ? (
+                  {error || linkError ? (
                     <div role="alert" className="rounded-xl border border-rose-400/25 bg-rose-400/[.08] px-4 py-3 text-sm text-rose-200">
                       {error || "El enlace de acceso ya no es válido. Solicita uno nuevo."}
                     </div>
