@@ -192,9 +192,7 @@ export default function SistemaPage() {
     const totalRevenue = revenueData.reduce((acc, curr) => acc + curr.total, 0);
     const totalQuotesValue = filteredQuotes.reduce((acc, q) => acc + q.total, 0);
 
-    if (isLoading) {
-        return <div className="p-8 text-center text-muted-foreground animate-pulse">Cargando Dashboard...</div>;
-    }
+    // El dashboard se pinta de inmediato; la sincronización del ERP no bloquea su estructura.
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-10">
@@ -254,16 +252,16 @@ export default function SistemaPage() {
                         <DollarSign className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+                        <div className="text-2xl font-bold">{isLoading && facturas.length === 0 ? '—' : formatCurrency(totalRevenue)}</div>
                     </CardContent>
                 </Card>
                 <Card className="shadow-sm border-l-4 border-l-green-500 bg-card">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Cotizaciones ({filteredQuotes.length})</CardTitle>
+                        <CardTitle className="text-sm font-medium">Cotizaciones ({isLoading && cotizaciones.length === 0 ? '—' : filteredQuotes.length})</CardTitle>
                         <FileText className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(totalQuotesValue)}</div>
+                        <div className="text-2xl font-bold">{isLoading && cotizaciones.length === 0 ? '—' : formatCurrency(totalQuotesValue)}</div>
                     </CardContent>
                 </Card>
             </div>
