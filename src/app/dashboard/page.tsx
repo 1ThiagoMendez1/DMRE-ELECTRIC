@@ -28,6 +28,7 @@ import { isWithinInterval, startOfYear, endOfYear } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useErp } from "@/components/providers/erp-provider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RegistroObra } from "@/types/sistema";
 
 export default function DashboardPage() {
@@ -36,7 +37,8 @@ export default function DashboardPage() {
         inventario,
         cotizaciones,
         facturas,
-        isLoading
+        dashboardLoading,
+        dashboardError
     } = useErp();
 
     // --- State ---
@@ -251,16 +253,16 @@ export default function DashboardPage() {
                         <DollarSign className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{isLoading && facturas.length === 0 ? '—' : formatCurrency(totalRevenue)}</div>
+                        <div className="text-2xl font-bold">{dashboardLoading && facturas.length === 0 ? <Skeleton className="h-7 w-28 rounded-lg" /> : formatCurrency(totalRevenue)}</div>
                     </CardContent>
                 </Card>
                 <Card className="shadow-sm border-l-4 border-l-green-500 bg-card">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Cotizaciones ({isLoading && cotizaciones.length === 0 ? '—' : filteredQuotes.length})</CardTitle>
+                        <CardTitle className="text-sm font-medium">Cotizaciones ({dashboardLoading && cotizaciones.length === 0 ? '…' : filteredQuotes.length})</CardTitle>
                         <FileText className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{isLoading && cotizaciones.length === 0 ? '—' : formatCurrency(totalQuotesValue)}</div>
+                        <div className="text-2xl font-bold">{dashboardLoading && cotizaciones.length === 0 ? <Skeleton className="h-7 w-32 rounded-lg" /> : formatCurrency(totalQuotesValue)}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -270,29 +272,29 @@ export default function DashboardPage() {
 
                 {/* 1. Ingresos */}
                 <DashboardPanel title="Tendencia de Facturación" sub="Evolución de ventas mensuales" typeState={[revenueType, setRevenueType]}>
-                    <DynamicChart type={revenueType} data={revenueData} dataKey="total" xAxisKey="name" color="#0088FE" />
+                    <DynamicChart loading={dashboardLoading} error={dashboardError} type={revenueType} data={revenueData} dataKey="total" xAxisKey="name" color="#0088FE" />
                 </DashboardPanel>
 
                 {/* 2. Top Products */}
                 <DashboardPanel title="Productos Demandados" sub="Top items por cantidad cotizada" typeState={[productType, setProductType]}>
-                    <DynamicChart type={productType} data={topProducts} dataKey="count" xAxisKey="name" color="#82ca9d" />
+                    <DynamicChart loading={dashboardLoading} error={dashboardError} type={productType} data={topProducts} dataKey="count" xAxisKey="name" color="#82ca9d" />
                 </DashboardPanel>
 
                 {/* 3. Quote Status */}
                 <DashboardPanel title="Estado de Cotizaciones" sub="Distribución por estado actual" typeState={[statusType, setStatusType]}>
-                    <DynamicChart type={statusType} data={quoteStatusData} dataKey="value" xAxisKey="name" color="#ffc658" />
+                    <DynamicChart loading={dashboardLoading} error={dashboardError} type={statusType} data={quoteStatusData} dataKey="value" xAxisKey="name" color="#ffc658" />
                 </DashboardPanel>
 
                 {/* 4. Client Volume */}
                 <DashboardPanel title="Volumen por Cliente" sub="Clientes con mayor valor cotizado" typeState={[clientVolumeType, setClientVolumeType]}>
-                    <DynamicChart type={clientVolumeType} data={clientVolumeData} dataKey="total" xAxisKey="name" color="#FF8042" />
+                    <DynamicChart loading={dashboardLoading} error={dashboardError} type={clientVolumeType} data={clientVolumeData} dataKey="total" xAxisKey="name" color="#FF8042" />
                 </DashboardPanel>
 
             </div>
 
             {/* Full Width Table Panel */}
             <DashboardPanel title="Estado de Inventario" sub="Vista de valorización y alertas de stock" typeState={[inventoryType, setInventoryType]}>
-                <DynamicChart type={inventoryType} data={inventoryData} dataKey="value" xAxisKey="name" color="#8884d8" height={400} />
+                <DynamicChart loading={dashboardLoading} error={dashboardError} type={inventoryType} data={inventoryData} dataKey="value" xAxisKey="name" color="#8884d8" height={400} />
             </DashboardPanel>
 
         </div>
