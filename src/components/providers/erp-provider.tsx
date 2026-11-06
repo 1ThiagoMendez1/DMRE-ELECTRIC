@@ -35,6 +35,7 @@ import { getConsumosResumenAction, createConsumoAction } from "@/app/dashboard/s
 import { getComprasAction, createCompraAction, updateCompraAction, deleteCompraAction } from "@/app/dashboard/sistema/financiera/compras-actions";
 import { createClient } from "@/utils/supabase/client";
 import { getInitialErpDataAction } from "@/actions/erp-actions";
+import { getDashboardDataAction } from "@/app/dashboard/dashboard-data-actions";
 import { useToast } from "@/hooks/use-toast";
 
 // Fallback mock data for users (until profiles table is connected)
@@ -74,6 +75,8 @@ interface ErpContextType {
 
     // Loading states
     isLoading: boolean;
+    dashboardLoading: boolean;
+    dashboardError: boolean;
 
     // Factura Actions
     addFactura: (factura: Factura) => void;
@@ -201,6 +204,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     const { toast } = useToast();
     // Loading state
     const [isLoading, setIsLoading] = useState(true);
+    const [dashboardLoading, setDashboardLoading] = useState(true);
+    const [dashboardError, setDashboardError] = useState(false);
 
     // Data states - initialized empty, will be loaded from DB
     const [facturas, setFacturas] = useState<Factura[]>([]);
@@ -236,6 +241,20 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     // Load all data from Supabase
     const loadAllData = async () => {
         setIsLoading(true);
+        setDashboardError(false);
+        // Se pide el panel por separado y en paralelo: no depende de las consultas pesadas del ERP.
+        const priorityDashboard = getDashboardDataAction().then(data => {
+            setCotizaciones(data.cotizaciones);
+            setFacturas(data.facturas);
+            setClientes(data.clientes);
+            setInventario(data.inventario);
+            setDashboardLoading(false);
+            return data;
+        }).catch(error => {
+            console.warn("No fue posible precargar el panel:", error);
+            setDashboardError(true);
+            return null;
+        });
         try {
             // La identidad y su menú se cargan independientemente del ERP completo.
             // No exponer navegación hasta comprobar la sesión y los permisos de ese usuario.
@@ -270,6 +289,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                                 if (Array.isArray(cache.facturas)) setFacturas(cache.facturas.map((f: any) => ({ ...f, fechaEmision: new Date(f.fechaEmision) })));
                                 if (Array.isArray(cache.clientes)) setClientes(cache.clientes);
                                 if (Array.isArray(cache.inventario)) setInventario(cache.inventario);
+                                setDashboardLoading(false);
                             } else sessionStorage.removeItem(`erp_dashboard_${user.id}`);
                         }
                     } catch { /* si el navegador rechaza el caché, cargamos desde Supabase */ }
@@ -312,8 +332,12 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setInstalaciones(data.instalaciones);
             setComprasFinanciera(data.comprasFinanciera);
 
-            // Mostrar cifras apenas se reciben, sin esperar agenda, permisos ni otras vistas.
+            // La carga integral del ERP sigue su curso para el resto de módulos.
             setIsLoading(false);
+            setDashboardLoading(false);
+            setDashboardError(false);
+            // No dejemos respuestas antiguas de la precarga pisar un ERP ya sincronizado.
+            await priorityDashboard;
             const [agendaData, rolesData, permsData, cotProvData, consumosData, liqs, user] = await extrasPromise;
             setAgenda(agendaData);
             setRoles(rolesData);
@@ -337,6 +361,9 @@ export function ErpProvider({ children }: { children: ReactNode }) {
 
         } catch (error) {
             console.error("Error loading data:", error);
+            await priorityDashboard;
+            // Si también falla la consulta ligera, mostrar error en vez de datos inventados.
+            setDashboardLoading(false);
         } finally {
             setIsLoading(false);
         }
@@ -1010,7 +1037,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             comprasFinanciera,
 
             // Loading
-            isLoading,
+            isLoading, dashboardLoading, dashboardError,
             addFactura, updateFactura,
             addCotizacion, updateCotizacion, deleteCotizacion,
             addCliente, updateCliente, deleteCliente,
