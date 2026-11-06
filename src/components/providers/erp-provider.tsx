@@ -309,6 +309,8 @@ export function ErpProvider({ children }: { children: ReactNode }) {
                 authPromise,
             ]);
             const data = await getInitialErpDataAction();
+            // La consulta completa debe tener la última palabra sobre la vista previa.
+            await priorityDashboard;
 
             // Set all states at once
             setUsers(data.users);
@@ -336,8 +338,6 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             setIsLoading(false);
             setDashboardLoading(false);
             setDashboardError(false);
-            // No dejemos respuestas antiguas de la precarga pisar un ERP ya sincronizado.
-            await priorityDashboard;
             const [agendaData, rolesData, permsData, cotProvData, consumosData, liqs, user] = await extrasPromise;
             setAgenda(agendaData);
             setRoles(rolesData);
