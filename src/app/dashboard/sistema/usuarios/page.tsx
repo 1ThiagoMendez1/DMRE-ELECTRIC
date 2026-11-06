@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
     Card,
     CardContent,
@@ -46,17 +47,14 @@ import { cn } from "@/lib/utils";
 
 export default function UsuariosPage() {
     const { toast } = useToast();
-    const { users, updateUserPermissions, setCurrentUser, currentUser, deleteUser, toggleUserStatus } = useErp();
+    const { users, updateUserPermissions, currentUser, deleteUser, toggleUserStatus } = useErp();
     const [searchTerm, setSearchTerm] = useState("");
 
     // No longer needing local state for users as it comes from context
     // const [usuarios, setUsuarios] = useState(initialUsers); 
 
-    const handleCreateUser = (newUser: any) => {
-        // Implement add user in provider if needed, for now just a toast demo or we should add 'addUser' to context
-        // For this task, we focus on permissions of existing users.
-        toast({ title: "Información", description: "Creación de usuarios simulada (falta implementar en provider addUser)" });
-    };
+    // El diálogo registra usuarios en Supabase y actualiza la lista por su cuenta.
+    const handleCreateUser = () => {};
 
     const handleDeleteUser = async (userId: string) => {
         if (confirm("¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.")) {
@@ -125,9 +123,10 @@ export default function UsuariosPage() {
                                 <TableRow key={user.id}>
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                {user.avatar ? <img src={user.avatar} className="rounded-full" /> : <UserCircle className="h-5 w-5" />}
-                                            </div>
+                                            <Avatar className="h-9 w-9 shrink-0 border border-border/50">
+                                                <AvatarImage src={user.avatar || undefined} alt={`Foto de ${user.name}`} className="object-cover" />
+                                                <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">{user.name.split(" ").slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "DM"}</AvatarFallback>
+                                            </Avatar>
                                             {user.name}
                                             {currentUser?.id === user.id && <Badge variant="outline" className="ml-2 text-[10px]">Tú</Badge>}
                                         </div>
@@ -193,9 +192,6 @@ export default function UsuariosPage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => setCurrentUser(user)}>
-                                                        Simular Sesión (Demo)
-                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => toggleUserStatus(user.id, !user.isActive)}>
                                                         {user.isActive ? "Desactivar Acceso" : "Activar Acceso"}
                                                     </DropdownMenuItem>
