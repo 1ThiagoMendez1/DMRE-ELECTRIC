@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { ThemeToggle } from './theme-toggle';
 import { NotificationCenter } from './notification-center';
+import { AccountMenu } from './account-menu';
 import { useErp } from "@/components/providers/erp-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 
