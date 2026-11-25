@@ -145,8 +145,8 @@ interface ErpContextType {
     updateCuentaBancaria: (updated: CuentaBancaria) => void;
     addMovimientoFinanciero: (mov: MovimientoFinanciero) => void;
     updateMovimientoFinanciero: (updated: MovimientoFinanciero) => void;
-    addObligacionFinanciera: (obl: ObligacionFinanciera) => void;
-    updateObligacionFinanciera: (updated: ObligacionFinanciera) => void;
+    addObligacionFinanciera: (obl: ObligacionFinanciera) => Promise<void>;
+    updateObligacionFinanciera: (updated: ObligacionFinanciera) => Promise<void>;
     deleteObligacionFinanciera: (id: string) => void;
     // Compra Financiera Actions
     addCompraFinanciera: (compra: Omit<CompraFinanciera, "id" | "saldo">) => Promise<void>;
@@ -741,7 +741,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
             const saved = await createObligacionFinancieraAction(rest as any);
             setObligacionesFinancieras(prev => [saved, ...prev]);
             await loadAllData(); // Refresh to update movimientos and cuentas
-        } catch (error) { console.error("Error adding obligacion:", error); }
+        } catch (error) { console.error("Error adding obligacion:", error); throw error; }
     };
 
     const updateObligacionFinanciera = async (updated: ObligacionFinanciera) => {
