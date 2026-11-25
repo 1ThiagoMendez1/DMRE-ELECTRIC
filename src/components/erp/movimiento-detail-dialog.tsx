@@ -48,6 +48,8 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
     const [identificacion, setIdentificacion] = useState(movimiento.identificacion || "");
     const [valor, setValor] = useState(movimiento.valor.toString());
     const [iva, setIva] = useState(movimiento.iva !== undefined ? movimiento.iva.toString() : "0");
+    const [retencion, setRetencion] = useState(String(movimiento.retencion || 0));
+    const [retencionPct, setRetencionPct] = useState("");
     const [fecha, setFecha] = useState(movimiento.fecha ? new Date(movimiento.fecha).toISOString().split('T')[0] : ""); // YYYY-MM-DD
     const [categoria, setCategoria] = useState<CategoriaMovimiento>(movimiento.categoria);
     const [tipo, setTipo] = useState<TipoMovimiento>(movimiento.tipo);
@@ -60,6 +62,8 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
             setIdentificacion(movimiento.identificacion || "");
             setValor(movimiento.valor.toString());
             setIva(movimiento.iva !== undefined ? movimiento.iva.toString() : "0");
+            setRetencion(String(movimiento.retencion || 0));
+            setRetencionPct("");
             setFecha(movimiento.fecha ? new Date(movimiento.fecha).toISOString().split('T')[0] : "");
             setCategoria(movimiento.categoria);
             setTipo(movimiento.tipo);
@@ -103,6 +107,7 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
             identificacion,
             valor: parseFloat(valor) || 0,
             iva: parseFloat(iva) || 0,
+            retencion: parseFloat(retencion) || 0,
             fecha: fecha ? new Date(fecha + "T12:00:00") : movimiento.fecha,
             categoria,
             tipo,
@@ -297,6 +302,16 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                             disabled={!isEditing}
                             className="w-full font-mono"
                         />
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="retencion" className="text-xs font-semibold text-muted-foreground">Retención (COP)</Label>
+                        {isEditing && <div className="flex items-center gap-2">
+                            <Input aria-label="Porcentaje de retención" type="number" min="0" max="100" step="0.0001" value={retencionPct} placeholder="%"
+                                onChange={e=>{const pct=e.target.value;setRetencionPct(pct);setRetencion((Number(valor || 0)*Number(pct)/100).toFixed(2));}} className="w-24" />
+                            <span className="text-xs text-muted-foreground">o valor</span>
+                        </div>}
+                        <Input id="retencion" type="number" min="0" step="0.01" value={retencion} onChange={e=>{setRetencion(e.target.value);setRetencionPct("");}} disabled={!isEditing} className="w-full font-mono" />
                     </div>
 
                     {!isEditing && (
