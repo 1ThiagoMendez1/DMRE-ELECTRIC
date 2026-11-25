@@ -266,7 +266,7 @@ export interface CuentaBancaria {
 }
 
 export type TipoMovimiento = 'INGRESO' | 'EGRESO';
-export type CategoriaMovimiento = 'NOMINA' | 'PROVEEDORES' | 'SERVICIOS' | 'IMPUESTOS' | 'PRESTAMOS' | 'VENTAS' | 'INSTALACION' | 'SUMINISTRO' | 'OTROS';
+export type CategoriaMovimiento = 'NOMINA' | 'PROVEEDORES' | 'SERVICIOS' | 'IMPUESTOS' | 'PRESTAMOS' | 'VENTAS' | 'INSTALACION' | 'SUMINISTRO' | 'OTROS' | 'SEGUROS_POLIZAS' | 'MAQUINARIA_EQUIPOS' | 'HERRAMIENTA' | 'MATERIALES' | 'MANO_OBRA' | 'TRANSPORTE' | 'ADMINISTRACION' | 'CAJA_MENOR' | 'IMPREVISTOS';
 
 export interface MovimientoFinanciero {
     id: string;
