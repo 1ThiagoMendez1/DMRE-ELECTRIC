@@ -1,4 +1,4 @@
-import { PagoObligacion } from "@/types/sistema";
+import type { PagoObligacion } from "@/types/sistema";
 
 export interface AmortizationRow {
     periodo: number;
