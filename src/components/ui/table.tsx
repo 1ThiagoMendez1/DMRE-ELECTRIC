@@ -2,18 +2,75 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Table = React.forwardRef<
-  HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-sm", className)}
-      {...props}
-    />
-  </div>
-))
+type TableProps = React.HTMLAttributes<HTMLTableElement> & {
+  /** En teléfonos convierte filas en fichas; "scroll" mantiene la tabla horizontal. */
+  mobileView?: "cards" | "scroll"
+  scrollLabel?: string
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, mobileView = "cards", scrollLabel = "Tabla de registros", children, ...props }, ref) => {
+    const tableRef = React.useRef<HTMLTableElement | null>(null)
+
+    const assignRef = React.useCallback((node: HTMLTableElement | null) => {
+      tableRef.current = node
+      if (typeof ref === "function") ref(node)
+      else if (ref) (ref as React.MutableRefObject<HTMLTableElement | null>).current = node
+    }, [ref])
+
+    React.useEffect(() => {
+      if (mobileView !== "cards") return
+      const root = tableRef.current
+      if (!root) return
+      let scheduled = false
+      const syncLabels = () => {
+        if (!root) return
+        const headings = Array.from(root.querySelectorAll<HTMLTableCellElement>("thead tr:last-child th"))
+          .map((cell) => cell.textContent?.trim() || "Detalle")
+        root.querySelectorAll<HTMLTableRowElement>("tbody tr").forEach(row => {
+          let index = 0
+          row.querySelectorAll<HTMLTableCellElement>(":scope > td").forEach(cell => {
+            const span = cell.colSpan || 1
+            if (span > 1) {
+              cell.removeAttribute("data-mobile-label")
+              cell.setAttribute("data-mobile-full", "true")
+            } else {
+              cell.removeAttribute("data-mobile-full")
+              cell.setAttribute("data-mobile-label", headings[index] || "Detalle")
+            }
+            index += span
+          })
+        })
+      }
+      syncLabels()
+      const observer = new MutationObserver(() => {
+        if (scheduled) return
+        scheduled = true
+        queueMicrotask(() => { scheduled = false; syncLabels() })
+      })
+      observer.observe(root, { childList: true, subtree: true, characterData: true })
+      return () => observer.disconnect()
+    }, [mobileView, children])
+
+    return (
+      <div
+        role="region"
+        tabIndex={0}
+        aria-label={scrollLabel}
+        className="dmre-table-viewport relative w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      >
+        <table
+          ref={assignRef}
+          data-mobile-view={mobileView}
+          className={cn("dmre-data-table w-full caption-bottom text-sm", className)}
+          {...props}
+        >
+          {children}
+        </table>
+      </div>
+    )
+  }
+)
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<
