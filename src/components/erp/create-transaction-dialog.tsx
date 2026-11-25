@@ -37,6 +37,7 @@ import { CuentaBancaria, TipoMovimiento, CategoriaMovimiento, Cotizacion, Obliga
 import { createClient } from "@/utils/supabase/client";
 import { FINANCE_CATEGORIES } from "@/lib/categorias-financieras";
 import { useErp } from "@/components/providers/erp-provider";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
     tipo: z.enum(["INGRESO", "EGRESO", "TRANSFERENCIA"] as const),
@@ -99,6 +100,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
     const [isUploading, setIsUploading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errorSave, setErrorSave] = useState("");
+    const { toast } = useToast();
     const [uploadedFileName, setUploadedFileName] = useState<string>("");
     const [retencionPct, setRetencionPct] = useState("");
     const supabase = createClient();
@@ -319,7 +321,8 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
         setRetencionPct("");
         } catch (error) {
             if (partialTransfer) {
-                setErrorSave("Se registró la salida del traspaso pero falló la entrada. No repita el movimiento: concilie las dos cuentas.");
+                toast({ variant: "destructive", title: "Traspaso parcialmente registrado", description: "Se guardó el egreso, pero falló el ingreso. No repitas el pago: concilia ambas cuentas." });
+                setErrorSave("Traspaso pendiente de conciliación; consulta el historial antes de intentar otra vez.");
                 setOpen(false);
             } else {
                 setErrorSave(error instanceof Error ? error.message : "No se pudo guardar el movimiento.");
