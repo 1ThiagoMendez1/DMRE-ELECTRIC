@@ -72,6 +72,7 @@ import { BillingModule } from "@/components/erp/billing-module";
 import { ComprasModule } from "@/components/erp/compras-module";
 import { ProjectProfitabilityModule } from "@/components/erp/project-profitability-module";
 import { generateExcelReport } from "@/lib/excel-generator";
+import { getMovimientosFinancierosParaExcelAction } from "@/app/dashboard/sistema/financiera/bancos-actions";
 
 import { useToast } from "@/hooks/use-toast";
 import { useErp } from "@/components/providers/erp-provider";
@@ -225,9 +226,26 @@ export default function FinancieraPage() {
                 cuentaId: filterCuenta !== "TODOS" ? filterCuenta : undefined,
                 periodStart,
             };
-            await generateExcelReport(movimientosFiltrados, filterState, {
-                cuentas,
-                allMovimientos: movimientos,
+            // Traer historial completo: la tabla del dashboard puede estar paginada,
+            // pero los saldos de apertura requieren todos los movimientos.
+            const allMovimientos = await getMovimientosFinancierosParaExcelAction();
+            const allRows = allMovimientos.map(m => ({
+                ...m, esSimple: !!cotizaciones.find(q=>q.id===m.cotizacionId && q.tipo==="SIMPLIFICADA")
+            }));
+            const exportados = allRows.filter(m => {
+                if (m.esSimple) return false;
+                const fecha = format(fechaContable(m.fecha), "yyyy-MM-dd");
+                if (fastDateFilter === "dia" || fastDateFilter === "custom") {
+                    if (fecha !== (filterFecha || format(new Date(), "yyyy-MM-dd"))) return false;
+                } else if (fastDateFilter === "mes" && !fecha.startsWith(filterMes + "-")) return false;
+                else if (fastDateFilter === "año" && !fecha.startsWith(filterAnio + "-")) return false;
+                if (filterTipo !== "TODOS" && m.tipo !== filterTipo) return false;
+                if (filterCategoria !== "TODOS" && m.categoria !== filterCategoria) return false;
+                if (filterCuenta !== "TODOS" && m.cuentaId !== filterCuenta) return false;
+                return true;
+            });
+            await generateExcelReport(exportados, filterState, {
+                cuentas, allMovimientos: allRows,
             });
             toast({
                 title: "Excel generado",
