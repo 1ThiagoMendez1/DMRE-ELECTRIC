@@ -434,3 +434,57 @@
     box-shadow: inset -10px 0 12px -13px hsl(var(--foreground) / .25);
   }
 }
+
+
+/* Adaptación de formularios, tarjetas KPI, filtros y gráficas antiguas del ERP. */
+@media (max-width: 639px) {
+  .dmre-page-content :is(.grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6, .grid-cols-7, .grid-cols-8, .grid-cols-9),
+  .dmre-page-content [class*="grid-cols-4"],
+  .dmre-page-content [class*="grid-cols-5"],
+  .dmre-page-content [class*="grid-cols-6"],
+  .dmre-page-content [class*="grid-cols-7"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dmre-page-content :is(.flex.justify-between, .flex.justify-end) {
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+
+  .dmre-page-content :is(input, textarea, select, button, [role="combobox"]) {
+    max-width: 100%;
+  }
+
+  .dmre-page-content [class*="w-[450px]"],
+  .dmre-page-content [class*="w-[400px]"],
+  .dmre-page-content [class*="w-[300px]"],
+  .dmre-page-content [class*="w-[250px]"],
+  .dmre-page-content [class*="w-[240px]"] {
+    max-width: 100%;
+  }
+
+  .dmre-page-content .recharts-responsive-container,
+  .dmre-page-content canvas,
+  .dmre-page-content svg:not([data-sidebar]) {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .dmre-page-content .grid-cols-2:not([role="tablist"]),
+  .dmre-dialog-content .grid-cols-2:not([role="tablist"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .dmre-page-content :is(.grid-cols-5, .grid-cols-6, .grid-cols-7, .grid-cols-8, .grid-cols-9) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
