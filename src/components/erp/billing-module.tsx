@@ -38,9 +38,13 @@ export function BillingModule() {
     const { facturas, addFactura, updateFactura, cotizaciones, cuentasBancarias } = useErp();
     const { toast } = useToast();
     const [invoiceSearch, setInvoiceSearch] = useState("");
-    const [monthFilter, setMonthFilter] = useState("");
+    const [monthFilter, setMonthFilter] = useState(format(new Date(), "yyyy-MM"));
+    const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [periodMode, setPeriodMode] = useState<"TODOS" | "MES" | "ANIO" | "RANGO">("TODOS");
     const [isExporting, setIsExporting] = useState(false);
-    const [facturasFilter, setFacturasFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("NORMAL");
+    const [facturasFilter, setFacturasFilter] = useState<"TODAS" | "NORMAL" | "SIMPLIFICADA">("TODAS");
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
         vencidas: false,
         pendientes: false,
@@ -106,10 +110,14 @@ export function BillingModule() {
             const matchesType = facturasFilter === 'TODAS' || tipo === facturasFilter;
 
             const fecha = new Date(f.fechaEmision);
-            const matchesMonth = !monthFilter || (monthFilter === format(fecha, 'yyyy-MM'));
-            return matchesSearch && matchesType && matchesMonth;
+            const dateKey = format(fecha, "yyyy-MM-dd");
+            const periodMatches = periodMode === "TODOS" ||
+                (periodMode === "MES" && format(fecha, "yyyy-MM") === monthFilter) ||
+                (periodMode === "ANIO" && String(fecha.getFullYear()) === yearFilter) ||
+                (periodMode === "RANGO" && (!dateFrom || dateKey >= dateFrom) && (!dateTo || dateKey <= dateTo));
+            return matchesSearch && matchesType && periodMatches;
         });
-    }, [facturas, invoiceSearch, facturasFilter, monthFilter]);
+    }, [facturas, invoiceSearch, facturasFilter, monthFilter, yearFilter, dateFrom, dateTo, periodMode]);
 
     // Grouping Logic
     const groups = useMemo(() => {
@@ -183,11 +191,22 @@ export function BillingModule() {
                                 <TabsTrigger value="TODAS">Todas</TabsTrigger>
                             </TabsList>
                         </Tabs>
-                        <Input type="month" value={monthFilter} aria-label="Filtrar facturas por mes" onChange={e => setMonthFilter(e.target.value)} className="w-full sm:w-40" />
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select aria-label="Periodo de facturación" className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={periodMode} onChange={e=>setPeriodMode(e.target.value as "TODOS" | "MES" | "ANIO" | "RANGO")}>
+                                <option value="TODOS">Todas las fechas</option><option value="MES">Filtrar por mes</option>
+                                <option value="ANIO">Filtrar por año</option><option value="RANGO">Entre dos fechas</option>
+                            </select>
+                            {periodMode === "MES" && <Input type="month" value={monthFilter} aria-label="Mes de emisión" onChange={e => setMonthFilter(e.target.value)} className="w-40" />}
+                            {periodMode === "ANIO" && <Input type="number" min="2000" max="2100" step="1" value={yearFilter} aria-label="Año de emisión" onChange={e => setYearFilter(e.target.value)} className="w-28" />}
+                            {periodMode === "RANGO" && <>
+                                <Input type="date" value={dateFrom} aria-label="Fecha inicial" onChange={e => setDateFrom(e.target.value)} className="w-40" />
+                                <Input type="date" value={dateTo} min={dateFrom || undefined} aria-label="Fecha final" onChange={e => setDateTo(e.target.value)} className="w-40" />
+                            </>}
+                        </div>
                         <Button type="button" variant="outline" disabled={isExporting} className="gap-2" onClick={async () => {
                             setIsExporting(true);
                             try {
-                                await exportFacturasExcel(filteredFacturas, monthFilter);
+                                await exportFacturasExcel(filteredFacturas, periodMode === "MES" ? monthFilter : periodMode === "ANIO" ? yearFilter : periodMode === "RANGO" ? `${dateFrom || "inicio"}_${dateTo || "fin"}` : "Todas");
                                 toast({ title: "Excel generado", description: "El archivo contiene las facturas del filtro aplicado." });
                             } catch (error) {
                                 console.error(error);
