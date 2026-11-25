@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { 
@@ -40,17 +43,72 @@ import { CreateCompraDialog } from "./create-compra-dialog";
 
 export function ComprasModule() {
     const { comprasFinanciera, deleteCompraFinanciera } = useErp();
+    const { toast } = useToast();
+    const [filterProveedor, setFilterProveedor] = useState("TODOS");
+    const [isExporting, setIsExporting] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
 
-    const filteredCompras = comprasFinanciera.filter(c => 
-        (c.numeroFactura || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.cotizacion?.numero || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.cotizacion?.cliente?.nombre || "").toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const proveedoresLista = useMemo(() => Array.from(new Map(comprasFinanciera
+        .map(c=>[c.cotizacionProveedor?.proveedorId || "SIN_PROVEEDOR", c.cotizacionProveedor?.proveedor?.nombre || "Sin proveedor"] as const))
+        .entries()).sort((a,b)=>a[1].localeCompare(b[1],"es")), [comprasFinanciera]);
+    const filteredCompras = comprasFinanciera.filter(c => {
+        const proveedorId = c.cotizacionProveedor?.proveedorId || "SIN_PROVEEDOR";
+        const query = searchTerm.trim().toLowerCase();
+        return (filterProveedor === "TODOS" || proveedorId === filterProveedor) && (
+            (c.numeroFactura || "").toLowerCase().includes(query) ||
+            (c.cotizacion?.numero || "").toLowerCase().includes(query) ||
+            (c.cotizacion?.cliente?.nombre || "").toLowerCase().includes(query) ||
+            (c.cotizacionProveedor?.proveedor?.nombre || "").toLowerCase().includes(query) ||
+            (c.cotizacionProveedor?.proveedor?.nit || "").toLowerCase().includes(query)
+        );
+    });
 
     const totalFacturado = filteredCompras.reduce((acc, curr) => acc + curr.valorFactura, 0);
     const totalPagado = filteredCompras.reduce((acc, curr) => acc + curr.valorPago, 0);
     const totalPendiente = totalFacturado - totalPagado;
+
+    const exportExcel = async () => {
+        setIsExporting(true);
+        try {
+            const book = new ExcelJS.Workbook();
+            book.creator = "DMRE Electric";
+            const sheet = book.addWorksheet("Compras");
+            sheet.columns = [
+                {header:"Fecha",key:"fecha",width:16},{header:"Factura",key:"factura",width:20},
+                {header:"Proveedor",key:"proveedor",width:32},{header:"NIT",key:"nit",width:20},
+                {header:"Referencia CM",key:"cm",width:18},{header:"Oferta",key:"oferta",width:18},
+                {header:"Cliente",key:"cliente",width:30},{header:"IVA",key:"iva",width:18},
+                {header:"Valor factura",key:"valor",width:22},{header:"Pagado",key:"pagado",width:22},
+                {header:"Saldo",key:"saldo",width:22},{header:"Método pago",key:"metodo",width:20},
+                {header:"Estado",key:"estado",width:16}
+            ];
+            sheet.getRow(1).font={bold:true,color:{argb:"FFFFFFFF"}};
+            sheet.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF1E293B"}};
+            for (const compra of filteredCompras) {
+                const saldo=Number(compra.valorFactura)-Number(compra.valorPago);
+                const row=sheet.addRow({
+                    fecha:format(new Date(compra.fecha),"dd/MM/yyyy"),
+                    factura:compra.numeroFactura,
+                    proveedor:compra.cotizacionProveedor?.proveedor?.nombre||"Sin proveedor",
+                    nit:compra.cotizacionProveedor?.proveedor?.nit||"",
+                    cm:compra.cotizacionProveedor?.numero||"",
+                    oferta:compra.cotizacion?.numero||"",
+                    cliente:compra.cotizacion?.cliente?.nombre||"",
+                    iva:compra.iva||0, valor:compra.valorFactura, pagado:compra.valorPago,
+                    saldo, metodo:compra.metodoPago||"",
+                    estado:saldo<=0?"PAGADA":compra.valorPago>0?"PARCIAL":"PENDIENTE",
+                });
+                for(let col=8;col<=11;col++) row.getCell(col).numFmt='"$"#,##0.00';
+            }
+            if(filteredCompras.length)sheet.autoFilter={from:"A1",to:"M"+(filteredCompras.length+1)};
+            sheet.views=[{state:"frozen",ySplit:1}];
+            const bytes=await book.xlsx.writeBuffer();
+            saveAs(new Blob([bytes as BlobPart], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), "Compras_DMRE_"+format(new Date(),"yyyyMMdd")+".xlsx");
+            toast({title:"Compras exportadas",description:"Excel generado con el filtro de proveedor aplicado."});
+        } catch (error) {
+            toast({variant:"destructive",title:"No se pudo exportar",description:error instanceof Error?error.message:"Comprueba los registros."});
+        } finally {setIsExporting(false);}
+    };
 
     return (
         <div className="space-y-6">
@@ -91,12 +149,20 @@ export function ComprasModule() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <CreateCompraDialog />
+                <div className="flex flex-wrap gap-2">
+                    <select aria-label="Filtrar compras por proveedor" className="h-10 min-w-[200px] rounded-md border border-input bg-background px-3 text-sm" value={filterProveedor} onChange={e=>setFilterProveedor(e.target.value)}>
+                        <option value="TODOS">Todos los proveedores</option>
+                        {proveedoresLista.map(([id, nombre])=><option key={id} value={id}>{nombre}</option>)}
+                    </select>
+                    <Button variant="outline" className="gap-2" disabled={isExporting} onClick={exportExcel}><Download className="h-4 w-4"/>{isExporting?"Exportando...":"Exportar Excel"}</Button>
+                    <CreateCompraDialog />
+                </div>
             </div>
 
             <Card>
                 <CardContent className="p-0">
-                    <Table>
+                    <div className="w-full overflow-x-auto">
+                    <Table className="min-w-[1260px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Fecha</TableHead>
@@ -219,6 +285,7 @@ export function ComprasModule() {
                             )}
                         </TableBody>
                     </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>
