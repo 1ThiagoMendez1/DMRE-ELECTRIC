@@ -34,6 +34,7 @@ import { Plus, FileText, Upload, Loader2, X, ExternalLink, Eye } from "lucide-re
 import { formatCurrency } from "@/lib/utils";
 import { CuentaBancaria, TipoMovimiento, CategoriaMovimiento, Cotizacion, ObligacionFinanciera, MovimientoFinanciero } from "@/types/sistema";
 import { createClient } from "@/utils/supabase/client";
+import { FINANCE_CATEGORIES } from "@/lib/categorias-financieras";
 import { useErp } from "@/components/providers/erp-provider";
 
 const formSchema = z.object({
@@ -292,13 +293,13 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                 categoria: values.categoria as CategoriaMovimiento,
                 tercero: values.tercero,
                 identificacion: values.identificacion,
-                concepto: values.concepto,
+                concepto: ["OFICINA", "ADMINISTRATIVO"].includes(values.cotizacionId || "") ? `${values.cotizacionId} - ${values.concepto}` : values.concepto,
                 valor: values.valor,
                 iva: values.iva,
                 retencion: values.retencion,
                 cuotas: values.cuotas,
                 cuotaActual: values.cuotaActual,
-                cotizacionId: values.cotizacionId,
+                cotizacionId: values.cotizacionId && !["none", "OFICINA", "ADMINISTRATIVO"].includes(values.cotizacionId) ? values.cotizacionId : undefined,
                 comprobanteUrl: values.comprobanteUrl,
                 referencia: emp ? `EMP-${emp.id}` : undefined
             };
@@ -413,10 +414,12 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    <SelectItem value="none">Sin Vincular</SelectItem>
-                                                    {cotizaciones.filter(q => ['APROBADA', 'EN_EJECUCION', 'FINALIZADA'].includes(q.estado)).map(q => (
+                                                    <SelectItem value="none">Sin vincular</SelectItem>
+                                                    <SelectItem value="OFICINA">Oficina</SelectItem>
+                                                    <SelectItem value="ADMINISTRATIVO">Administrativo</SelectItem>
+                                                    {cotizaciones.filter(q => ['APROBADA', 'EN_EJECUCION', 'FINALIZADA'].includes(q.estado)).sort((a,b) => (a.tipo==='SIMPLIFICADA'?0:1)-(b.tipo==='SIMPLIFICADA'?0:1) || a.numero.localeCompare(b.numero,'es',{numeric:true})).map(q => (
                                                         <SelectItem key={q.id} value={q.id}>
-                                                            {q.numero} - {q.cliente?.nombre}
+                                                            {q.tipo === "SIMPLIFICADA" ? "Simple" : "Normal"} · {q.numero} - {q.cliente?.nombre}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -439,14 +442,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    <SelectItem value="VENTAS">Ventas</SelectItem>
-                                                    <SelectItem value="NOMINA">Nómina</SelectItem>
-                                                    <SelectItem value="PROVEEDORES">Proveedores</SelectItem>
-                                                    <SelectItem value="SUMINISTRO">Suministro</SelectItem>
-                                                    <SelectItem value="INSTALACION">Instalación</SelectItem>
-                                                    <SelectItem value="SERVICIOS">Servicios</SelectItem>
-                                                    <SelectItem value="IMPUESTOS">Impuestos</SelectItem>
-                                                    <SelectItem value="OTROS">Otros</SelectItem>
+                                                    {FINANCE_CATEGORIES.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />
