@@ -246,6 +246,28 @@ export async function getMovimientosFinancierosAction(): Promise<MovimientoFinan
     }));
 }
 
+/** Recupera el historial completo para exportaciones y saldos de apertura.
+ * Evita el límite por defecto de 1000 filas del API de Supabase.
+ */
+export async function getMovimientosFinancierosParaExcelAction(): Promise<MovimientoFinanciero[]> {
+    const supabase = await createClient();
+    const pageSize = 500;
+    const all: MovimientoFinanciero[] = [];
+    for (let start = 0; start < 50000; start += pageSize) {
+        const { data, error } = await supabase.from("movimientos_financieros")
+            .select("*, cuentas_bancarias(id, nombre)")
+            .order("fecha", { ascending: true }).order("id", { ascending: true })
+            .range(start, start + pageSize - 1);
+        if (error) throw new Error("No fue posible obtener todo el historial para el reporte.");
+        all.push(...(data || []).map((row: any) => ({
+            ...mapMovimientoToUI(row),
+            cuenta: row.cuentas_bancarias ? { id: row.cuentas_bancarias.id, nombre: row.cuentas_bancarias.nombre } : undefined,
+        })));
+        if (!data || data.length < pageSize) return all;
+    }
+    throw new Error("Hay más de 50.000 movimientos. El reporte es demasiado grande para una sola exportación.");
+}
+
 export async function createMovimientoFinancieroAction(movimiento: Omit<MovimientoFinanciero, "id">): Promise<MovimientoFinanciero> {
     const supabase = await createClient();
     const dbData = mapMovimientoToDB(movimiento);
