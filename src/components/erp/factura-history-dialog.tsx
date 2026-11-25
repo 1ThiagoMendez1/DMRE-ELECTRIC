@@ -110,6 +110,11 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
     const [editFechaEmision, setEditFechaEmision] = useState(format(new Date(factura.fechaEmision), "yyyy-MM-dd"));
     const [editFechaVencimiento, setEditFechaVencimiento] = useState(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
     const [isSavingDetails, setIsSavingDetails] = useState(false);
+    const [editCotizacionId, setEditCotizacionId] = useState(factura.cotizacionId || "MANUAL");
+    const [editIva, setEditIva] = useState(String(factura.iva || 0));
+    const [editReteFuente, setEditReteFuente] = useState(String(factura.retencionRenta || 0));
+    const [editReteIca, setEditReteIca] = useState(String(factura.retencionIca || 0));
+    const [editReteIva, setEditReteIva] = useState(String(factura.retencionIva || 0));
 
     // Retención y descripción al marcar como PAGADA
     const [retencionMonto, setRetencionMonto] = useState<string>(factura.retencionRenta ? factura.retencionRenta.toString() : "");
@@ -136,12 +141,17 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         setDescripcionRetencion(factura.observaciones || "");
 
         setEditNumero(factura.numero || factura.id);
+        setEditCotizacionId(factura.cotizacionId || "MANUAL");
+        setEditIva(String(factura.iva || 0));
+        setEditReteFuente(String(factura.retencionRenta || 0));
+        setEditReteIca(String(factura.retencionIca || 0));
+        setEditReteIva(String(factura.retencionIva || 0));
         setEditFechaEmision(format(new Date(factura.fechaEmision), "yyyy-MM-dd"));
         setEditFechaVencimiento(format(new Date(factura.fechaVencimiento), "yyyy-MM-dd"));
     }, [factura]);
 
     // Movimientos history (Mock for now, would replace with real fetch if implementing full audit log)
-    const { movimientosFinancieros, refreshData } = useErp();
+    const { movimientosFinancieros, refreshData, cotizaciones } = useErp();
 
     const movimientos = useMemo(() => {
         const creationEvent: MovimientoFactura = {
@@ -342,26 +352,42 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
     };
 
     const handleGuardarDetalles = async () => {
+        const iva = Number(editIva);
+        const retefuente = Number(editReteFuente);
+        const reteica = Number(editReteIca);
+        const reteiva = Number(editReteIva);
+        const totalRetenciones = retefuente + reteica + reteiva;
+        if (!editNumero.trim() || !editFechaEmision || !editFechaVencimiento ||
+            [iva, retefuente, reteica, reteiva].some(v => !Number.isFinite(v) || v < 0) ||
+            totalRetenciones > factura.valorFacturado) {
+            toast({ variant: "destructive", title: "Revisa los impuestos", description: "Las fechas y el número son obligatorios. Las retenciones deben ser positivas y no exceder el total." });
+            return;
+        }
+        const selectedQuote = cotizaciones.find(q => q.id === editCotizacionId);
+        const neto = Math.max(0, factura.valorFacturado - totalRetenciones);
+        const paid = Number(factura.valorPagado || 0);
+        const newSaldo = Math.max(0, neto - paid);
         setIsSavingDetails(true);
         try {
-            await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate API
-
-            const updatedInvoice = {
+            const updatedInvoice: Factura = {
                 ...factura,
-                id: editNumero,
-                numero: editNumero,
-                fechaEmision: new Date(editFechaEmision + 'T12:00:00'),
-                fechaVencimiento: new Date(editFechaVencimiento + 'T12:00:00'),
+                // Mantener UUID inmutable; solo cambia el consecutivo visible.
+                numero: editNumero.trim(),
+                fechaEmision: new Date(editFechaEmision + "T12:00:00"),
+                fechaVencimiento: new Date(editFechaVencimiento + "T12:00:00"),
+                cotizacionId: selectedQuote?.id,
+                cotizacion: selectedQuote || undefined,
+                trabajoId: selectedQuote?.trabajoId,
+                iva, retencionRenta: retefuente, retencionIca: reteica, retencionIva: reteiva,
+                saldoPendiente: newSaldo,
+                estado: newSaldo > 0 && factura.estado === "PAGADA" ? "PARCIAL" : factura.estado,
             };
-
-            onFacturaUpdated(updatedInvoice);
-            toast({
-                title: "Detalles Actualizados",
-                description: `Los detalles de la factura han sido modificados.`,
-            });
-        } finally {
-            setIsSavingDetails(false);
-        }
+            await onFacturaUpdated(updatedInvoice);
+            setSaldoPendiente(newSaldo);
+            toast({ title: "Factura actualizada", description: "Oferta y retenciones guardadas correctamente." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "No se pudo guardar", description: error instanceof Error ? error.message : "Compruebe la conexión." });
+        } finally { setIsSavingDetails(false); }
     };
 
     const getMovimientoIcon = (tipo: MovimientoFactura['tipo']) => {
@@ -439,6 +465,24 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                             onChange={(e) => setEditFechaVencimiento(e.target.value)}
                                         />
                                     </div>
+                                </div>
+                                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                    <div className="sm:col-span-2 space-y-1">
+                                        <Label>Oferta vinculada</Label>
+                                        <Select value={editCotizacionId} onValueChange={setEditCotizacionId}>
+                                            <SelectTrigger><SelectValue placeholder="Elige una oferta" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="MANUAL">Sin vincular / Oficina / Administrativo</SelectItem>
+                                                {[...cotizaciones].sort((a,b)=> (a.tipo==="SIMPLIFICADA"?0:1)-(b.tipo==="SIMPLIFICADA"?0:1) || a.numero.localeCompare(b.numero,"es",{numeric:true})).map(q=>
+                                                    <SelectItem key={q.id} value={q.id}>{q.tipo==="SIMPLIFICADA"?"Simple":"Normal"} · {q.numero} — {q.cliente?.nombre}</SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div><Label htmlFor="fac-edit-iva">IVA (COP)</Label><Input id="fac-edit-iva" type="number" min="0" step="0.01" value={editIva} onChange={e=>setEditIva(e.target.value)}/></div>
+                                    <div><Label htmlFor="fac-edit-retefuente">ReteFuente (COP)</Label><Input id="fac-edit-retefuente" type="number" min="0" step="0.01" value={editReteFuente} onChange={e=>setEditReteFuente(e.target.value)}/></div>
+                                    <div><Label htmlFor="fac-edit-reteica">ReteICA (COP)</Label><Input id="fac-edit-reteica" type="number" min="0" step="0.01" value={editReteIca} onChange={e=>setEditReteIca(e.target.value)}/></div>
+                                    <div><Label htmlFor="fac-edit-reteiva">ReteIVA (COP)</Label><Input id="fac-edit-reteiva" type="number" min="0" step="0.01" value={editReteIva} onChange={e=>setEditReteIva(e.target.value)}/></div>
                                 </div>
                                 <div className="mt-4 flex justify-end">
                                     <Button 
