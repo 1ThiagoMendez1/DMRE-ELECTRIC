@@ -1,52 +1,83 @@
 "use server";
 
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
-async function financeClient() {
+// El presupuesto se guarda en un atributo adicional del JSONB opciones_pdf.
+// Así conserva su valor propio sin alterar el precio de venta de la cotización
+// y sin requerir una migración de tablas de producción.
+const BUDGET_FIELD = "dmrePresupuestoProyectoCOP";
+
+async function financeUser() {
     const cookieStore = await cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { cookies: { getAll: () => cookieStore.getAll(), setAll: values => {
-            try { values.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {}
-        }}}
-    );
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user || user.is_anonymous) throw new Error("Debes iniciar sesión.");
-    const { data: profile } = await supabase.from("profiles")
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anon) throw new Error("Supabase no está configurado.");
+    const supabase = createServerClient(url, anon, {
+        cookies: {
+            getAll: () => cookieStore.getAll(),
+            setAll: values => { try { values.forEach(({name,value,options})=>cookieStore.set(name,value,options)); } catch {} }
+        }
+    });
+    const {data:{user},error} = await supabase.auth.getUser();
+    if (error || !user || user.is_anonymous) throw new Error("Tu sesión expiró.");
+    const {data: profile,error:accessError} = await supabase.from("profiles")
         .select("role,sidebar_access,is_active").eq("id",user.id).single();
-    if (!profile || profile.is_active === false ||
-       (profile.role !== "ADMIN" && !profile.sidebar_access?.includes("financiera")))
-       throw new Error("No tienes acceso al análisis financiero.");
-    return { supabase, user };
+    if (accessError || !profile || profile.is_active === false ||
+        (profile.role !== "ADMIN" && !profile.sidebar_access?.includes("financiera")))
+        throw new Error("No tienes permisos de análisis financiero.");
+    return user;
 }
 
-export async function getPresupuestosProyectoAction(): Promise<Record<string, number>> {
-    const { supabase } = await financeClient();
-    const { data, error } = await supabase.from("presupuestos_proyecto")
-        .select("cotizacion_id,valor_presupuestado");
-    if (error) {
-        if (error.code === "42P01" || error.code === "PGRST205")
-            throw new Error("Falta aplicar la migración de presupuestos de proyecto.");
-        throw new Error("No fue posible consultar los presupuestos.");
+function adminClient() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
+    if (!url || !key) throw new Error("Servicio de finanzas no configurado.");
+    return createAdminClient(url, key, {auth:{autoRefreshToken:false,persistSession:false}});
+}
+
+function extractBudget(options: unknown): number | undefined {
+    if (!options || typeof options !== "object" || Array.isArray(options)) return undefined;
+    const value = (options as Record<string,unknown>)[BUDGET_FIELD];
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+export async function getPresupuestosProyectoAction(): Promise<Record<string,number>> {
+    await financeUser();
+    const admin = adminClient();
+    const budgets: Record<string,number> = {};
+    for(let offset=0; offset < 50000; offset += 500) {
+        const {data,error} = await admin.from("cotizaciones")
+            .select("id,opciones_pdf").order("id").range(offset,offset+499);
+        if(error) throw new Error("No se pudo consultar los presupuestos.");
+        for(const row of data || []) {
+            const amount = extractBudget(row.opciones_pdf);
+            if(amount !== undefined) budgets[row.id] = amount;
+        }
+        if(!data || data.length < 500) break;
     }
-    return Object.fromEntries((data || []).map(row=>[row.cotizacion_id, Number(row.valor_presupuestado)]));
+    return budgets;
 }
 
-export async function savePresupuestoProyectoAction(cotizacionId: string, valor: number): Promise<number> {
-    const { supabase, user } = await financeClient();
-    if (!/^[0-9a-f-]{36}$/i.test(cotizacionId) || !Number.isFinite(valor) || valor < 0)
+export async function savePresupuestoProyectoAction(cotizacionId:string, valor:number):Promise<number> {
+    await financeUser();
+    if (!/^[a-f0-9-]{36}$/i.test(cotizacionId) || !Number.isFinite(valor) || valor < 0 || valor > 1e15)
         throw new Error("Oferta o presupuesto inválido.");
-    const { error } = await supabase.from("presupuestos_proyecto")
-        .upsert({ cotizacion_id: cotizacionId, valor_presupuestado: Math.round(valor*100)/100,
-            actualizado_por: user.id, updated_at: new Date().toISOString() }, { onConflict: "cotizacion_id" });
-    if (error) {
-        if (error.code === "42P01" || error.code === "PGRST205")
-            throw new Error("Falta aplicar la migración de presupuestos de proyecto.");
-        throw new Error("No se pudo guardar el presupuesto. Verifica tus permisos.");
-    }
+    const amount = Math.round(valor * 100) / 100;
+    const admin = adminClient();
+    const {data:current,error:readError} = await admin.from("cotizaciones")
+        .select("id,opciones_pdf,updated_at").eq("id",cotizacionId).single();
+    if(readError || !current) throw new Error("No se encontró la oferta.");
+    const previous = current.opciones_pdf && typeof current.opciones_pdf === "object" && !Array.isArray(current.opciones_pdf)
+        ? current.opciones_pdf : {};
+    // Comprobación optimista: no sobreescribir modificaciones simultáneas a la oferta.
+    const {data:updated,error} = await admin.from("cotizaciones")
+        .update({opciones_pdf:{...previous,[BUDGET_FIELD]:amount}})
+        .eq("id",cotizacionId).eq("updated_at",current.updated_at)
+        .select("id").maybeSingle();
+    if(error || !updated) throw new Error("La oferta cambió mientras guardabas el presupuesto. Actualiza y vuelve a intentarlo.");
     revalidatePath("/dashboard/sistema/financiera");
-    return Math.round(valor*100)/100;
+    return amount;
 }
