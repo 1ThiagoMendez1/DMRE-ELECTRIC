@@ -619,7 +619,8 @@ export default function FinancieraPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <Table>
+                            <div className="w-full overflow-x-auto rounded-lg border">
+                            <Table className="min-w-[1100px]">
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Fecha</TableHead>
@@ -630,6 +631,7 @@ export default function FinancieraPage() {
                                         <TableHead>Concepto</TableHead>
                                         <TableHead>Cuenta</TableHead>
                                         <TableHead className="text-right">IVA</TableHead>
+                                        <TableHead className="text-right">Retención</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                         <TableHead className="text-center">Detalle</TableHead>
                                     </TableRow>
@@ -637,7 +639,7 @@ export default function FinancieraPage() {
                                 <TableBody>
                                     {movimientosFiltrados.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={10} className="h-24 text-center">
+                                            <TableCell colSpan={11} className="h-24 text-center">
                                                 No se encontraron movimientos con los filtros seleccionados.
                                             </TableCell>
                                         </TableRow>
@@ -673,6 +675,7 @@ export default function FinancieraPage() {
                                             <TableCell className="text-right text-muted-foreground">
                                                 {formatCurrency(mov.iva || 0)}
                                             </TableCell>
+                                            <TableCell className="text-right text-muted-foreground">{formatCurrency(mov.retencion || 0)}</TableCell>
                                             <TableCell className={cn("text-right font-medium", mov.tipo === 'INGRESO' ? "text-green-600" : "text-red-600")}>
                                                 {mov.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(mov.valor)}
                                             </TableCell>
@@ -687,6 +690,7 @@ export default function FinancieraPage() {
                                     )})}
                                 </TableBody>
                             </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
