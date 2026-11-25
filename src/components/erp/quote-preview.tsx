@@ -220,7 +220,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
 
                     {/* TABLE */}
                     <div className="mb-8 text-black">
-                        <table className="w-full text-sm border-collapse">
+                        <div role="region" aria-label="Tabla con desplazamiento horizontal" tabIndex={0} className="dmre-static-table-wrap dmre-table-viewport w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><table className="min-w-[640px] w-full text-sm border-collapse">
                             <thead>
                                 <tr className="border-b-2 border-black" style={{ backgroundColor: currentStyle.layout === 'official_grid' ? '#fff' : rgbToHex(currentStyle.colors.accent) }}>
                                     <th className="py-2 px-1 text-center w-16 whitespace-nowrap">IT</th>
@@ -302,7 +302,7 @@ export function QuotePreview({ quote, currentStyle, companyInfo, preparedByFallb
                                     })
                                 )}
                             </tbody>
-                        </table>
+                        </table></div>
                     </div>
 
                     {/* TOTALS */}
