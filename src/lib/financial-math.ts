@@ -1,4 +1,3 @@
-
 import { PagoObligacion } from "@/types/sistema";
 
 export interface AmortizationRow {
@@ -8,106 +7,83 @@ export interface AmortizationRow {
     interes: number;
     capital: number;
     saldo: number;
-    isReal: boolean; // true if based on actual payment, false if projected
+    isReal: boolean;
+}
+
+const roundCOP = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+/** El sistema guarda la tasa pactada como decimal efectivo anual (0.15 = 15% E.A.). */
+export function annualEffectiveToMonthly(annualEffective: number): number {
+    if (!Number.isFinite(annualEffective) || annualEffective < 0 || annualEffective > 10)
+        throw new Error("Tasa E.A. inválida.");
+    return Math.pow(1 + annualEffective, 1 / 12) - 1;
+}
+
+export function calculateMonthlyQuota(principal: number, annualEffective: number, months: number): number {
+    if (!Number.isFinite(principal) || principal <= 0 || !Number.isInteger(months) || months <= 0)
+        throw new Error("Monto o plazo inválidos.");
+    const monthly = annualEffectiveToMonthly(annualEffective);
+    if (monthly === 0) return roundCOP(principal / months);
+    const factor = Math.pow(1 + monthly, months);
+    return roundCOP(principal * monthly * factor / (factor - 1));
+}
+
+/** Nunca permite amortización negativa ni pagar más capital del pendiente. */
+export function calculatePaymentBreakdown(balance: number, annualEffective: number, amount: number, extraCapital = false) {
+    if (![balance, amount].every(Number.isFinite) || balance < 0 || amount <= 0)
+        throw new Error("Monto del pago o saldo inválido.");
+    if (extraCapital) {
+        if (amount > balance + 0.009) throw new Error("El abono supera el saldo de capital.");
+        return { interes: 0, capital: roundCOP(amount), saldoRestante: roundCOP(Math.max(0, balance - amount)) };
+    }
+    const interest = roundCOP(balance * annualEffectiveToMonthly(annualEffective));
+    if (amount <= interest) throw new Error("El pago no cubre el interés mensual pactado.");
+    const capital = roundCOP(amount - interest);
+    if (capital > balance + 0.009) throw new Error("El pago supera el saldo más los intereses del periodo.");
+    return { interes: interest, capital, saldoRestante: roundCOP(Math.max(0, balance - capital)) };
 }
 
 export function calculateAmortizationSchedule(
     montoOriginal: number,
-    tasaInteresMensual: number, // e.g. 0.02 for 2%
+    tasaEfectivaAnual: number,
     plazoMesesOriginal: number,
     fechaInicio: Date,
-    pagosRealizados: PagoObligacion[] = []
+    pagosRealizados: PagoObligacion[] = [],
+    cuotaPactada?: number,
+    tipoCuota: "FIJA" | "VARIABLE" = "FIJA"
 ): AmortizationRow[] {
     const rows: AmortizationRow[] = [];
-    let currentBalance = montoOriginal;
+    let currentBalance = Math.max(0, montoOriginal);
+    const annualRate = Number.isFinite(tasaEfectivaAnual) ? Math.max(0, tasaEfectivaAnual) : 0;
+    const monthly = annualEffectiveToMonthly(annualRate);
+    const sorted = [...pagosRealizados].sort((a,b)=>new Date(a.fecha).getTime()-new Date(b.fecha).getTime());
+    let projectionDate = new Date(fechaInicio);
 
-    // Convert dates to timestamps for reliable sorting
-    const sortedPagos = [...pagosRealizados].sort((a, b) =>
-        new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
-    );
-
-    // 1. Process Actual History
-    // We map payments to their approximate periods or just list them sequentially?
-    // A robust way for simple loans is: 
-    // - Iterate through sorted payments.
-    // - Each payment reduces the balance at that point in time.
-    // - We create "Real" rows for these.
-
-    let lastPaymentDate = new Date(fechaInicio);
-
-    sortedPagos.forEach((pago, index) => {
-        // Simple sequential indexing for history
+    for (const payment of sorted) {
+        const capital = Number(payment.capital || 0);
+        currentBalance = Math.max(0, Number.isFinite(payment.saldoRestante) ? payment.saldoRestante : currentBalance - capital);
+        projectionDate = new Date(payment.fecha);
         rows.push({
-            periodo: index + 1, // This effectively replaces "Month 1, 2..." with "Payment 1, 2..."
-            fecha: new Date(pago.fecha),
-            cuota: pago.valor,
-            interes: pago.interes || 0,
-            capital: pago.capital || 0,
-            saldo: pago.saldoRestante,
-            isReal: true
+            periodo: rows.length + 1, fecha: new Date(payment.fecha), cuota: Number(payment.valor) || 0,
+            interes: Number(payment.interes) || 0, capital, saldo: currentBalance, isReal: true
         });
-        currentBalance = pago.saldoRestante;
-        lastPaymentDate = new Date(pago.fecha);
-    });
-
-    // 2. Project Future
-    // If balance is still positive, project remaining payments.
-    // We assume the GOAL is to pay off the *remaining* balance.
-    // Question: Do we keep the ORIGINAl quota (which reduces term) or recalculate quota (keep term)?
-    // Standard "Abono a Capital" usually keeps the Quota fixed and reduces the Term.
-
-    /* 
-       Standard Formula for Quota: 
-       A = P * [ r(1+r)^n ] / [ (1+r)^n - 1 ]
-       But here we have a fixed Quota (usually) and want to find 'n' (remaining periods).
-       OR we continue iterating until balance <= 0 using the known 'valorCuota' if available.
-       
-       However, we don't have the original 'valorCuota' passed in explicitly as a param here, 
-       but we can infer it or calculate a "suggested" one if we wanted to stick to original term.
-       
-       Let's assume the user wants to see what happens if they keep paying the *original* expected quota.
-       We need to calculate what that original quota was to project it.
-    */
-
-    const calculatedOriginalQuota = montoOriginal * (
-        (tasaInteresMensual * Math.pow(1 + tasaInteresMensual, plazoMesesOriginal)) /
-        (Math.pow(1 + tasaInteresMensual, plazoMesesOriginal) - 1)
-    );
-
-    let projectionDate = new Date(lastPaymentDate);
-    let projectedPeriod = rows.length + 1;
-
-    // Safety break to prevent infinite loops
-    const MAX_PERIODS = 360;
-
-    while (currentBalance > 100 && projectedPeriod <= MAX_PERIODS) {
-        // Advance 1 month
-        projectionDate.setMonth(projectionDate.getMonth() + 1);
-
-        const interes = currentBalance * tasaInteresMensual;
-        let cuota = calculatedOriginalQuota;
-
-        // Adjust final quota if balance is small
-        if (currentBalance + interes < cuota) {
-            cuota = currentBalance + interes;
-        }
-
-        const capital = cuota - interes;
-        const newBalance = currentBalance - capital;
-
-        rows.push({
-            periodo: projectedPeriod,
-            fecha: new Date(projectionDate),
-            cuota: cuota,
-            interes: interes,
-            capital: capital,
-            saldo: newBalance > 0 ? newBalance : 0,
-            isReal: false
-        });
-
-        currentBalance = newBalance;
-        projectedPeriod++;
     }
+    if (currentBalance <= 0.009 || !plazoMesesOriginal) return rows;
 
+    const defaultQuota = calculateMonthlyQuota(montoOriginal, annualRate, plazoMesesOriginal);
+    let quota = cuotaPactada && cuotaPactada > 0 ? cuotaPactada : defaultQuota;
+    const periodsLeft = Math.max(1, plazoMesesOriginal - rows.length);
+
+    for (let index = 0; index < Math.min(360, periodsLeft + (tipoCuota === "FIJA" ? 120 : 0)) && currentBalance > 0.009; index++) {
+        projectionDate = new Date(projectionDate.getFullYear(), projectionDate.getMonth() + 1, Math.min(projectionDate.getDate(), 28));
+        const interes = roundCOP(currentBalance * monthly);
+        if (tipoCuota === "VARIABLE") quota = calculateMonthlyQuota(currentBalance, annualRate, Math.max(1, periodsLeft - index));
+        // Una cuota pactada menor al interés no amortiza. Dejar constancia sin simular capital negativo.
+        if (quota <= interes) break;
+        const cuota = Math.min(quota, roundCOP(currentBalance + interes));
+        const capital = roundCOP(Math.max(0, cuota - interes));
+        currentBalance = roundCOP(Math.max(0, currentBalance - capital));
+        rows.push({ periodo: rows.length + 1, fecha: new Date(projectionDate), cuota, interes, capital, saldo: currentBalance, isReal: false });
+    }
     return rows;
 }
