@@ -76,6 +76,7 @@ import { generateExcelReport } from "@/lib/excel-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useErp } from "@/components/providers/erp-provider";
 import { formatCurrency, cn } from "@/lib/utils";
+import { FINANCE_CATEGORIES, financeCategoryLabel } from "@/lib/categorias-financieras";
 import { CuentaBancaria, MovimientoFinanciero, ObligacionFinanciera } from "@/types/sistema";
 
 export default function FinancieraPage() {
@@ -593,14 +594,7 @@ export default function FinancieraPage() {
                                         onChange={(e) => setFilterCategoria(e.target.value)}
                                     >
                                         <option value="TODOS">Todas</option>
-                                        <option value="VENTAS">Ventas</option>
-                                        <option value="NOMINA">Nómina</option>
-                                        <option value="PROVEEDORES">Proveedores</option>
-                                        <option value="SUMINISTRO">Suministro</option>
-                                        <option value="INSTALACION">Instalación</option>
-                                        <option value="SERVICIOS">Servicios</option>
-                                        <option value="IMPUESTOS">Impuestos</option>
-                                        <option value="OTROS">Otros</option>
+                                        {FINANCE_CATEGORIES.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-1">
@@ -655,7 +649,7 @@ export default function FinancieraPage() {
                                                     {mov.tipo}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="capitalize">{mov.categoria?.toLowerCase() || 'N/A'}</TableCell>
+                                            <TableCell className="capitalize">{financeCategoryLabel(mov.categoria)}</TableCell>
                                             <TableCell className="max-w-[150px] md:max-w-[200px]">
                                                 <div className="flex flex-col overflow-hidden">
                                                     <span className="text-sm truncate" title={mov.tercero || 'N/A'}>{mov.tercero || 'Sin tercero'}</span>
