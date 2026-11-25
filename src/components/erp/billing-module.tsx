@@ -146,8 +146,8 @@ export function BillingModule() {
     }), { facturado: 0, retenciones: 0, pendiente: 0 }), [filteredFacturas]);
 
     // Handlers
-    const handleCreateInvoice = (newInvoice: Factura) => {
-        addFactura(newInvoice);
+    const handleCreateInvoice = async (newInvoice: Factura) => {
+        await addFactura(newInvoice);
         toast({ title: "Factura Creada", description: `Factura ${newInvoice.numero || newInvoice.id} creada correctamente.` });
     };
 
