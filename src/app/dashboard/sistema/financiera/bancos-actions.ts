@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { CuentaBancaria, MovimientoFinanciero } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
+import { FINANCE_DB_CATEGORIES } from "@/lib/categorias-financieras";
 
 // =============================================
 // CUENTAS BANCARIAS
@@ -104,6 +105,7 @@ function parseConceptoMetadata(rawConcepto: string = "") {
     let nit: string | undefined = undefined;
     let iva: number | undefined = undefined;
     let retencion: number | undefined = undefined;
+    let categoriaPersonalizada: string | undefined = undefined;
 
     const idMatch = cleanConcepto.match(/\(ID:\s*([^)]+)\)/i) || cleanConcepto.match(/\(NIT:\s*([^)]+)\)/i);
     if (idMatch) {
@@ -124,19 +126,24 @@ function parseConceptoMetadata(rawConcepto: string = "") {
         if (Number.isFinite(parsed)) retencion = parsed;
         cleanConcepto = cleanConcepto.replace(retMatch[0], "").trim();
     }
+    const catMatch = cleanConcepto.match(/\(CAT:\s*([A-Z_]+)\)/i);
+    if (catMatch) {
+        categoriaPersonalizada = catMatch[1].toUpperCase();
+        cleanConcepto = cleanConcepto.replace(catMatch[0], "").trim();
+    }
     cleanConcepto = cleanConcepto.replace(/\s+/g, " ").trim();
 
-    return { cleanConcepto, nit, iva, retencion };
+    return { cleanConcepto, nit, iva, retencion, categoriaPersonalizada };
 }
 
 function mapMovimientoToUI(db: any): MovimientoFinanciero {
-    const { cleanConcepto, nit, iva: parsedIva, retencion } = parseConceptoMetadata(db.concepto);
+    const { cleanConcepto, nit, iva: parsedIva, retencion, categoriaPersonalizada } = parseConceptoMetadata(db.concepto);
 
     return {
         id: db.id,
         fecha: new Date(db.fecha),
         tipo: db.tipo,
-        categoria: db.categoria || "OTROS",
+        categoria: categoriaPersonalizada || db.categoria || "OTROS",
         concepto: cleanConcepto || db.concepto,
         descripcion: db.descripcion,
         valor: Number(db.valor) || 0,
@@ -169,6 +176,7 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
         .replace(/\(NIT:\s*[^)]+\)/gi, "")
         .replace(/\(IVA:\s*[^)]+\)/gi, "")
         .replace(/\(RET:\s*[^)]+\)/gi, "")
+        .replace(/\(CAT:\s*[^)]+\)/gi, "")
         .replace(/\s+/g, " ")
         .trim();
 
@@ -185,10 +193,12 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
         conceptoFinal += ` (RET: ${ret.toFixed(2)})`;
     }
 
+    if (ui.categoria && !FINANCE_DB_CATEGORIES.has(ui.categoria)) conceptoFinal += ` (CAT: ${ui.categoria})`;
+
     const payload: any = {
         fecha: ui.fecha ? (ui.fecha instanceof Date ? ui.fecha.toISOString() : ui.fecha) : undefined,
         tipo: ui.tipo,
-        categoria: ui.categoria,
+        categoria: ui.categoria && FINANCE_DB_CATEGORIES.has(ui.categoria) ? ui.categoria : "OTROS",
         concepto: conceptoFinal,
         descripcion: ui.descripcion,
         valor: ui.valor,
