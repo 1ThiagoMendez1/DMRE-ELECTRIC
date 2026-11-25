@@ -34,6 +34,7 @@ import { Plus, FileText, Upload, Loader2, X, ExternalLink, Eye } from "lucide-re
 import { formatCurrency } from "@/lib/utils";
 import { CuentaBancaria, TipoMovimiento, CategoriaMovimiento, Cotizacion, ObligacionFinanciera, MovimientoFinanciero } from "@/types/sistema";
 import { createClient } from "@/utils/supabase/client";
+import { useErp } from "@/components/providers/erp-provider";
 
 const formSchema = z.object({
     tipo: z.enum(["INGRESO", "EGRESO", "TRANSFERENCIA"] as const),
@@ -45,6 +46,7 @@ const formSchema = z.object({
     concepto: z.string().min(3, "Concepto requerido"),
     valor: z.coerce.number().min(1, "Valor debe ser mayor a 0"),
     iva: z.coerce.number().optional().default(0),
+    retencion: z.coerce.number().min(0, "La retención debe ser positiva.").optional().default(0),
     fecha: z.string().optional(),
     cuotas: z.coerce.number().optional(),
     cuotaActual: z.coerce.number().optional(),
@@ -94,7 +96,9 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
     const [open, setOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedFileName, setUploadedFileName] = useState<string>("");
+    const [retencionPct, setRetencionPct] = useState("");
     const supabase = createClient();
+    const { clientes, proveedores, empleados } = useErp();
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -104,6 +108,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
             concepto: "",
             valor: 0,
             iva: 0,
+            retencion: 0,
             fecha: new Date().toISOString().split('T')[0],
             tercero: "",
             identificacion: "",
@@ -120,6 +125,13 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
     const [providersList, setProvidersList] = useState<{id: string, nombre: string, identificacion: string}[]>([]);
     const [employeesList, setEmployeesList] = useState<{id: string, nombre: string, salario: number, identificacion: string}[]>([]);
     const [loadingTerceros, setLoadingTerceros] = useState(false);
+
+    const contactos = [
+        ...clientes.map(c => ({ nombre: c.nombre, identificacion: c.documento, origen: "Cliente" })),
+        ...proveedores.map(p => ({ nombre: p.nombre, identificacion: p.nit || "", origen: "Proveedor" })),
+        ...empleados.map(e => ({ nombre: e.nombreCompleto, identificacion: e.cedula || "", origen: "Empleado", salario: e.salarioBase })),
+        ...movimientos.filter(m=>!!m.tercero).map(m=>({ nombre: m.tercero || "", identificacion: m.identificacion || "", origen: "Tercero" }))
+    ].filter((contact, index, list)=>list.findIndex(other=>other.nombre.toLowerCase()===contact.nombre.toLowerCase())===index);
 
     const watchCategoria = form.watch("categoria");
     const watchCotizacionId = form.watch("cotizacionId");
@@ -283,6 +295,7 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                 concepto: values.concepto,
                 valor: values.valor,
                 iva: values.iva,
+                retencion: values.retencion,
                 cuotas: values.cuotas,
                 cuotaActual: values.cuotaActual,
                 cotizacionId: values.cotizacionId,
@@ -442,111 +455,31 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                 />
 
 
-                                {form.watch("categoria") === "NOMINA" ? (
-                                    <FormField
-                                        control={form.control}
-                                        name="tercero"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Empleado (Tercero)</FormLabel>
-                                                <Select 
-                                                    onValueChange={(val) => {
-                                                        field.onChange(val);
-                                                        const emp = employeesList.find(e => e.nombre === val) || assignedEmployees.find(e => e.nombre === val);
-                                                        if (emp) {
-                                                            if ('salario' in emp) {
-                                                                form.setValue("valor", emp.salario);
-                                                                form.setValue("iva", 0);
-                                                            }
-                                                            if ('identificacion' in emp && emp.identificacion) {
-                                                                form.setValue("identificacion", String(emp.identificacion));
-                                                            }
-                                                            // Opcionalmente pre-llenar concepto si está vacío
-                                                            if (!form.getValues("concepto")) {
-                                                                form.setValue("concepto", `Pago Nómina - ${emp.nombre}`);
-                                                            }
+                                <FormField
+                                    control={form.control}
+                                    name="tercero"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Tercero (empleado, cliente, proveedor o beneficiario)</FormLabel>
+                                            <FormControl>
+                                                <Input list="dmre-contactos" autoComplete="off" placeholder="Empieza a escribir el nombre..." {...field}
+                                                    onChange={e => {
+                                                        const name = e.target.value;
+                                                        field.onChange(name);
+                                                        const match = contactos.find(c=>c.nombre.toLocaleLowerCase("es-CO")===name.toLocaleLowerCase("es-CO"));
+                                                        if (match) {
+                                                            form.setValue("identificacion", match.identificacion || "");
+                                                            if ("salario" in match && form.getValues("categoria") === "NOMINA" && Number(match.salario) > 0)
+                                                                form.setValue("valor", Number(match.salario));
                                                         }
-                                                    }} 
-                                                    value={field.value}
-                                                >
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder={
-                                                                loadingEmployees || loadingTerceros ? "Cargando..." : "Seleccione empleado"
-                                                            } />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        {employeesList.length === 0 && !loadingTerceros ? (
-                                                            <SelectItem value="none_disabled" disabled>No hay empleados disponibles</SelectItem>
-                                                        ) : (
-                                                            employeesList.map(e => (
-                                                                <SelectItem key={e.id} value={e.nombre}>
-                                                                    {e.nombre} - {formatCurrency(e.salario)}
-                                                                </SelectItem>
-                                                            ))
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                ) : form.watch("categoria") === "PROVEEDORES" ? (
-                                    <FormField
-                                        control={form.control}
-                                        name="tercero"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Proveedor (Tercero)</FormLabel>
-                                                <Select 
-                                                    onValueChange={(val) => {
-                                                        field.onChange(val);
-                                                        const prov = providersList.find(p => p.nombre === val);
-                                                        if (prov && prov.identificacion) {
-                                                            form.setValue("identificacion", prov.identificacion);
-                                                        }
-                                                    }} 
-                                                    value={field.value}
-                                                >
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder={
-                                                                loadingTerceros ? "Cargando..." : "Seleccione proveedor"
-                                                            } />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        {providersList.length === 0 && !loadingTerceros ? (
-                                                            <SelectItem value="none_disabled" disabled>No hay proveedores</SelectItem>
-                                                        ) : (
-                                                            providersList.map(p => (
-                                                                <SelectItem key={p.id} value={p.nombre}>
-                                                                    {p.nombre}
-                                                                </SelectItem>
-                                                            ))
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                ) : (
-                                    <FormField
-                                        control={form.control}
-                                        name="tercero"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Tercero (Beneficiario/Pagador)</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="Nombre del tercero" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                )}
+                                                    }}/>
+                                            </FormControl>
+                                            <datalist id="dmre-contactos">{contactos.map(c=><option key={c.nombre} value={c.nombre} label={c.origen} />)}</datalist>
+                                            <p className="text-[11px] text-muted-foreground">Selecciona una sugerencia para completar identificación o escribe un nombre nuevo.</p>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
                                 <FormField
                                     control={form.control}
@@ -619,6 +552,8 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                                     const cat = form.getValues("categoria");
                                                     form.setValue("iva", tipo === "TRANSFERENCIA" || cat === "NOMINA"
                                                         ? 0 : Number((num * 0.19).toFixed(2)), { shouldValidate: true });
+                                                    if (Number(retencionPct) > 0)
+                                                        form.setValue("retencion", Number((num * Number(retencionPct) / 100).toFixed(2)), { shouldValidate: true });
                                                 }}
                                                 className="font-medium"
                                             />
@@ -675,6 +610,26 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                                 )}
                             />
                         </div>
+
+                        {form.watch("tipo") !== "TRANSFERENCIA" && (
+                            <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                                <p className="text-sm font-semibold">Retención aplicada</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="ret-porcentaje">Porcentaje (%)</Label>
+                                        <Input id="ret-porcentaje" type="number" min="0" max="100" step="0.0001" value={retencionPct} placeholder="Ej. 2.5"
+                                            onChange={e=>{
+                                                const pct = e.target.value;setRetencionPct(pct);
+                                                form.setValue("retencion", Number(((Number(form.getValues("valor"))||0)*Number(pct)/100).toFixed(2)), { shouldValidate: true });
+                                            }} />
+                                    </div>
+                                    <FormField control={form.control} name="retencion" render={({field})=>(
+                                        <FormItem><FormLabel>Valor retenido (COP)</FormLabel><FormControl><Input type="number" min="0" step="0.01" value={Number(field.value) || 0} onChange={e=>{setRetencionPct("");field.onChange(e.target.value);}} /></FormControl><FormMessage /></FormItem>
+                                    )}/>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">Se registra en el reporte contable. El movimiento bancario conserva el valor efectivo ingresado.</p>
+                            </div>
+                        )}
 
                         {Number(form.watch("valor") || 0) > 0 && (
                             <div className="flex items-center justify-between px-3 py-2 bg-primary/5 rounded-md border border-primary/15 text-xs">
