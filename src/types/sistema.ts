@@ -280,7 +280,8 @@ export interface MovimientoFinanciero {
     concepto?: string;
     descripcion?: string;
     valor: number;
-    iva?: number; // Add iva field
+    iva?: number; // IVA contable del movimiento
+    retencion?: number; // Retención aplicada al movimiento, en COP
     referencia?: string; // Add referencia field
     esSimple?: boolean;
     // Foreign Keys
@@ -316,6 +317,8 @@ export interface ObligacionFinanciera {
     fechaInicio: Date;
     fechaFin?: Date;
     valorCuota: number;
+    tipoCuota?: 'FIJA' | 'VARIABLE';
+    soporteUrl?: string; // Ruta privada del soporte contractual
     cuotasPagadas?: number;
     saldoCapital: number;
     estado?: EstadoObligacion;
