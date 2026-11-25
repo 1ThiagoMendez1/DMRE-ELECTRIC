@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
     // Las fotos de perfil se envían como Server Actions (límite verificado en el servidor).
-    serverActions: { bodySizeLimit: '4mb' },
+    serverActions: { bodySizeLimit: '12mb' },
   },
 };
 
