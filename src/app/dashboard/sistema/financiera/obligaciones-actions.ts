@@ -61,7 +61,7 @@ function mapObligacionToUI(db: any): ObligacionFinanciera {
             interes: Number(p.interes),
             capital: Number(p.capital),
             saldoRestante: Number(p.saldo_restante),
-            comprobanteUrl: p.comprobante_url
+            comprobanteUrl: p.comprobante_url || (typeof p.nota === "string" && p.nota.startsWith("DMRE_SOPORTE:") ? p.nota.slice("DMRE_SOPORTE:".length) : undefined)
         })) : []
     };
 }
@@ -168,7 +168,7 @@ export async function registrarPagoObligacionAction(pago: {
             interes: pago.interes,
             capital: pago.capital,
             saldo_restante: pago.saldoRestante,
-            comprobante_url: pago.comprobanteUrl
+            nota: pago.comprobanteUrl ? `DMRE_SOPORTE:${pago.comprobanteUrl}` : null
         });
 
     if (payError) throw new Error("Error registrando pago: " + payError.message);
@@ -216,7 +216,7 @@ export async function registrarPagoObligacionAction(pago: {
             interes: Number(p.interes),
             capital: Number(p.capital),
             saldoRestante: Number(p.saldo_restante),
-            comprobanteUrl: p.comprobante_url
+            comprobanteUrl: p.comprobante_url || (typeof p.nota === "string" && p.nota.startsWith("DMRE_SOPORTE:") ? p.nota.slice("DMRE_SOPORTE:".length) : undefined)
         })) : []
     };
 }
