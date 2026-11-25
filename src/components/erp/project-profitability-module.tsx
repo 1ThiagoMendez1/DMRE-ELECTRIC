@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { getPresupuestosProyectoAction, savePresupuestoProyectoAction } from "@/app/dashboard/sistema/financiera/presupuestos-actions";
 import { 
     Card, 
     CardContent, 
@@ -68,6 +72,38 @@ export function ProjectProfitabilityModule() {
     const { cotizaciones, movimientosFinancieros, comprasFinanciera } = useErp();
     const [selectedCotizacionId, setSelectedCotizacionId] = useState<string>("");
     const [open, setOpen] = useState<boolean>(false);
+    const [presupuestos, setPresupuestos] = useState<Record<string, number>>({});
+    const [presupuestoInput, setPresupuestoInput] = useState("");
+    const [savingBudget, setSavingBudget] = useState(false);
+    const [budgetError, setBudgetError] = useState("");
+    const { toast } = useToast();
+    useEffect(() => {
+        let active = true;
+        getPresupuestosProyectoAction().then(result => {
+            if (active) { setPresupuestos(result); setBudgetError(""); }
+        }).catch(error => {
+            if (active) setBudgetError(error instanceof Error ? error.message : "No se pudo consultar presupuestos.");
+        });
+        return () => { active = false; };
+    }, []);
+    useEffect(() => {
+        setPresupuestoInput(selectedCotizacionId in presupuestos ? String(presupuestos[selectedCotizacionId]) : "");
+    }, [selectedCotizacionId, presupuestos]);
+    const guardarPresupuesto = async () => {
+        const monto = Number(presupuestoInput);
+        if (!selectedCotizacionId || presupuestoInput.trim() === "" || !Number.isFinite(monto) || monto < 0) {
+            toast({ variant: "destructive", title: "Presupuesto inválido", description: "Introduce un valor válido en COP." }); return;
+        }
+        setSavingBudget(true);
+        try {
+            const saved = await savePresupuestoProyectoAction(selectedCotizacionId, monto);
+            setPresupuestos(prev => ({ ...prev, [selectedCotizacionId]: saved }));
+            setBudgetError("");
+            toast({ title: "Presupuesto guardado", description: "El importe quedó asociado exclusivamente a esta oferta." });
+        } catch (error) {
+            setBudgetError(error instanceof Error ? error.message : "No se pudo guardar el presupuesto.");
+        } finally { setSavingBudget(false); }
+    };
 
     // Get only approved or in-progress quotes
     const activeQuotes = useMemo(() => 
@@ -100,7 +136,8 @@ export function ProjectProfitabilityModule() {
             .reduce((sum, c) => sum + c.valorFactura, 0);
 
         const totalGastos = totalEgresosMov + totalCompras;
-        const budget = selectedQuote.total;
+        const budget = presupuestos[selectedQuote.id] ?? selectedQuote.total;
+        // Hasta definir el presupuesto propio, usar el precio ofertado solo como referencia.
         const margin = budget - totalGastos;
         const profitability = budget > 0 ? (margin / budget) * 100 : 0;
         const consumptionPercent = budget > 0 ? (totalGastos / budget) * 100 : 0;
@@ -152,7 +189,7 @@ export function ProjectProfitabilityModule() {
             linkedMovimientos,
             linkedCompras
         };
-    }, [selectedQuote, movimientosFinancieros, comprasFinanciera]);
+    }, [selectedQuote, movimientosFinancieros, comprasFinanciera, presupuestos]);
 
     return (
         <div className="space-y-6">
@@ -246,6 +283,35 @@ export function ProjectProfitabilityModule() {
                 </div>
             ) : (
                 <>
+                    <Card className="border-primary/25 bg-primary/[.025]">
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4 text-primary" /> Presupuesto del proyecto</CardTitle>
+                            <CardDescription>Registra un presupuesto independiente del valor de venta de la cotización.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                <div className="flex-1 space-y-1.5">
+                                    <Label htmlFor="proyecto-presupuesto">Presupuesto asignado (COP)</Label>
+                                    <Input id="proyecto-presupuesto" type="number" min="0" step="0.01"
+                                        placeholder="Ingresa presupuesto aprobado" value={presupuestoInput}
+                                        onChange={e=>setPresupuestoInput(e.target.value)} />
+                                </div>
+                                <Button onClick={guardarPresupuesto} disabled={savingBudget || !presupuestoInput.trim()}>
+                                    {savingBudget ? "Guardando..." : "Guardar presupuesto"}
+                                </Button>
+                            </div>
+                            {budgetError && <p role="alert" className="text-sm text-destructive">{budgetError}</p>}
+                            <p className="text-xs text-muted-foreground">
+                                {selectedQuote.id in presupuestos
+                                    ? "Presupuesto independiente registrado. El análisis utiliza este valor."
+                                    : "Aún no hay presupuesto independiente. El análisis usa como referencia provisional el valor de la oferta: " + formatCurrency(selectedQuote.total)}
+                            </p>
+                            <div className="rounded-md border p-3 text-xs text-muted-foreground">
+                                La distribución de gastos de oficina y administración entre ofertas queda pendiente de definir en la reunión solicitada en la revisión (página 10). No se calcula ni asigna automáticamente para evitar inconsistencias contables.
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Key Metrics Cards */}
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 md:grid-cols-4">
                         <Card>
@@ -255,7 +321,7 @@ export function ProjectProfitabilityModule() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{formatCurrency(analytics?.budget || 0)}</div>
-                                <p className="text-xs text-muted-foreground mt-1">Valor total de la oferta aprobada</p>
+                                <p className="text-xs text-muted-foreground mt-1">{selectedQuote.id in presupuestos ? "Presupuesto registrado para esta oferta" : "Referencia provisional: valor de venta"}</p>
                             </CardContent>
                         </Card>
 
