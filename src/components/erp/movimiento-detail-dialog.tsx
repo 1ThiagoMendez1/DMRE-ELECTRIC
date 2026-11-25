@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MovimientoFinanciero, TipoMovimiento, CategoriaMovimiento } from "@/types/sistema";
+import { FINANCE_CATEGORIES } from "@/lib/categorias-financieras";
 import { formatCurrency } from "@/lib/utils";
 import { Pencil, Eye, FileText, ExternalLink, Download, Upload, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -218,15 +219,16 @@ export function MovimientoDetailDialog({ movimiento, movimientos = [], onMovimie
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="NOMINA">Nómina</SelectItem>
-                                <SelectItem value="PROVEEDORES">Proveedores</SelectItem>
-                                <SelectItem value="SUMINISTRO">Suministro</SelectItem>
-                                <SelectItem value="INSTALACION">Instalación</SelectItem>
-                                <SelectItem value="SERVICIOS">Servicios</SelectItem>
-                                <SelectItem value="IMPUESTOS">Impuestos</SelectItem>
-                                <SelectItem value="VENTAS">Ventas</SelectItem>
-                                <SelectItem value="OTROS">Otros</SelectItem>
-                            </SelectContent>
+                                
+                                
+                                
+                                
+                                
+                                
+                                
+                                
+                            {FINANCE_CATEGORIES.map(item=><SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                                </SelectContent>
                         </Select>
                     </div>
 
