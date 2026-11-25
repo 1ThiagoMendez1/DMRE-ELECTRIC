@@ -277,16 +277,17 @@ export default function FinancieraPage() {
     // );
 
     // Calculate totals
-    const totalSaldo = cuentas.reduce((acc, curr) => {
-        if (curr.tipo === 'CREDITO') return acc - curr.saldoActual;
-        return acc + curr.saldoActual;
-    }, 0);
-    const totalIngresos = movimientos
-        .filter(m => m.tipo === 'INGRESO' && !m.esSimple)
-        .reduce((acc, m) => acc + m.valor, 0);
-    const totalEgresos = movimientos
-        .filter(m => m.tipo === 'EGRESO' && !m.esSimple)
-        .reduce((acc, m) => acc + m.valor, 0);
+    const saldoDisponible = cuentas.filter(c => c.tipo !== "CREDITO").reduce((a, c) => a + (Number(c.saldoActual) || 0), 0);
+    const creditoCuentas = cuentas.filter(c => c.tipo === "CREDITO").reduce((a, c) => a + (Number(c.saldoActual) || 0), 0);
+    const obligacionesPendientes = obligaciones.filter(o => o.estado !== "PAGADO" && o.estado !== "CANCELADO")
+        .filter(o => !o.cuentaId || !cuentas.some(c => c.id === o.cuentaId && c.tipo === "CREDITO"))
+        .reduce((a, o) => a + Math.max(0, Number(o.saldoCapital) || 0), 0);
+    const totalPasivos = creditoCuentas + obligacionesPendientes;
+    const totalSaldo = saldoDisponible - totalPasivos;
+    const nowMonth = format(new Date(), "yyyy-MM");
+    const movimientosDelMes = movimientos.filter(m => format(fechaContable(m.fecha), "yyyy-MM") === nowMonth && !m.esSimple);
+    const totalIngresos = movimientosDelMes.filter(m => m.tipo === "INGRESO").reduce((a,m)=>a+(Number(m.valor)||0),0);
+    const totalEgresos = movimientosDelMes.filter(m => m.tipo === "EGRESO").reduce((a,m)=>a+(Number(m.valor)||0),0);
 
 
 
@@ -336,12 +337,7 @@ export default function FinancieraPage() {
                     <h2 className="text-3xl font-bold tracking-tight">Financiera</h2>
                     <p className="text-muted-foreground">Gestión de tesorería, bancos y obligaciones.</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline">
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar
-                    </Button>
-                </div>
+                {/* Exportación general inactiva eliminada; se conservan los reportes específicos. */}
             </div>
 
             <Tabs defaultValue="cuentas" className="space-y-4">
@@ -365,7 +361,7 @@ export default function FinancieraPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{formatCurrency(totalSaldo)}</div>
-                                <p className="text-xs text-muted-foreground">+2.5% vs mes anterior</p>
+                                <p className="text-xs text-muted-foreground">Disponibles menos obligaciones y créditos vigentes</p>
                             </CardContent>
                         </Card>
                         <Card>
@@ -495,15 +491,15 @@ export default function FinancieraPage() {
                                     Pasivos / Crédito
                                 </div>
                                 <div className="text-xl font-bold text-red-600">
-                                    {formatCurrency(cuentas.filter(c => c.tipo === 'CREDITO').reduce((a, c) => a + c.saldoActual, 0))}
+                                    {formatCurrency(totalPasivos)}
                                 </div>
                             </CardContent>
                         </Card>
                         <Card className="border-l-4 border-l-primary bg-primary/5">
                             <CardContent className="p-4">
-                                <div className="text-sm text-muted-foreground">Total Disponible</div>
-                                <div className="text-xl font-bold text-primary">{formatCurrency(totalSaldo)}</div>
-                                <div className="text-[10px] text-muted-foreground">Activos - Pasivos</div>
+                                <div className="text-sm text-muted-foreground">Disponible en bancos y caja</div>
+                                <div className="text-xl font-bold text-primary">{formatCurrency(saldoDisponible)}</div>
+                                <div className="text-[10px] text-muted-foreground">Disponible antes de descontar obligaciones</div>
                             </CardContent>
                         </Card>
                     </div>
