@@ -357,14 +357,16 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
         const reteica = Number(editReteIca);
         const reteiva = Number(editReteIva);
         const totalRetenciones = retefuente + reteica + reteiva;
+        const subtotal = factura.subtotal ?? Math.max(0, factura.valorFacturado - (factura.iva || 0));
+        const totalAjustado = Math.round((subtotal + iva) * 100) / 100;
         if (!editNumero.trim() || !editFechaEmision || !editFechaVencimiento ||
             [iva, retefuente, reteica, reteiva].some(v => !Number.isFinite(v) || v < 0) ||
-            totalRetenciones > factura.valorFacturado) {
+            totalRetenciones > totalAjustado) {
             toast({ variant: "destructive", title: "Revisa los impuestos", description: "Las fechas y el número son obligatorios. Las retenciones deben ser positivas y no exceder el total." });
             return;
         }
         const selectedQuote = cotizaciones.find(q => q.id === editCotizacionId);
-        const neto = Math.max(0, factura.valorFacturado - totalRetenciones);
+        const neto = Math.max(0, totalAjustado - totalRetenciones);
         const paid = Number(factura.valorPagado || 0);
         const newSaldo = Math.max(0, neto - paid);
         setIsSavingDetails(true);
@@ -378,7 +380,8 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                 cotizacionId: selectedQuote?.id,
                 cotizacion: selectedQuote || undefined,
                 trabajoId: selectedQuote?.trabajoId,
-                iva, retencionRenta: retefuente, retencionIca: reteica, retencionIva: reteiva,
+                iva, subtotal, valorFacturado: totalAjustado,
+                retencionRenta: retefuente, retencionIca: reteica, retencionIva: reteiva,
                 saldoPendiente: newSaldo,
                 estado: newSaldo > 0 && factura.estado === "PAGADA" ? "PARCIAL" : factura.estado,
             };
@@ -473,7 +476,7 @@ export function FacturaHistoryDialog({ factura, onFacturaUpdated, cuentas, trigg
                                             <SelectTrigger><SelectValue placeholder="Elige una oferta" /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="MANUAL">Sin vincular / Oficina / Administrativo</SelectItem>
-                                                {[...cotizaciones].sort((a,b)=> (a.tipo==="SIMPLIFICADA"?0:1)-(b.tipo==="SIMPLIFICADA"?0:1) || a.numero.localeCompare(b.numero,"es",{numeric:true})).map(q=>
+                                                {[...cotizaciones].filter(q=>!factura.clienteId || q.clienteId === factura.clienteId).sort((a,b)=> (a.tipo==="SIMPLIFICADA"?0:1)-(b.tipo==="SIMPLIFICADA"?0:1) || a.numero.localeCompare(b.numero,"es",{numeric:true})).map(q=>
                                                     <SelectItem key={q.id} value={q.id}>{q.tipo==="SIMPLIFICADA"?"Simple":"Normal"} · {q.numero} — {q.cliente?.nombre}</SelectItem>
                                                 )}
                                             </SelectContent>
