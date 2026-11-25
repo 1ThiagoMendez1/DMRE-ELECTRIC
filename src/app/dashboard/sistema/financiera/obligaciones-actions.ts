@@ -3,13 +3,39 @@
 import { createClient } from "@/utils/supabase/server";
 import { ObligacionFinanciera } from "@/types/sistema";
 import { revalidatePath } from "next/cache";
+import { calculatePaymentBreakdown } from "@/lib/financial-math";
 
 // =============================================
 // OBLIGACIONES FINANCIERAS
 // =============================================
 
 
+function parseObligationDetails(raw: string | null | undefined) {
+    try {
+        const value = JSON.parse(raw || "");
+        if (value && value._dmreObligacionV1 === true) {
+            return {
+                notes: String(value.notes || ""),
+                tipoCuota: value.tipoCuota === "VARIABLE" ? "VARIABLE" as const : "FIJA" as const,
+                soporteUrl: typeof value.soporteUrl === "string" ? value.soporteUrl : undefined
+            };
+        }
+    } catch { /* Previous notes can be normal text. */ }
+    return { notes: raw || "", tipoCuota: "FIJA" as const, soporteUrl: undefined };
+}
+
+function encodeObligationDetails(ui: Partial<ObligacionFinanciera>) {
+    if (ui.observaciones === undefined && ui.tipoCuota === undefined && ui.soporteUrl === undefined) return undefined;
+    return JSON.stringify({
+        _dmreObligacionV1: true,
+        notes: ui.observaciones || "",
+        tipoCuota: ui.tipoCuota === "VARIABLE" ? "VARIABLE" : "FIJA",
+        soporteUrl: ui.soporteUrl || ""
+    });
+}
+
 function mapObligacionToUI(db: any): ObligacionFinanciera {
+    const details = parseObligationDetails(db.observaciones);
     return {
         id: db.id,
         tipo: db.tipo || "PRESTAMO",
@@ -22,10 +48,12 @@ function mapObligacionToUI(db: any): ObligacionFinanciera {
         fechaFin: db.fecha_fin ? new Date(db.fecha_fin) : undefined,
         valorCuota: Number(db.valor_cuota) || 0,
         cuotasPagadas: db.cuotas_pagadas || 0,
-        saldoCapital: Number(db.saldo_capital) || Number(db.monto_original) || 0,
+        saldoCapital: db.saldo_capital === null || db.saldo_capital === undefined ? Number(db.monto_original || 0) : Number(db.saldo_capital),
         estado: db.estado || "ACTIVO",
         cuentaId: db.cuenta_id,
-        observaciones: db.observaciones,
+        observaciones: details.notes,
+        tipoCuota: details.tipoCuota,
+        soporteUrl: details.soporteUrl,
         pagos: db.obligaciones_pagos ? db.obligaciones_pagos.map((p: any) => ({
             id: p.id,
             fecha: new Date(p.fecha),
@@ -48,7 +76,7 @@ function getSafeMiddayUTC(dateStrOrObj: Date | string | undefined | null): strin
 }
 
 function mapObligacionToDB(ui: Partial<ObligacionFinanciera>) {
-    return {
+    const raw = {
         tipo: ui.tipo,
         entidad: ui.entidad,
         descripcion: ui.descripcion,
@@ -62,8 +90,9 @@ function mapObligacionToDB(ui: Partial<ObligacionFinanciera>) {
         saldo_capital: ui.saldoCapital,
         estado: ui.estado,
         cuenta_id: ui.cuentaId,
-        observaciones: ui.observaciones,
+        observaciones: encodeObligationDetails(ui),
     };
+    return Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== undefined));
 }
 
 export async function getObligacionesFinancierasAction(): Promise<ObligacionFinanciera[]> {
@@ -107,6 +136,7 @@ export async function registrarPagoObligacionAction(pago: {
     capital: number;
     saldoRestante: number;
     cuentaBancariaId?: string; // Optional: to record transaction
+    tipoPago?: "CUOTA" | "ABONO_CAPITAL";
     comprobanteUrl?: string;
 }): Promise<ObligacionFinanciera> {
     const supabase = await createClient();
@@ -115,6 +145,19 @@ export async function registrarPagoObligacionAction(pago: {
         Math.abs(pago.valor - pago.capital - pago.interes) > 0.05) {
         throw new Error("El desglose del pago no coincide con su valor total.");
     }
+    const { data: vigente, error: lecturaError } = await supabase
+        .from("obligaciones_financieras")
+        .select("saldo_capital,monto_original,tasa_interes,estado")
+        .eq("id", pago.obligacionId).single();
+    if (lecturaError || !vigente || vigente.estado === "CANCELADO" || vigente.estado === "PAGADO")
+        throw new Error("La obligación no se encuentra activa.");
+    const saldo = vigente.saldo_capital == null ? Number(vigente.monto_original) : Number(vigente.saldo_capital);
+    const calculado = calculatePaymentBreakdown(saldo, Number(vigente.tasa_interes || 0), pago.valor, pago.tipoPago === "ABONO_CAPITAL");
+    if (Math.abs(calculado.interes - pago.interes) > 0.05 || Math.abs(calculado.capital - pago.capital) > 0.05)
+        throw new Error("El desglose del pago ya no coincide con el saldo actual. Actualice el detalle antes de confirmar.");
+    if (Math.abs(calculado.saldoRestante - pago.saldoRestante) > 0.05)
+        throw new Error("El saldo proyectado no coincide con el crédito.");
+
     // 1. Insert Payment
     const { error: payError } = await supabase
         .from("obligaciones_pagos")
@@ -204,14 +247,12 @@ export async function createObligacionFinancieraAction(obligacion: Omit<Obligaci
             cuenta_id: obligacion.cuentaId
         });
 
-        if (movError) {
-            console.error("Error inserting movement:", movError);
-        }
-
-        await supabase.rpc("update_cuenta_saldo", {
+        if (movError) throw new Error("Obligación creada, pero falló el movimiento del desembolso; concilie antes de repetir.");
+        const { error: balanceError } = await supabase.rpc("update_cuenta_saldo", {
             cuenta_uuid: obligacion.cuentaId,
             delta_valor: obligacion.montoPrestado
         });
+        if (balanceError) throw new Error("Obligación creada, pero no se actualizó la cuenta bancaria; requiere conciliación.");
     }
 
     revalidatePath("/dashboard/sistema/financiera");
