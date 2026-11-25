@@ -95,7 +95,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 shadow-sm transition-colors duration-300">
+        <header className="flex h-14 min-w-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 sm:px-4 shadow-sm transition-colors duration-300">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1 h-8 w-8 hover:bg-accent/50 hover:text-accent-foreground transition-colors" />
             <Separator orientation="vertical" className="mr-2 h-4 mx-2" />
@@ -115,7 +115,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <AccountMenu compact />
           </div>
         </header>
-        <div className="flex-1 p-4 sm:p-6 lg:p-8 pt-6 w-full max-w-full min-w-0">
+        <div className="dmre-page-content flex-1 w-full min-w-0 max-w-full overflow-x-clip px-3 py-4 sm:px-5 sm:py-6 lg:px-8">
           {children}
         </div>
       </SidebarInset>
