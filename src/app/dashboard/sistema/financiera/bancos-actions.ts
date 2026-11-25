@@ -103,6 +103,7 @@ function parseConceptoMetadata(rawConcepto: string = "") {
     let cleanConcepto = rawConcepto || "";
     let nit: string | undefined = undefined;
     let iva: number | undefined = undefined;
+    let retencion: number | undefined = undefined;
 
     const idMatch = cleanConcepto.match(/\(ID:\s*([^)]+)\)/i) || cleanConcepto.match(/\(NIT:\s*([^)]+)\)/i);
     if (idMatch) {
@@ -117,13 +118,19 @@ function parseConceptoMetadata(rawConcepto: string = "") {
         cleanConcepto = cleanConcepto.replace(ivaMatch[0], "").trim();
     }
 
+    const retMatch = cleanConcepto.match(/\(RET:\s*([\d.]+)\)/i);
+    if (retMatch) {
+        const parsed = Number(retMatch[1]);
+        if (Number.isFinite(parsed)) retencion = parsed;
+        cleanConcepto = cleanConcepto.replace(retMatch[0], "").trim();
+    }
     cleanConcepto = cleanConcepto.replace(/\s+/g, " ").trim();
 
-    return { cleanConcepto, nit, iva };
+    return { cleanConcepto, nit, iva, retencion };
 }
 
 function mapMovimientoToUI(db: any): MovimientoFinanciero {
-    const { cleanConcepto, nit, iva: parsedIva } = parseConceptoMetadata(db.concepto);
+    const { cleanConcepto, nit, iva: parsedIva, retencion } = parseConceptoMetadata(db.concepto);
 
     return {
         id: db.id,
@@ -134,6 +141,7 @@ function mapMovimientoToUI(db: any): MovimientoFinanciero {
         descripcion: db.descripcion,
         valor: Number(db.valor) || 0,
         iva: parsedIva !== undefined ? parsedIva : (db.iva !== undefined && db.iva !== null ? Number(db.iva) : 0),
+        retencion: retencion ?? (db.retencion == null ? 0 : Number(db.retencion)),
         tercero: db.tercero,
         identificacion: db.identificacion || nit,
         referencia: db.referencia, // Added
@@ -160,6 +168,7 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
         .replace(/\(ID:\s*[^)]+\)/gi, "")
         .replace(/\(NIT:\s*[^)]+\)/gi, "")
         .replace(/\(IVA:\s*[^)]+\)/gi, "")
+        .replace(/\(RET:\s*[^)]+\)/gi, "")
         .replace(/\s+/g, " ")
         .trim();
 
@@ -168,6 +177,12 @@ function mapMovimientoToDB(ui: Partial<MovimientoFinanciero>) {
     }
     if (ui.iva !== undefined && ui.iva !== null && Number(ui.iva) > 0) {
         conceptoFinal += ` (IVA: ${Number(Number(ui.iva).toFixed(2))})`;
+    }
+
+    if (ui.retencion !== undefined && ui.retencion !== null && Number(ui.retencion) > 0) {
+        const ret = Number(ui.retencion);
+        if (!Number.isFinite(ret) || ret < 0) throw new Error("Retención inválida.");
+        conceptoFinal += ` (RET: ${ret.toFixed(2)})`;
     }
 
     const payload: any = {
