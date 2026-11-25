@@ -113,7 +113,7 @@ export function RolesView() {
                                                     </Badge>
                                                 </h3>
                                                 <div className="border rounded-lg overflow-hidden">
-                                                    <table className="w-full text-sm">
+                                                    <div role="region" aria-label="Tabla con desplazamiento horizontal" tabIndex={0} className="dmre-static-table-wrap dmre-table-viewport w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><table className="min-w-[550px] w-full text-sm">
                                                         <thead className="bg-muted/50 text-left">
                                                             <tr>
                                                                 <th className="p-3 font-medium">Recurso</th>
@@ -160,7 +160,7 @@ export function RolesView() {
                                                                 );
                                                             })}
                                                         </tbody>
-                                                    </table>
+                                                    </table></div>
                                                 </div>
                                             </div>
                                         ))}
