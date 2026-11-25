@@ -79,8 +79,8 @@ interface ErpContextType {
     dashboardError: boolean;
 
     // Factura Actions
-    addFactura: (factura: Factura) => void;
-    updateFactura: (updated: Factura) => void;
+    addFactura: (factura: Factura) => Promise<void>;
+    updateFactura: (updated: Factura) => Promise<void>;
 
     // Cotizacion Actions
     addCotizacion: (cotizacion: Cotizacion) => void;
