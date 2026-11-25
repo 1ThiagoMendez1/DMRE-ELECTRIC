@@ -90,9 +90,10 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
     const approvedSupplierQuotes = cotizacionesProveedor.filter(cp => cp.estado === 'APROBADA');
 
     // Approved client quotes (Offers)
-    const approvedQuotes = cotizaciones.filter(c => 
+    const approvedQuotes = cotizaciones.filter(c =>
         c.estado === 'APROBADA' || c.estado === 'EN_EJECUCION' || c.estado === 'FINALIZADA'
-    );
+    ).sort((a,b) => (a.tipo==="SIMPLIFICADA"?0:1)-(b.tipo==="SIMPLIFICADA"?0:1) ||
+        a.numero.localeCompare(b.numero,"es",{numeric:true}));
 
     const form = useForm<z.infer<typeof compraSchema>>({
         resolver: zodResolver(compraSchema),
@@ -256,7 +257,7 @@ export function CreateCompraDialog({ compra }: CreateCompraDialogProps) {
                                                 <SelectItem value="sin_oferta">Sin Oferta</SelectItem>
                                                 {approvedQuotes.map((q) => (
                                                     <SelectItem key={q.id} value={q.id}>
-                                                        {q.numero} - {q.cliente?.nombre} ({q.descripcionTrabajo})
+                                                        {q.tipo === "SIMPLIFICADA" ? "Simple" : "Normal"} · {q.numero} - {q.cliente?.nombre} ({q.descripcionTrabajo})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
