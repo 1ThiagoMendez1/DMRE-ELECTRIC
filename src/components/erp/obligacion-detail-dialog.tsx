@@ -38,7 +38,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ObligacionFinanciera } from "@/types/sistema";
 import { formatCurrency } from "@/lib/utils";
-import { calculateAmortizationSchedule } from "@/lib/financial-math";
+import { calculateAmortizationSchedule, annualEffectiveToMonthly, calculatePaymentBreakdown } from "@/lib/financial-math";
+import { uploadObligacionSupportAction, getObligacionSupportUrlAction } from "@/app/dashboard/sistema/financiera/obligaciones-documentos-actions";
 
 interface ObligacionDetailDialogProps {
     obligacion: ObligacionFinanciera;
@@ -70,6 +71,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
     // Auto-calculated fields display
     const [calcInteres, setCalcInteres] = useState(0);
     const [calcCapital, setCalcCapital] = useState(0);
+    const [pagoError, setPagoError] = useState("");
 
     // Fetch fresh data when dialog opens
     useEffect(() => {
@@ -82,36 +84,33 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
         }
     }, [open, obligacion]);
 
-    // Recalculate split when Value or Type changes
+    // Desglose con tasa mensual efectiva derivada de la E.A. contractual.
     useEffect(() => {
-        const valor = parseFloat(pagoValor) || 0;
-        if (valor === 0) {
-            setCalcInteres(0);
-            setCalcCapital(0);
-            return;
+        const amount = Number(pagoValor);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            setCalcInteres(0); setCalcCapital(0); setPagoError(""); return;
         }
-
-        if (pagoTipo === 'ABONO_CAPITAL') {
-            // Extra payment reduces capital 100% (assuming interest is paid separately or this is purely extra)
-            // Or typically, user pays interest accrued so far + extra.
-            // Requirement: "Depends on quota... other payment is to capital".
-            // Let's implement: Abono Capital = 100% to Capital.
-            setCalcInteres(0);
-            setCalcCapital(valor);
-        } else {
-            // Standard Quota
-            // Interest = Balance * Rate
-            const rateMonthly = localObligacion.tasaInteres; // e.g. 0.02
-            const interest = localObligacion.saldoCapital * rateMonthly;
-
-            // Capital = Payment - Interest
-            const capital = valor - interest;
-
-            setCalcInteres(interest > 0 ? interest : 0);
-            setCalcCapital(capital);
+        try {
+            const result = calculatePaymentBreakdown(localObligacion.saldoCapital, localObligacion.tasaInteres, amount, pagoTipo === "ABONO_CAPITAL");
+            setCalcInteres(result.interes);setCalcCapital(result.capital);setPagoError("");
+        } catch (error) {
+            setCalcInteres(0);setCalcCapital(0);
+            setPagoError(error instanceof Error ? error.message : "Monto inválido.");
         }
     }, [pagoValor, pagoTipo, localObligacion.saldoCapital, localObligacion.tasaInteres]);
 
+    const openPrivateSupport = async (path?: string) => {
+        if (!path) return;
+        try {
+            if (path.startsWith("https://")) {
+                window.open(path, "_blank", "noopener,noreferrer"); return;
+            }
+            const url = await getObligacionSupportUrlAction(path);
+            window.open(url, "_blank", "noopener,noreferrer");
+        } catch (error) {
+            toast({ variant: "destructive", title: "No se pudo abrir el soporte", description: error instanceof Error ? error.message : "Revisa tus permisos." });
+        }
+    };
 
     const refreshData = async () => {
         setIsLoading(true);
@@ -136,7 +135,9 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
             localObligacion.tasaInteres,
             localObligacion.plazoMeses,
             new Date(localObligacion.fechaInicio),
-            localObligacion.pagos
+            localObligacion.pagos,
+            localObligacion.valorCuota,
+            localObligacion.tipoCuota || "FIJA"
         );
     }, [localObligacion]);
 
@@ -168,34 +169,18 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
             return;
         }
 
-        if (calcCapital < 0 || calcCapital > localObligacion.saldoCapital + 0.01) {
-            toast({ title: "Desglose inválido", description: "El abono al capital no puede ser negativo ni superar el saldo.", variant: "destructive" });
+        if (pagoError || calcCapital <= 0 || calcCapital > localObligacion.saldoCapital + 0.01) {
+            toast({ title: "Desglose inválido", description: pagoError || "El abono al capital debe ser positivo y no superar el saldo.", variant: "destructive" });
             return;
         }
         const nuevoSaldo = localObligacion.saldoCapital - calcCapital;
 
         setIsLoading(true);
         try {
-            let comprobanteUrl = undefined;
+            let comprobanteUrl: string | undefined;
             if (comprobanteFile) {
-                const supabase = createClient();
-                const fileExt = comprobanteFile.name.split('.').pop();
-                const fileName = `obligacion-${localObligacion.id}-${Date.now()}.${fileExt}`;
-                const filePath = `obligaciones/${fileName}`;
-
-                const { error: uploadError } = await supabase.storage
-                    .from("documentos")
-                    .upload(filePath, comprobanteFile);
-
-                if (uploadError) {
-                    throw new Error("Error subiendo el comprobante: " + uploadError.message);
-                }
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from("documentos")
-                    .getPublicUrl(filePath);
-
-                comprobanteUrl = publicUrl;
+                const payload = new FormData(); payload.append("file", comprobanteFile);
+                comprobanteUrl = await uploadObligacionSupportAction(payload);
             }
 
             const updatedObligacion = await registrarPagoObligacionAction({
@@ -206,7 +191,8 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                 capital: calcCapital,
                 saldoRestante: nuevoSaldo > 0 ? nuevoSaldo : 0,
                 cuentaBancariaId: cuentaId || undefined,
-                comprobanteUrl: comprobanteUrl
+                comprobanteUrl: comprobanteUrl,
+                tipoPago: pagoTipo
             });
 
             setLocalObligacion(updatedObligacion);
@@ -406,7 +392,8 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                         <span>Nuevo Saldo:</span>
                                         <span>{formatCurrency(localObligacion.saldoCapital - calcCapital)}</span>
                                     </div>
-                                    <Button className="w-full mt-4" onClick={handleRegistrarPago} disabled={isLoading}>
+                                    {pagoError && <p role="alert" className="text-xs rounded border border-destructive/30 bg-destructive/5 p-2 text-destructive">{pagoError}</p>}
+                                    <Button className="w-full mt-4" onClick={handleRegistrarPago} disabled={isLoading || !!pagoError || !pagoValor}>
                                         {isLoading ? "Procesando..." : "Confirmar Pago"}
                                     </Button>
                                 </div>
