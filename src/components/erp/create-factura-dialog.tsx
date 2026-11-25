@@ -41,9 +41,10 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatCurrency, cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface CreateFacturaDialogProps {
-    onFacturaCreated: (factura: Factura) => void;
+    onFacturaCreated: (factura: Factura) => Promise<void> | void;
     nextId?: string;
     cotizaciones?: Cotizacion[];
 }
@@ -61,6 +62,11 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
     const [estado, setEstado] = useState<"PENDIENTE" | "PARCIAL" | "PAGADA">("PENDIENTE");
     const [archivoUrl, setArchivoUrl] = useState("");
     const [isUploading, setIsUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [reteFuente, setReteFuente] = useState("0");
+    const [reteIca, setReteIca] = useState("0");
+    const [reteIva, setReteIva] = useState("0");
+    const { toast } = useToast();
     
     // Impuestos States
     const [tipoImpuesto, setTipoImpuesto] = useState<"NINGUNO" | "IVA" | "AIU">("NINGUNO");
@@ -112,7 +118,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
     };
 
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!clienteId || !numero || !fechaEmision || !valor) return;
 
         // Validation: Check if value exceeds Cotizacion total
@@ -151,6 +157,11 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
             total = subtotal + calculatedIva;
         }
 
+        const sumRetenciones = Number(reteFuente) + Number(reteIca) + Number(reteIva);
+        if ([reteFuente, reteIca, reteIva].some(v => Number(v) < 0 || !Number.isFinite(Number(v))) || sumRetenciones > total) {
+            toast({ variant: "destructive", title: "Retenciones inválidas", description: "Las retenciones deben ser positivas y no superar la factura." });
+            return;
+        }
         const newFactura: Factura = {
             id: numero,
             numero: numero,
@@ -159,8 +170,8 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
             subtotal: subtotal,
             iva: calculatedIva,
             valorFacturado: total,
-            valorPagado: estado === "PAGADA" ? total : 0,
-            saldoPendiente: estado === "PAGADA" ? 0 : total,
+            valorPagado: estado === "PAGADA" ? Math.max(0, total - sumRetenciones) : 0,
+            saldoPendiente: estado === "PAGADA" ? 0 : Math.max(0, total - sumRetenciones),
             estado: estado,
             cotizacionId: selectedCotizacionId !== "MANUAL" ? selectedCotizacionId : undefined,
             clienteId: clienteId,
@@ -173,14 +184,23 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                 cliente: cliente as Cliente,
             } as any,
             anticipoRecibido: 0,
-            retencionRenta: 0,
-            retencionIca: 0,
-            retencionIva: 0,
+            retencionRenta: Number(reteFuente),
+            retencionIca: Number(reteIca),
+            retencionIva: Number(reteIva),
             archivoUrl: archivoUrl
         };
 
 
-        onFacturaCreated(newFactura);
+        setIsSaving(true);
+        try {
+            await onFacturaCreated(newFactura);
+            toast({ title: "Factura registrada", description: "El impuesto y las retenciones quedaron guardados." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "No se creó la factura", description: error instanceof Error ? error.message : "Revisa los datos." });
+            setIsSaving(false);
+            return;
+        }
+        setIsSaving(false);
         setOpen(false);
         setClienteId("");
         setSelectedCotizacionId("MANUAL");
@@ -196,6 +216,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
         setAiuUtilPct(0);
         setIvaUtilPct(19);
         setIvaGeneralPct(19);
+        setReteFuente("0");setReteIca("0");setReteIva("0");
     };
 
 
@@ -290,7 +311,8 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="MANUAL">-- Sin Oferta Vinculada --</SelectItem>
-                                    {cotizaciones.filter(c => c.clienteId === clienteId).map(c => {
+                                    {cotizaciones.filter(c => c.clienteId === clienteId)
+                                        .sort((a,b) => (a.tipo === "SIMPLIFICADA" ? 0 : 1) - (b.tipo === "SIMPLIFICADA" ? 0 : 1) || a.numero.localeCompare(b.numero, "es", { numeric: true })).map(c => {
                                         const yaFacturado = facturas
                                             .filter(f => f.cotizacionId === c.id)
                                             .reduce((sum, f) => sum + f.valorFacturado, 0);
@@ -458,6 +480,16 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                         </div>
                     </div>
 
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <div><p className="text-sm font-semibold">Retenciones tributarias</p><p className="text-xs text-muted-foreground">Registra los valores en COP según el comprobante. Se descuentan del saldo neto por cobrar.</p></div>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <div><Label htmlFor="fac-retefuente">ReteFuente</Label><Input id="fac-retefuente" type="number" step="0.01" min="0" value={reteFuente} onChange={e=>setReteFuente(e.target.value)} /></div>
+                            <div><Label htmlFor="fac-reteica">ReteICA</Label><Input id="fac-reteica" type="number" step="0.01" min="0" value={reteIca} onChange={e=>setReteIca(e.target.value)} /></div>
+                            <div><Label htmlFor="fac-reteiva">ReteIVA</Label><Input id="fac-reteiva" type="number" step="0.01" min="0" value={reteIva} onChange={e=>setReteIva(e.target.value)} /></div>
+                        </div>
+                        <p className="text-xs font-semibold">Total retenido: {formatCurrency((Number(reteFuente)||0)+(Number(reteIca)||0)+(Number(reteIva)||0))}</p>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                         <Label htmlFor="estado" className="text-right">Estado</Label>
                         <Select value={estado} onValueChange={(v) => setEstado(v as any)}>
@@ -516,7 +548,7 @@ export function CreateFacturaDialog({ onFacturaCreated, nextId, cotizaciones = [
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleSave}>Crear Factura</Button>
+                    <Button onClick={handleSave} disabled={isSaving || isUploading}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Crear Factura</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
