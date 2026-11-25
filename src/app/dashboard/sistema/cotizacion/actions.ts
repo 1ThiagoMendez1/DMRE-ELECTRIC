@@ -321,9 +321,22 @@ export async function updateCotizacionAction(id: string, cotizacion: Partial<Cot
     const supabase = await createClient();
 
     // Fetch current state for history comparison
-    const { data: currentDb } = await supabase.from("cotizaciones").select("estado, progreso").eq("id", id).single();
+    const { data: currentDb } = await supabase.from("cotizaciones")
+        .select("estado, progreso, opciones_pdf").eq("id", id).single();
 
     const dbData = mapToDB(cotizacion);
+    // La edición de PDF no puede borrar ni modificar el presupuesto
+    // guardado por el módulo financiero en este JSONB.
+    const previousOptions = currentDb?.opciones_pdf && typeof currentDb.opciones_pdf === "object"
+        && !Array.isArray(currentDb.opciones_pdf) ? currentDb.opciones_pdf : {};
+    if (cotizacion.opcionesPdf !== undefined) {
+        const requestedOptions = { ...dbData.opciones_pdf };
+        delete requestedOptions.dmrePresupuestoProyectoCOP;
+        dbData.opciones_pdf = { ...previousOptions, ...requestedOptions };
+        if (previousOptions.dmrePresupuestoProyectoCOP !== undefined) {
+            dbData.opciones_pdf.dmrePresupuestoProyectoCOP = previousOptions.dmrePresupuestoProyectoCOP;
+        }
+    }
 
     const { data, error } = await supabase
         .from("cotizaciones")
