@@ -237,7 +237,7 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
                             <div>
                                 <h3 className="font-semibold mb-3">Ítems Cotizados</h3>
                                 <div className="border rounded-lg overflow-hidden">
-                                    <table className="w-full text-sm text-left">
+                                    <div role="region" aria-label="Tabla con desplazamiento horizontal" tabIndex={0} className="dmre-static-table-wrap dmre-table-viewport w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><table className="min-w-[460px] w-full text-sm text-left">
                                         <thead className="bg-muted/50">
                                             <tr>
                                                 <th className="p-3 font-medium">Descripción</th>
@@ -271,7 +271,7 @@ export function ComercialInteractionPanel({ cotizacionId, onBack }: ComercialInt
                                                 <td className="p-3 text-right font-bold text-primary">${quote.total.toLocaleString()}</td>
                                             </tr>
                                         </tfoot>
-                                    </table>
+                                    </table></div>
                                 </div>
                             </div>
                         </CardContent>
