@@ -90,12 +90,14 @@ interface CreateTransactionDialogProps {
     cuentas: CuentaBancaria[];
     cotizaciones?: Cotizacion[];
     movimientos?: MovimientoFinanciero[];
-    onTransactionCreated: (tx: any) => void;
+    onTransactionCreated: (tx: any) => Promise<void> | void;
 }
 
 export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimientos = [], onTransactionCreated }: CreateTransactionDialogProps) {
     const [open, setOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [errorSave, setErrorSave] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState<string>("");
     const [retencionPct, setRetencionPct] = useState("");
     const supabase = createClient();
@@ -248,7 +250,10 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
         setUploadedFileName('');
     };
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        setSaving(true); setErrorSave("");
+        let partialTransfer = false;
+        try {
         const cuenta = cuentas.find(c => c.id === values.cuentaId);
         const txDate = values.fecha ? new Date(values.fecha + "T12:00:00") : new Date();
 
@@ -280,8 +285,9 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                 comprobanteUrl: values.comprobanteUrl
             };
             
-            onTransactionCreated(egreso);
-            setTimeout(() => onTransactionCreated(ingreso), 300);
+            await onTransactionCreated(egreso);
+            partialTransfer = true;
+            await onTransactionCreated(ingreso);
         } else {
             const emp = employeesList.find(e => e.nombre === values.tercero) || assignedEmployees.find(e => e.nombre === values.tercero);
             const newTx = {
@@ -303,12 +309,23 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                 comprobanteUrl: values.comprobanteUrl,
                 referencia: emp ? `EMP-${emp.id}` : undefined
             };
-            onTransactionCreated(newTx);
+            await onTransactionCreated(newTx);
         }
 
         setOpen(false);
         form.reset();
         setUploadedFileName("");
+        setRetencionPct("");
+        } catch (error) {
+            if (partialTransfer) {
+                setErrorSave("Se registró la salida del traspaso pero falló la entrada. No repita el movimiento: concilie las dos cuentas.");
+                setOpen(false);
+            } else {
+                setErrorSave(error instanceof Error ? error.message : "No se pudo guardar el movimiento.");
+            }
+        } finally {
+            setSaving(false);
+        }
     }
 
     return (
@@ -761,8 +778,9 @@ export function CreateTransactionDialog({ cuentas, cotizaciones = [], movimiento
                             return null;
                         })()}
 
+                        {errorSave && <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">{errorSave}</p>}
                         <DialogFooter>
-                            <Button type="submit">Registrar</Button>
+                            <Button type="submit" disabled={saving || isUploading}>{saving ? "Guardando..." : "Registrar"}</Button>
                         </DialogFooter>
                     </form>
                 </Form>
