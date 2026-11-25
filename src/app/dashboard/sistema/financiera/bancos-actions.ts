@@ -251,6 +251,13 @@ export async function getMovimientosFinancierosAction(): Promise<MovimientoFinan
  */
 export async function getMovimientosFinancierosParaExcelAction(): Promise<MovimientoFinanciero[]> {
     const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error("Sesión no válida para consultar los informes.");
+    const { data: profile, error: accessError } = await supabase.from("profiles")
+        .select("role,sidebar_access,is_active").eq("id", user.id).single();
+    if (accessError || !profile || profile.is_active === false ||
+        (profile.role !== "ADMIN" && !profile.sidebar_access?.includes("financiera")))
+        throw new Error("No tienes permisos para exportar movimientos financieros.");
     const pageSize = 500;
     const all: MovimientoFinanciero[] = [];
     for (let start = 0; start < 50000; start += pageSize) {
