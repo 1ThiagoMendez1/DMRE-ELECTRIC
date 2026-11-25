@@ -488,3 +488,33 @@ body {
   max-width: 100%;
   overflow-x: clip;
 }
+
+
+@media (max-width: 639px) {
+  /* Las matrices de permisos y documentos deben conservar su orden de columnas. */
+  .dmre-static-table-wrap::before {
+    content: "Desliza para ver las demás columnas  ↔";
+    display: block;
+    position: sticky;
+    left: 0;
+    width: max-content;
+    padding: .5rem .65rem;
+    font-size: .7rem;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+  }
+}
+
+@media print {
+  .dmre-static-table-wrap,
+  .dmre-table-viewport {
+    overflow: visible !important;
+    max-width: none !important;
+  }
+  .dmre-static-table-wrap::before {
+    display: none !important;
+  }
+  .dmre-data-table {
+    display: table !important;
+  }
+}
