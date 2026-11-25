@@ -244,6 +244,16 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                     {/* --- DETAILS TAB --- */}
                     <TabsContent value="detalle" className="flex-1 overflow-auto p-4 border rounded-md mt-2">
                         <div className="grid gap-4">
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Tasa pactada E.A.</p><p className="font-bold">{(localObligacion.tasaInteres * 100).toFixed(4)} %</p></div>
+                                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Tasa efectiva mensual</p><p className="font-bold">{(annualEffectiveToMonthly(localObligacion.tasaInteres) * 100).toFixed(4)} %</p></div>
+                                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Cuota pactada</p><p className="font-bold">{formatCurrency(localObligacion.valorCuota)}</p></div>
+                                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Modalidad</p><p className="font-semibold">{localObligacion.tipoCuota === "VARIABLE" ? "Cuota variable" : "Cuota fija"}</p></div>
+                                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Plazo</p><p className="font-semibold">{localObligacion.plazoMeses} meses</p></div>
+                                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Capital pendiente</p><p className="font-bold">{formatCurrency(localObligacion.saldoCapital)}</p></div>
+                            </div>
+                            {localObligacion.observaciones && <div className="rounded-lg border p-3 text-sm"><p className="text-xs text-muted-foreground mb-1">Condiciones adicionales</p>{localObligacion.observaciones}</div>}
+                            {localObligacion.soporteUrl && <Button size="sm" variant="outline" className="w-fit gap-2" onClick={() => void openPrivateSupport(localObligacion.soporteUrl)}><ExternalLink className="h-4 w-4" /> Ver contrato o soporte</Button>}
                             <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
                                 <Label className="text-right font-bold">Entidad</Label>
                                 <Input
@@ -281,7 +291,8 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                 Proyección Futura
                             </div>
                         </div>
-                        <Table>
+                        <div className="overflow-x-auto w-full">
+                        <Table className="min-w-[720px]">
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-[80px]">#</TableHead>
@@ -305,6 +316,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                 ))}
                             </TableBody>
                         </Table>
+                        </div>
                     </TabsContent>
 
                     {/* --- PAYMENTS & HISTORY TAB --- */}
@@ -434,9 +446,7 @@ export function ObligacionDetailDialog({ obligacion, onObligacionUpdated, trigge
                                                 <TableCell className="text-center">
                                                     {pago.comprobanteUrl ? (
                                                         <Button variant="ghost" size="icon" asChild>
-                                                            <a href={pago.comprobanteUrl} target="_blank" rel="noopener noreferrer">
-                                                                <ExternalLink className="h-4 w-4 text-blue-600" />
-                                                            </a>
+                                                            <button type="button" onClick={() => void openPrivateSupport(pago.comprobanteUrl)} title="Ver soporte del pago"><ExternalLink className="h-4 w-4 text-blue-600" /></button>
                                                         </Button>
                                                     ) : '-'}
                                                 </TableCell>
