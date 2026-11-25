@@ -306,8 +306,8 @@ export default function FinancieraPage() {
         toast({ title: "Cuenta actualizada", description: "Los datos de la cuenta han sido guardados." });
     };
 
-    const handleCreateTransaction = (newTransaction: MovimientoFinanciero) => {
-        addMovimientoFinanciero(newTransaction);
+    const handleCreateTransaction = async (newTransaction: MovimientoFinanciero) => {
+        await addMovimientoFinanciero(newTransaction);
         toast({ title: "Transacción registrada", description: "El movimiento ha sido guardado exitosamente." });
     };
 
@@ -325,13 +325,12 @@ export default function FinancieraPage() {
         }
     };
 
-    const handleCreateObligacion = (newObligacion: ObligacionFinanciera) => {
-        addObligacionFinanciera(newObligacion);
-        toast({ title: "Obligación registrada", description: "El crédito ha sido guardado exitosamente." });
+    const handleCreateObligacion = async (newObligacion: ObligacionFinanciera) => {
+        await addObligacionFinanciera(newObligacion);
     };
 
-    const handleUpdateObligacion = (updatedObl: ObligacionFinanciera) => {
-        updateObligacionFinanciera(updatedObl);
+    const handleUpdateObligacion = async (updatedObl: ObligacionFinanciera) => {
+        await updateObligacionFinanciera(updatedObl);
         toast({ title: "Obligación actualizada", description: "Los cambios han sido guardados." });
     };
 
