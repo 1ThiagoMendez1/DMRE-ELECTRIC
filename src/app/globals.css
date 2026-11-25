@@ -185,3 +185,252 @@
     border: none;
   }
 }
+
+/* DMRE Responsive System: large datasets remain usable without page-wide overflow. */
+@layer components {
+  .dmre-page-content,
+  .dmre-page-content > *,
+  [data-sidebar="inset"],
+  .dmre-card,
+  .dmre-card-content {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dmre-table-viewport {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / .45) transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dmre-table-viewport::-webkit-scrollbar,
+  .dmre-tabs-list::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .dmre-table-viewport::-webkit-scrollbar-thumb,
+  .dmre-tabs-list::-webkit-scrollbar-thumb {
+    border-radius: 8px;
+    background: hsl(var(--muted-foreground) / .38);
+  }
+
+  .dmre-data-table {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .dmre-data-table th,
+  .dmre-data-table td {
+    vertical-align: middle;
+  }
+
+  .dmre-dialog-content {
+    min-width: 0;
+    max-width: calc(100dvw - 1rem);
+    max-height: calc(100dvh - 1.5rem);
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .dmre-dialog-content > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dmre-dialog-content input,
+  .dmre-dialog-content select,
+  .dmre-dialog-content textarea {
+    max-width: 100%;
+  }
+
+  .dmre-tabs-list {
+    max-width: 100%;
+    min-width: 0;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 1023px) {
+  .dmre-tabs-list {
+    display: flex !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .dmre-tabs-list > [role="tab"] {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+  }
+
+  /* Contain wide headings and filters without clipping controls. */
+  .dmre-page-content > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 639px) {
+  .dmre-page-content {
+    padding-inline: .75rem;
+  }
+
+  .dmre-card-header {
+    padding: 1rem;
+  }
+
+  .dmre-card-content {
+    padding-inline: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .dmre-dialog-content {
+    width: calc(100dvw - 1rem) !important;
+    max-width: calc(100dvw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+    padding: .875rem !important;
+    border-radius: 1rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .dmre-dialog-content .grid {
+    min-width: 0;
+  }
+
+  .dmre-dialog-content [class*="grid-cols-4"],
+  .dmre-dialog-content [class*="grid-cols-3"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dmre-dialog-content [class*="col-span-3"],
+  .dmre-dialog-content [class*="col-span-2"] {
+    grid-column: 1 / -1;
+  }
+
+  /* A row becomes a labeled, tappable card; no horizontal page scrollbar. */
+  .dmre-data-table[data-mobile-view="cards"] {
+    display: block;
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: auto;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    padding: .25rem 0 .75rem;
+    width: 100%;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border));
+    border-radius: .875rem;
+    background: hsl(var(--card));
+    box-shadow: 0 2px 6px hsl(var(--foreground) / .03);
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 35%) minmax(0, 1fr);
+    align-items: center;
+    gap: .5rem;
+    padding: .7rem .875rem;
+    width: 100%;
+    min-width: 0;
+    max-width: none !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    text-align: start;
+    border-bottom: 1px solid hsl(var(--border) / .6);
+    height: auto;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td:last-child {
+    border-bottom: 0;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td:not([data-mobile-full])::before {
+    content: attr(data-mobile-label);
+    font-size: .68rem;
+    line-height: 1.25;
+    text-transform: uppercase;
+    letter-spacing: .025em;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground));
+    white-space: normal;
+    min-width: 0;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td[data-mobile-full] {
+    display: block;
+    text-align: center;
+    padding: 1.25rem;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td button,
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td a {
+    touch-action: manipulation;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td .truncate {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > th {
+    display: block;
+    padding: .75rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .dmre-data-table[data-mobile-view="cards"] > tbody > tr > td {
+    grid-template-columns: minmax(5rem, 32%) minmax(0, 1fr);
+    font-size: .8125rem;
+    gap: .375rem;
+    padding: .6rem .7rem;
+  }
+
+  .dmre-tabs-list > [role="tab"] {
+    padding-inline: .6rem;
+    font-size: .75rem;
+  }
+}
+
+/* Visible horizontal scroll hint for touch/tablet, hidden for card view. */
+@media (min-width: 640px) and (max-width: 1199px) {
+  .dmre-table-viewport {
+    box-shadow: inset -10px 0 12px -13px hsl(var(--foreground) / .25);
+  }
+}
