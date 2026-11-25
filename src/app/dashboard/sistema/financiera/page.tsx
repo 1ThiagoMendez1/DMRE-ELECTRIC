@@ -97,6 +97,8 @@ export default function FinancieraPage() {
     // Filtros para Movimientos
     const [isExporting, setIsExporting] = useState(false);
     const [filterFecha, setFilterFecha] = useState("");
+    const [filterMes, setFilterMes] = useState(format(new Date(), "yyyy-MM"));
+    const [filterAnio, setFilterAnio] = useState(String(new Date().getFullYear()));
     const [fastDateFilter, setFastDateFilter] = useState("todos"); // dia, mes, año, todos, custom
     const [filterTipo, setFilterTipo] = useState("TODOS");
     const [filterCategoria, setFilterCategoria] = useState("TODOS");
@@ -192,15 +194,13 @@ export default function FinancieraPage() {
         const d = new Date(mov.fecha);
         const localD = fechaContable(d);
         
-        const today = new Date();
-        if (fastDateFilter === 'dia') {
-            if (localD.getDate() !== today.getDate() || localD.getMonth() !== today.getMonth() || localD.getFullYear() !== today.getFullYear()) return false;
-        } else if (fastDateFilter === 'mes') {
-            if (localD.getMonth() !== today.getMonth() || localD.getFullYear() !== today.getFullYear()) return false;
-        } else if (fastDateFilter === 'año') {
-            if (localD.getFullYear() !== today.getFullYear()) return false;
-        } else {
-            if (filterFecha && format(localD, "yyyy-MM-dd") !== filterFecha) return false;
+        const formatted = format(localD, "yyyy-MM-dd");
+        if (fastDateFilter === "dia" || fastDateFilter === "custom") {
+            if (formatted !== (filterFecha || format(new Date(), "yyyy-MM-dd"))) return false;
+        } else if (fastDateFilter === "mes") {
+            if (!formatted.startsWith(filterMes + "-")) return false;
+        } else if (fastDateFilter === "año") {
+            if (!formatted.startsWith(filterAnio + "-")) return false;
         }
 
         if (filterTipo !== "TODOS" && mov.tipo !== filterTipo) return false;
@@ -215,10 +215,14 @@ export default function FinancieraPage() {
     const handleExportExcel = async () => {
         setIsExporting(true);
         try {
+            const periodStart = fastDateFilter === "mes" ? `${filterMes}-01` :
+                fastDateFilter === "año" ? `${filterAnio}-01-01` :
+                fastDateFilter === "dia" || fastDateFilter === "custom" ? (filterFecha || format(new Date(), "yyyy-MM-dd")) : undefined;
             const filterState = {
-                mes: filterFecha ? format(new Date(filterFecha + "T12:00:00"), 'MMMM', { locale: es }) : undefined,
-                ano: filterFecha ? format(new Date(filterFecha + "T12:00:00"), 'yyyy') : undefined,
+                mes: fastDateFilter === "mes" ? format(new Date(filterMes + "-15T12:00:00"), "MMMM", { locale: es }) : undefined,
+                ano: fastDateFilter === "mes" ? filterMes.slice(0, 4) : fastDateFilter === "año" ? filterAnio : undefined,
                 cuentaId: filterCuenta !== "TODOS" ? filterCuenta : undefined,
+                periodStart,
             };
             await generateExcelReport(movimientosFiltrados, filterState, {
                 cuentas,
@@ -537,7 +541,7 @@ export default function FinancieraPage() {
                                         <label className="text-xs font-medium text-muted-foreground">Fecha</label>
                                         <div className="flex bg-muted p-0.5 rounded-md">
                                             <button 
-                                                onClick={() => { setFastDateFilter('dia'); setFilterFecha(''); }} 
+                                                onClick={() => { setFastDateFilter('dia'); setFilterFecha(format(new Date(), "yyyy-MM-dd")); }} 
                                                 className={cn("px-2 py-0.5 text-[10px] rounded-sm transition-all", fastDateFilter === 'dia' ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:bg-background/50")}
                                             >Día</button>
                                             <button 
@@ -563,6 +567,10 @@ export default function FinancieraPage() {
                                         }} 
                                         className="h-8"
                                     />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div><label htmlFor="mov-mes" className="text-[11px] text-muted-foreground">Mes a analizar</label><Input id="mov-mes" type="month" className="h-8" value={filterMes} onChange={e => {setFilterMes(e.target.value);setFastDateFilter("mes");setFilterFecha("");}} /></div>
+                                        <div><label htmlFor="mov-ano" className="text-[11px] text-muted-foreground">Año a analizar</label><Input id="mov-ano" type="number" min="2000" max="2100" step="1" className="h-8" value={filterAnio} onChange={e => {setFilterAnio(e.target.value);setFastDateFilter("año");setFilterFecha("");}} /></div>
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Tipo</label>
