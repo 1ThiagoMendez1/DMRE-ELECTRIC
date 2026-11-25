@@ -8,11 +8,23 @@ export interface ExcelFilterState {
     mes?: string;
     ano?: string;
     cuentaId?: string;
+    periodStart?: string; // YYYY-MM-DD: primer día del periodo solicitado.
 }
 
 export interface ExcelReportOptions {
     cuentas?: CuentaBancaria[];
     allMovimientos?: MovimientoFinanciero[];
+}
+
+function accountingDateKey(value: Date | string): string {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return d.toISOString().slice(0, 10);
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(d);
+    const get = (key: string) => parts.find(p => p.type === key)?.value || "00";
+    return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 // Mantener el día de registro al exportar fechas ISO o timestamps almacenados en UTC.
@@ -80,15 +92,8 @@ export const generateExcelReport = async (
         selectedCuenta = cuentas.find(c => c.id === filters.cuentaId);
     }
 
-    // Si no vino especificado en filtros, verificar si todos los movimientos pertenecen a la misma cuenta
-    if (!selectedCuenta && movimientos.length > 0) {
-        const uniqueCuentaIds = Array.from(new Set(
-            movimientos.map(m => m.cuentaId || (m.cuenta && m.cuenta.id)).filter(Boolean)
-        ));
-        if (uniqueCuentaIds.length === 1) {
-            selectedCuenta = cuentas.find(c => c.id === uniqueCuentaIds[0]) || (movimientos[0].cuenta as CuentaBancaria);
-        }
-    }
+    // Un reporte "Todas" sigue siendo consolidado aunque solo haya una cuenta con movimientos.
+    // La cuenta individual se define únicamente por el filtro explícito del usuario.
 
     // --- Cabeceras de Empresa ---
     
@@ -172,67 +177,31 @@ export const generateExcelReport = async (
     // Ordenar movimientos por fecha ascendente
     const sortedMovimientos = [...movimientos].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 
-    // --- Cálculo del Saldo Inicial / Anterior ---
-    let saldoInicialPeriodo = 0;
-
-    if (selectedCuenta) {
-        const accountId = selectedCuenta.id;
-        const firstMovTime = sortedMovimientos.length > 0 ? new Date(sortedMovimientos[0].fecha).getTime() : Date.now();
-        
-        // Movimientos históricos de esta cuenta
-        const accountMovs = allMovimientos.filter(m => 
-            (m.cuentaId === accountId || (m.cuenta && m.cuenta.id === accountId)) && !m.esSimple
-        );
-        
-        // Movimientos anteriores al inicio del reporte
-        const priorMovs = accountMovs.filter(m => new Date(m.fecha).getTime() < firstMovTime);
-        const priorNet = priorMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
-
-        // Si la cuenta tiene saldoInicial explícito > 0
-        if (selectedCuenta.saldoInicial !== undefined && selectedCuenta.saldoInicial !== null && Number(selectedCuenta.saldoInicial) > 0) {
-            saldoInicialPeriodo = Number(selectedCuenta.saldoInicial) + priorNet;
-        } else {
-            // Reconstruir a partir del saldoActual actual
-            const allNet = accountMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
-            const saldoAlInicio = Number(selectedCuenta.saldoActual || 0) - allNet;
-            saldoInicialPeriodo = saldoAlInicio + priorNet;
-        }
-    } else if (sortedMovimientos.length > 0) {
-        // Reporte consolidado de múltiples cuentas
-        const uniqueCuentaIds = Array.from(new Set(
-            sortedMovimientos.map(m => m.cuentaId || (m.cuenta && m.cuenta.id)).filter(Boolean)
-        ));
-        
-        const firstMovTime = new Date(sortedMovimientos[0].fecha).getTime();
-
-        uniqueCuentaIds.forEach(accId => {
-            const cuentaObj = cuentas.find(c => c.id === accId);
-            if (!cuentaObj) return;
-
-            const accountMovs = allMovimientos.filter(m => 
-                (m.cuentaId === accId || (m.cuenta && m.cuenta.id === accId)) && !m.esSimple
-            );
-            const priorMovs = accountMovs.filter(m => new Date(m.fecha).getTime() < firstMovTime);
-            const priorNet = priorMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
-
-            if (cuentaObj.saldoInicial !== undefined && cuentaObj.saldoInicial !== null && Number(cuentaObj.saldoInicial) > 0) {
-                saldoInicialPeriodo += Number(cuentaObj.saldoInicial) + priorNet;
-            } else {
-                const allNet = accountMovs.reduce((sum, m) => sum + (m.tipo === 'INGRESO' ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
-                const saldoAlInicio = Number(cuentaObj.saldoActual || 0) - allNet;
-                saldoInicialPeriodo += saldoAlInicio + priorNet;
-            }
-        });
+    // Saldo a la apertura del PERIODO, no del primer movimiento visible.
+    // Saldo actual - todos los movimientos desde la fecha de corte permite
+    // reconstruir octubre/noviembre, incluso cuando el periodo no tiene transacciones.
+    const firstVisible = sortedMovimientos.length ? accountingDateKey(sortedMovimientos[0].fecha) : undefined;
+    const startPeriod = filters?.periodStart || firstVisible || accountingDateKey(new Date());
+    const cuentasCalculadas = selectedCuenta ? [selectedCuenta] : cuentas.filter(c => c.tipo !== "CREDITO");
+    const saldoInicialPeriodo = cuentasCalculadas.reduce((total, cuenta) => {
+        const afterNet = allMovimientos
+            .filter(m => !m.esSimple && (m.cuentaId === cuenta.id || m.cuenta?.id === cuenta.id))
+            .filter(m => accountingDateKey(m.fecha) >= startPeriod)
+            .reduce((net, m) => net + (m.tipo === "INGRESO" ? Number(m.valor || 0) : -Number(m.valor || 0)), 0);
+        return total + Number(cuenta.saldoActual || 0) - afterNet;
+    }, 0);
+    if (!cuentasCalculadas.length) {
+        console.warn("El reporte no tiene cuentas bancarias válidas para calcular un saldo de apertura.");
     }
 
     let runningTotal = saldoInicialPeriodo;
     let currentRowIdx = 8;
 
     // Fila de SALDO INICIAL / ANTERIOR (Fila 9)
-    if (sortedMovimientos.length > 0) {
+    if (sortedMovimientos.length > 0 || filters?.periodStart) {
         currentRowIdx++;
         const initialRow = worksheet.addRow({});
-        const firstFechaStr = ledgerDate(sortedMovimientos[0].fecha);
+        const firstFechaStr = startPeriod.split("-").reverse().join("/");
 
         initialRow.getCell('A').value = selectedCuenta 
             ? `SALDO ANTERIOR / INICIAL (${selectedCuenta.nombre})`
@@ -241,9 +210,9 @@ export const generateExcelReport = async (
         initialRow.getCell('B').value = '';
         initialRow.getCell('C').value = firstFechaStr;
         initialRow.getCell('C').alignment = { horizontal: 'center' };
-        initialRow.getCell('D').value = saldoInicialPeriodo;
+        initialRow.getCell('D').value = null; // No presentar el saldo anterior como un ingreso nuevo.
         initialRow.getCell('E').value = null;
-        initialRow.getCell('F').value = { formula: `D${currentRowIdx}-E${currentRowIdx}`, result: saldoInicialPeriodo };
+        initialRow.getCell('F').value = saldoInicialPeriodo;
         initialRow.getCell('F').font = { bold: true };
 
         initialRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
